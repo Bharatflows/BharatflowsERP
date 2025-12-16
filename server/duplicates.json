@@ -1,0 +1,59 @@
+{
+  "users": [
+    {
+      "id": "3f57bdc1-9e36-4484-8a64-90a746c387c6",
+      "email": "authtest@example.com",
+      "password": "$2a$10$zVaOmQgwZmBIa13o8lT9eOQW/O3ULW2/e6coRYy1GYsocJS5hNqwm",
+      "name": "Auth Test User",
+      "phone": "9999999999",
+      "role": "ADMIN",
+      "status": "ACTIVE",
+      "emailVerified": false,
+      "phoneVerified": false,
+      "lastLogin": "2025-12-01T22:50:33.778Z",
+      "createdAt": "2025-12-01T22:20:47.139Z",
+      "updatedAt": "2025-12-01T22:50:33.780Z",
+      "companyId": "69856ddb-b269-4159-8eea-20daaadb85a7",
+      "company": {
+        "id": "69856ddb-b269-4159-8eea-20daaadb85a7",
+        "businessName": "Auth Test Corp",
+        "legalName": null,
+        "gstin": "27AAAAA0000A1Z5",
+        "pan": null,
+        "email": "authtest@example.com",
+        "phone": "9999999999",
+        "address": {
+          "country": "India"
+        },
+        "bankDetails": null,
+        "logo": null,
+        "fiscalYear": null,
+        "plan": "FREE",
+        "features": null,
+        "createdAt": "2025-12-01T22:20:46.936Z",
+        "updatedAt": "2025-12-01T22:20:46.936Z"
+      }
+    }
+  ],
+  "companies": [
+    {
+      "id": "69856ddb-b269-4159-8eea-20daaadb85a7",
+      "businessName": "Auth Test Corp",
+      "legalName": null,
+      "gstin": "27AAAAA0000A1Z5",
+      "pan": null,
+      "email": "authtest@example.com",
+      "phone": "9999999999",
+      "address": {
+        "country": "India"
+      },
+      "bankDetails": null,
+      "logo": null,
+      "fiscalYear": null,
+      "plan": "FREE",
+      "features": null,
+      "createdAt": "2025-12-01T22:20:46.936Z",
+      "updatedAt": "2025-12-01T22:20:46.936Z"
+    }
+  ]
+}

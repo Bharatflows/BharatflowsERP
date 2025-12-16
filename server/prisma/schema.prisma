@@ -1,0 +1,1670 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id                 String              @id @default(uuid())
+  businessName       String
+  legalName          String?
+  gstin              String?             @unique
+  pan                String?
+  email              String?
+  phone              String?
+  address            Json?
+  bankDetails        Json?
+  logo               String?
+  fiscalYear         String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  features           Json?
+  plan               Plan                @default(FREE)
+  approvalWorkflows  ApprovalWorkflow[]
+  auditLogs          AuditLog[]
+  bankAccounts       BankAccount[]
+  categories         Category[]
+  conversations      Conversation[]
+  deliveryChallans   DeliveryChallan[]
+  devices            Device[]
+  eInvoices          EInvoice[]
+  eWaybills          EWaybill[]
+  employees          Employee[]
+  estimates          Estimate[]
+  expenses           Expense[]
+  gstPayments        GSTPayment[]
+  goodsReceivedNotes GoodsReceivedNote[]
+  ipWhitelists       IPWhitelist[]
+  invites            Invite[]
+  invoices           Invoice[]
+  parties            Party[]
+  paymentReminders   PaymentReminder[]
+  products           Product[]
+  purchaseBills      PurchaseBill[]
+  purchaseOrders     PurchaseOrder[]
+  quotations         Quotation[]
+  salesOrders        SalesOrder[]
+  sequences          Sequence[]
+  stockMovements     StockMovement[]
+  transactions       Transaction[]
+  units              Unit[]
+  users              User[]
+  warehouses         Warehouse[]
+  
+  // ERP Module Relations
+  leads              Lead[]
+  activities         Activity[]
+  attendances        Attendance[]
+  leaves             Leave[]
+  salaryStructures   SalaryStructure[]
+  payrollRuns        PayrollRun[]
+  ledgerGroups       LedgerGroup[]
+  ledgers            Ledger[]
+  vouchers           Voucher[]
+  posSessions        POSSession[]
+
+  stockBatches       StockBatch[]
+  creditNotes        CreditNote[]
+  debitNotes         DebitNote[]
+  expenseCategories  ExpenseCategory[]
+}
+
+model ExpenseCategory {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  budget      Decimal  @default(0)
+  color       String   @default("#6b7280")
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Accounting Integration
+  ledgerId    String?
+  ledger      Ledger?  @relation(fields: [ledgerId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model User {
+  id                       String                    @id @default(uuid())
+  email                    String                    @unique
+  password                 String
+  name                     String
+  phone                    String?                   @unique
+  role                     Role                      @default(USER)
+  status                   Status                    @default(ACTIVE)
+  emailVerified            Boolean                   @default(false)
+  phoneVerified            Boolean                   @default(false)
+  lastLogin                DateTime?
+  // Password Reset Fields
+  resetToken               String?
+  resetTokenExpiry         DateTime?
+  // OTP Fields
+  otp                      String?
+  otpExpiry                DateTime?
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  companyId                String
+  moduleAccess             Json?
+  conversationParticipants ConversationParticipant[]
+  devices                  Device[]
+  invitesSent              Invite[]                  @relation("InvitesSent")
+  invoices                 Invoice[]
+  messages                 Message[]
+  messageReads             MessageRead[]
+  company                  Company                   @relation(fields: [companyId], references: [id])
+  posSessions              POSSession[]
+  approvedExpenses         Expense[]                 @relation("ExpenseApprover")
+}
+
+model Product {
+  id                     String                  @id @default(uuid())
+  name                   String
+  code                   String?
+  hsnCode                String?
+  description            String?
+  unit                   String
+  purchasePrice          Decimal                 @default(0)
+  sellingPrice           Decimal                 @default(0)
+  mrp                    Decimal?
+  gstRate                Decimal                 @default(0)
+  currentStock           Int                     @default(0)
+  minStock               Int                     @default(0)
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  companyId              String
+  barcode                String?
+  category               String?
+  location               String?
+  maxStock               Int                     @default(0)
+  reorderLevel           Int                     @default(0)
+  sellWithoutStock       Boolean                 @default(false)
+  taxInclusive           Boolean                 @default(false)
+  trackInventory         Boolean                 @default(true)
+  
+  // New Inventory Features
+  isBatchTracked         Boolean                 @default(false)
+  isSerialTracked        Boolean                 @default(false)
+  batches                StockBatch[]
+  serialNumbers          SerialNumber[]
+  
+  // BOM Relations
+  asFinishedProduct      BillOfMaterial[]        @relation("FinishedProduct")
+  asRawMaterial          BOMItem[]               @relation("RawMaterial")
+
+  deliveryChallanItems   DeliveryChallanItem[]
+  estimateItems          EstimateItem[]
+  goodsReceivedNoteItems GoodsReceivedNoteItem[]
+  invoiceItems           InvoiceItem[]
+  company                Company                 @relation(fields: [companyId], references: [id])
+  purchaseBillItems      PurchaseBillItem[]
+  purchaseOrderItems     PurchaseOrderItem[]
+  quotationItems         QuotationItem[]
+  salesOrderItems        SalesOrderItem[]
+  stockMovements         StockMovement[]
+  creditNoteItems        CreditNoteItem[]
+  debitNoteItems         DebitNoteItem[]
+}
+
+model Party {
+  id                       String                    @id @default(uuid())
+  name                     String
+  type                     String
+  gstin                    String?
+  pan                      String?
+  email                    String?
+  phone                    String?
+  billingAddress           Json?
+  shippingAddress          Json?
+  openingBalance           Decimal                   @default(0)
+  currentBalance           Decimal                   @default(0)
+  isActive                 Boolean                   @default(true)
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  companyId                String
+  msmeType                 String?
+  udyamNumber              String?
+  conversationParticipants ConversationParticipant[]
+  deliveryChallans         DeliveryChallan[]
+  estimates                Estimate[]
+  goodsReceivedNotes       GoodsReceivedNote[]
+  invites                  Invite[]
+  invoices                 Invoice[]
+  company                  Company                   @relation(fields: [companyId], references: [id])
+  paymentReminders         PaymentReminder[]
+  purchaseBills            PurchaseBill[]
+  purchaseOrders           PurchaseOrder[]
+  quotations               Quotation[]
+  salesOrders              SalesOrder[]
+  activities               Activity[]
+  ledger                    Ledger?
+  creditNotes              CreditNote[]
+  debitNotes               DebitNote[]
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String
+  invoiceDate   DateTime
+  dueDate       DateTime?
+  subtotal      Decimal
+  totalTax      Decimal
+  totalAmount   Decimal
+  amountPaid    Decimal       @default(0)
+  balanceAmount Decimal
+  discountAmount Decimal      @default(0)
+  roundOff      Decimal       @default(0)
+  status        InvoiceStatus @default(DRAFT)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  companyId     String
+  userId        String
+  customerId    String
+  company       Company       @relation(fields: [companyId], references: [id])
+  customer      Party         @relation(fields: [customerId], references: [id])
+  user          User          @relation(fields: [userId], references: [id])
+  items         InvoiceItem[]
+  creditNotes   CreditNote[]
+
+  @@unique([companyId, invoiceNumber])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  taxRate     Decimal
+  taxAmount   Decimal
+  total       Decimal
+  invoiceId   String
+  productId   String?
+  productName String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+  
+  // Batch Reference
+  batchId     String?
+  batch       StockBatch? @relation(fields: [batchId], references: [id])
+}
+
+model CreditNote {
+  id              String   @id @default(uuid())
+  creditNoteNumber String
+  date            DateTime
+  invoiceId       String?
+  customerId      String
+  
+  subtotal        Decimal
+  totalTax        Decimal
+  totalAmount     Decimal
+  
+  type            String   @default("RETURN") // RETURN, FINANCIAL
+  reason          String?
+  status          String   @default("DRAFT")
+  
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id])
+  customer        Party    @relation(fields: [customerId], references: [id])
+  items           CreditNoteItem[]
+  
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, creditNoteNumber])
+}
+
+model CreditNoteItem {
+  id            String      @id @default(uuid())
+  creditNoteId  String
+  productId     String?
+  quantity      Int
+  rate          Decimal
+  taxRate       Decimal
+  taxAmount     Decimal
+  total         Decimal
+  reason        String?
+  
+  creditNote    CreditNote  @relation(fields: [creditNoteId], references: [id], onDelete: Cascade)
+  product       Product?    @relation(fields: [productId], references: [id])
+}
+
+model DebitNote {
+  id              String   @id @default(uuid())
+  debitNoteNumber String
+  date            DateTime
+  billId          String?
+  supplierId      String
+  
+  subtotal        Decimal
+  totalTax        Decimal
+  totalAmount     Decimal
+  
+  type            String   @default("RETURN") // RETURN, FINANCIAL
+  reason          String?
+  status          String   @default("DRAFT")
+  
+  bill            PurchaseBill? @relation(fields: [billId], references: [id])
+  supplier        Party    @relation(fields: [supplierId], references: [id])
+  items           DebitNoteItem[]
+  
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, debitNoteNumber])
+}
+
+model DebitNoteItem {
+  id            String      @id @default(uuid())
+  debitNoteId   String
+  productId     String?
+  quantity      Int
+  rate          Decimal
+  taxRate       Decimal
+  taxAmount     Decimal
+  total         Decimal
+  reason        String?
+  
+  debitNote     DebitNote  @relation(fields: [debitNoteId], references: [id], onDelete: Cascade)
+  product       Product?   @relation(fields: [productId], references: [id])
+}
+
+model Expense {
+  id              String    @id @default(uuid())
+  expenseNumber   String?
+  category        String
+  amount          Decimal
+  date            DateTime
+  description     String?
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED, PAID
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  companyId       String
+  gstAmount       Decimal   @default(0)
+  notes           String?
+  paymentMethod   String?
+  receiptUrl      String?
+  vendor          String?
+  
+  // Approval Workflow
+  approvedById    String?
+  approvedBy      User?     @relation("ExpenseApprover", fields: [approvedById], references: [id])
+  approvalDate    DateTime?
+  rejectionReason String?
+  
+  company         Company   @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, expenseNumber])
+}
+
+model PurchaseOrder {
+  id                    String              @id @default(uuid())
+  orderNumber           String
+  supplierInvoiceNumber String?
+  orderDate             DateTime
+  billDate              DateTime?
+  expectedDate          DateTime?
+  subtotal              Decimal
+  totalTax              Decimal
+  totalAmount           Decimal
+  paidAmount            Decimal             @default(0)
+  status                String              @default("DRAFT")
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  companyId             String
+  supplierId            String
+  company               Company             @relation(fields: [companyId], references: [id])
+  supplier              Party               @relation(fields: [supplierId], references: [id])
+  items                 PurchaseOrderItem[]
+
+  @@unique([companyId, orderNumber])
+}
+
+model PurchaseOrderItem {
+  id               String        @id @default(uuid())
+  quantity         Int
+  receivedQuantity Int           @default(0)
+  rate             Decimal
+  taxRate          Decimal
+  taxAmount        Decimal
+  total            Decimal
+  purchaseOrderId  String
+  productId        String?
+  productName      String
+  product          Product?      @relation(fields: [productId], references: [id])
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+}
+
+model Employee {
+  id               String    @id @default(uuid())
+  employeeId       String
+  name             String
+  email            String
+  phone            String
+  department       String
+  designation      String
+  joiningDate      DateTime
+  dateOfBirth      DateTime?
+  salary           Decimal
+  accountNumber    String?
+  ifscCode         String?
+  panNumber        String?
+  aadhaarNumber    String?
+  pfNumber         String?
+  esiNumber        String?
+  address          String?
+  emergencyContact String?
+  emergencyName    String?
+  status           String    @default("ACTIVE")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  
+  attendance       Attendance[]
+  leaves           Leave[]
+  salaryStructure  SalaryStructure?
+  payrollSlips     PayrollRun[]
+
+  @@unique([companyId, employeeId])
+  @@unique([companyId, email])
+}
+
+model BankAccount {
+  id             String        @id @default(uuid())
+  name           String
+  bankName       String
+  accountNumber  String
+  ifsc           String
+  type           String
+  balance        Decimal       @default(0)
+  status         String        @default("ACTIVE")
+  lastReconciled DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  companyId      String
+  company        Company       @relation(fields: [companyId], references: [id])
+  transactions   Transaction[]
+  ledger         Ledger?
+}
+
+model Transaction {
+  id          String      @id @default(uuid())
+  date        DateTime
+  description String
+  category    String
+  amount      Decimal
+  type        String
+  status      String      @default("CLEARED")
+  reference   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  companyId   String
+  accountId   String
+  account     BankAccount @relation(fields: [accountId], references: [id])
+  company     Company     @relation(fields: [companyId], references: [id])
+}
+
+model PaymentReminder {
+  id             String    @id @default(uuid())
+  partyId        String
+  invoiceId      String?
+  amount         Decimal
+  dueDate        DateTime
+  type           String
+  status         String    @default("upcoming")
+  description    String?
+  lastRemindedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  companyId      String
+  company        Company   @relation(fields: [companyId], references: [id])
+  party          Party     @relation(fields: [partyId], references: [id])
+
+  @@index([companyId])
+  @@index([partyId])
+  @@index([dueDate])
+}
+
+model Estimate {
+  id             String         @id @default(uuid())
+  estimateNumber String
+  date           DateTime
+  validUntil     DateTime
+  subtotal       Decimal
+  totalTax       Decimal
+  totalAmount    Decimal
+  status         String         @default("PENDING")
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  companyId      String
+  customerId     String
+  company        Company        @relation(fields: [companyId], references: [id])
+  customer       Party          @relation(fields: [customerId], references: [id])
+  items          EstimateItem[]
+
+  @@unique([companyId, estimateNumber])
+}
+
+model EstimateItem {
+  id          String   @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  taxRate     Decimal
+  taxAmount   Decimal
+  total       Decimal
+  estimateId  String
+  productId   String?
+  productName String
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
+model SalesOrder {
+  id           String           @id @default(uuid())
+  orderNumber  String
+  orderDate    DateTime
+  expectedDate DateTime?
+  subtotal     Decimal
+  totalTax     Decimal
+  totalAmount  Decimal
+  status       String           @default("DRAFT")
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  companyId    String
+  customerId   String
+  company      Company          @relation(fields: [companyId], references: [id])
+  customer     Party            @relation(fields: [customerId], references: [id])
+  items        SalesOrderItem[]
+
+  @@unique([companyId, orderNumber])
+}
+
+model SalesOrderItem {
+  id              String     @id @default(uuid())
+  quantity        Int
+  shippedQuantity Int        @default(0)
+  rate            Decimal
+  taxRate         Decimal
+  taxAmount       Decimal
+  total           Decimal
+  salesOrderId    String
+  productId       String?
+  productName     String
+  product         Product?   @relation(fields: [productId], references: [id])
+  salesOrder      SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+}
+
+model DeliveryChallan {
+  id              String                @id @default(uuid())
+  challanNumber   String
+  challanDate     DateTime
+  referenceNumber String?
+  subtotal        Decimal               @default(0)
+  totalAmount     Decimal               @default(0)
+  status          String                @default("DRAFT")
+  notes           String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  companyId       String
+  customerId      String
+  company         Company               @relation(fields: [companyId], references: [id])
+  customer        Party                 @relation(fields: [customerId], references: [id])
+  items           DeliveryChallanItem[]
+
+  @@unique([companyId, challanNumber])
+}
+
+model DeliveryChallanItem {
+  id          String          @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  total       Decimal
+  challanId   String
+  productId   String?
+  productName String
+  challan     DeliveryChallan @relation(fields: [challanId], references: [id], onDelete: Cascade)
+  product     Product?        @relation(fields: [productId], references: [id])
+}
+
+model Quotation {
+  id              String          @id @default(uuid())
+  quotationNumber String
+  date            DateTime
+  validUntil      DateTime
+  subtotal        Decimal
+  totalTax        Decimal
+  totalAmount     Decimal
+  status          String          @default("DRAFT")
+  notes           String?
+  terms           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  companyId       String
+  customerId      String
+  company         Company         @relation(fields: [companyId], references: [id])
+  customer        Party           @relation(fields: [customerId], references: [id])
+  items           QuotationItem[]
+
+  @@unique([companyId, quotationNumber])
+}
+
+model QuotationItem {
+  id          String    @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  taxRate     Decimal
+  taxAmount   Decimal
+  total       Decimal
+  quotationId String
+  productId   String?
+  productName String
+  product     Product?  @relation(fields: [productId], references: [id])
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseBill {
+  id            String             @id @default(uuid())
+  billNumber    String
+  billDate      DateTime
+  dueDate       DateTime?
+  subtotal      Decimal
+  totalTax      Decimal
+  totalAmount   Decimal
+  amountPaid    Decimal            @default(0)
+  balanceAmount Decimal
+  discountAmount Decimal      @default(0)
+  roundOff      Decimal       @default(0)
+  status        String             @default("DRAFT")
+  notes         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  companyId     String
+  supplierId    String
+  company       Company            @relation(fields: [companyId], references: [id])
+  supplier      Party              @relation(fields: [supplierId], references: [id])
+  items         PurchaseBillItem[]
+  debitNotes    DebitNote[]
+
+  @@unique([companyId, billNumber])
+}
+
+model PurchaseBillItem {
+  id          String       @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  taxRate     Decimal
+  taxAmount   Decimal
+  total       Decimal
+  billId      String
+  productId   String?
+  productName String
+  bill        PurchaseBill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  product     Product?     @relation(fields: [productId], references: [id])
+  
+  // Batch Reference (for creating new batches or adding to existing)
+  batchId     String?
+  batch       StockBatch? @relation(fields: [batchId], references: [id])
+  batchNumber String?
+  expiryDate  DateTime?
+}
+
+model GoodsReceivedNote {
+  id              String                  @id @default(uuid())
+  grnNumber       String
+  grnDate         DateTime
+  referenceNumber String?
+  subtotal        Decimal                 @default(0)
+  totalAmount     Decimal                 @default(0)
+  status          String                  @default("DRAFT")
+  notes           String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  companyId       String
+  supplierId      String
+  company         Company                 @relation(fields: [companyId], references: [id])
+  supplier        Party                   @relation(fields: [supplierId], references: [id])
+  items           GoodsReceivedNoteItem[]
+
+  @@unique([companyId, grnNumber])
+}
+
+model GoodsReceivedNoteItem {
+  id          String            @id @default(uuid())
+  quantity    Int
+  rate        Decimal
+  total       Decimal
+  grnId       String
+  productId   String?
+  productName String
+  grn         GoodsReceivedNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  product     Product?          @relation(fields: [productId], references: [id])
+  
+  // Batch Reference
+  batchId     String?
+  batch       StockBatch? @relation(fields: [batchId], references: [id])
+  batchNumber String?
+  expiryDate  DateTime?
+}
+
+model Warehouse {
+  id             String          @id @default(uuid())
+  name           String
+  code           String
+  address        String?
+  city           String?
+  state          String?
+  pincode        String?
+  isActive       Boolean         @default(true)
+  isDefault      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  companyId      String
+  stockMovements StockMovement[]
+  company        Company         @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, code])
+}
+
+model StockMovement {
+  id            String     @id @default(uuid())
+  type          String
+  quantity      Int
+  previousStock Int
+  newStock      Int
+  reference     String?
+  reason        String?
+  notes         String?
+  productId     String
+  warehouseId   String?
+  createdBy     String
+  createdAt     DateTime   @default(now())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id])
+  product       Product    @relation(fields: [productId], references: [id])
+  warehouse     Warehouse? @relation(fields: [warehouseId], references: [id])
+  
+  // Batch Tracking
+  batchId       String?
+  batch         StockBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([productId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model StockBatch {
+  id            String    @id @default(uuid())
+  productId     String
+  batchNumber   String
+  quantity      Int       @default(0)
+  mfgDate       DateTime?
+  expiryDate    DateTime?
+  mrp           Decimal?
+  costPrice     Decimal?
+  sellingPrice  Decimal?
+  
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  // Relations
+  invoiceItems        InvoiceItem[]
+  purchaseBillItems   PurchaseBillItem[]
+  grnItems            GoodsReceivedNoteItem[]
+  stockMovements      StockMovement[]
+
+  @@unique([companyId, productId, batchNumber])
+  @@index([expiryDate])
+}
+
+model Unit {
+  id        String   @id @default(uuid())
+  name      String
+  symbol    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, symbol])
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  parentId    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+}
+
+model Sequence {
+  id           String   @id @default(uuid())
+  documentType String
+  prefix       String
+  nextNumber   Int      @default(1)
+  format       String?
+  fiscalYear   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, documentType, fiscalYear])
+}
+
+model GSTPayment {
+  id            String   @id @default(uuid())
+  challanNumber String
+  date          DateTime
+  period        String
+  cgst          Decimal
+  sgst          Decimal
+  igst          Decimal  @default(0)
+  cess          Decimal  @default(0)
+  interest      Decimal  @default(0)
+  lateFee       Decimal  @default(0)
+  penalty       Decimal  @default(0)
+  total         Decimal
+  status        String   @default("pending")
+  paymentMode   String
+  transactionId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, challanNumber])
+  @@index([companyId])
+  @@index([period])
+}
+
+model EInvoice {
+  id            String    @id @default(uuid())
+  invoiceId     String
+  invoiceNumber String
+  invoiceDate   DateTime
+  irn           String?   @unique
+  ackNumber     String?
+  ackDate       DateTime?
+  status        String    @default("pending")
+  signedQR      String?
+  signedInvoice String?
+  customerName  String
+  gstin         String?
+  invoiceValue  Decimal
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  jsonPayload   Json?     // Stores the exact JSON sent to IRP
+
+  @@index([companyId])
+  @@index([invoiceId])
+}
+
+model EWaybill {
+  id              String    @id @default(uuid())
+  ewaybillNumber  String?   @unique
+  documentNumber  String
+  documentType    String
+  generatedDate   DateTime?
+  validUpto       DateTime?
+  fromGstin       String
+  toGstin         String?
+  fromPlace       String
+  toPlace         String
+  distance        Int
+  transporterName String?
+  transporterId   String?
+  vehicleNumber   String?
+  vehicleType     String?
+  transactionType String
+  supplyType      String
+  subSupplyType   String?
+  value           Decimal
+  status          String    @default("pending")
+  errorMessage    String?
+  jsonPayload     Json?     // Stores the exact JSON sent to NIC
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  companyId       String
+  invoiceId       String?
+  company         Company   @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([documentNumber])
+}
+
+model Device {
+  id              String   @id @default(uuid())
+  userId          String
+  deviceName      String
+  deviceType      String
+  browser         String
+  os              String?
+  location        String?
+  ipAddress       String
+  lastActive      DateTime @default(now())
+  isCurrentDevice Boolean  @default(false)
+  isTrusted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+}
+
+model IPWhitelist {
+  id          String   @id @default(uuid())
+  ipAddress   String
+  description String?
+  type        String
+  rangeStart  String?
+  rangeEnd    String?
+  enabled     Boolean  @default(true)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, ipAddress])
+  @@index([companyId])
+}
+
+model ApprovalWorkflow {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  documentType    String
+  thresholdAmount Decimal?
+  steps           Json
+  active          Boolean  @default(true)
+  priority        Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([documentType])
+}
+
+model Conversation {
+  id            String                    @id @default(uuid())
+  type          ConversationType          @default(DIRECT)
+  name          String?
+  description   String?
+  avatar        String?
+  encryptionKey String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  companyId     String
+  company       Company                   @relation(fields: [companyId], references: [id])
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@index([companyId])
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String          @id @default(uuid())
+  conversationId String
+  userId         String?
+  partyId        String?
+  role           ParticipantRole @default(MEMBER)
+  isAdmin        Boolean         @default(false)
+  nickname       String?
+  joinedAt       DateTime        @default(now())
+  leftAt         DateTime?
+  mutedUntil     DateTime?
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  party          Party?          @relation(fields: [partyId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@unique([conversationId, partyId])
+  @@index([userId])
+  @@index([partyId])
+}
+
+model Message {
+  id             String              @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  contentIv      String?
+  type           MessageType         @default(TEXT)
+  status         MessageStatus       @default(SENT)
+  replyToId      String?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  editedAt       DateTime?
+  deletedAt      DateTime?
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        Message?            @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies        Message[]           @relation("MessageReplies")
+  sender         User                @relation(fields: [senderId], references: [id])
+  attachments    MessageAttachment[]
+  readBy         MessageRead[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+model MessageAttachment {
+  id           String   @id @default(uuid())
+  messageId    String
+  fileName     String
+  originalName String
+  fileType     String
+  fileSize     Int
+  fileUrl      String
+  thumbnailUrl String?
+  encryptedKey String?
+  createdAt    DateTime @default(now())
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model Invite {
+  id           String       @id @default(uuid())
+  email        String
+  type         InviteType
+  status       InviteStatus @default(PENDING)
+  token        String       @unique
+  role         Role?
+  moduleAccess Json?
+  partyId      String?
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  message      String?
+  createdAt    DateTime     @default(now())
+  invitedById  String
+  companyId    String
+  company      Company      @relation(fields: [companyId], references: [id])
+  invitedBy    User         @relation("InvitesSent", fields: [invitedById], references: [id])
+  party        Party?       @relation(fields: [partyId], references: [id])
+
+  @@index([token])
+  @@index([companyId])
+  @@index([email])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  entityType    String
+  entityId      String
+  action        String
+  oldValue      Json?
+  newValue      Json?
+  changedBy     String
+  userIp        String?
+  userAgent     String?
+  resourceGroup String?  // e.g. "Sales", "Inventory", "Settings"
+  
+  // Security
+  hash          String?  // SHA-256 hash of this record
+  previousHash  String?  // Hash of previous record for chaining
+  
+  changedAt     DateTime @default(now())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([entityType, entityId])
+  @@index([changedAt])
+  @@index([hash])
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  ACCOUNTANT
+  USER
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+enum Plan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum InviteType {
+  EMPLOYEE
+  PARTY
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  DOCUMENT
+  VOICE
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+// ========== CRM MODULE ==========
+model Lead {
+  id          String   @id @default(uuid())
+  firstName   String
+  lastName    String?
+  email       String?
+  phone       String?
+  companyName String?
+  status      String   @default("NEW") // NEW, CONTACTED, QUALIFIED, LOST, WON
+  source      String?  // WEBSITE, REFERRAL, ETC
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  activities  Activity[]
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  type        String   // CALL, MEETING, EMAIL, NOTE
+  subject     String
+  description String?
+  date        DateTime @default(now())
+  
+  leadId      String?
+  lead        Lead?    @relation(fields: [leadId], references: [id])
+  
+  partyId     String?
+  party       Party?   @relation(fields: [partyId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  
+  createdBy   String 
+}
+
+// ========== HR & PAYROLL MODULE ==========
+model Attendance {
+  id          String   @id @default(uuid())
+  date        DateTime
+  status      String   // PRESENT, ABSENT, HALF_DAY, LEAVE
+  checkIn     DateTime?
+  checkOut    DateTime?
+  
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, employeeId, date])
+}
+
+model Leave {
+  id          String   @id @default(uuid())
+  type        String   // SICK, CASUAL, EARNED
+  startDate   DateTime
+  endDate     DateTime
+  reason      String?
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model SalaryStructure {
+  id          String   @id @default(uuid())
+  basic       Decimal
+  hra         Decimal  @default(0)
+  allowances  Decimal  @default(0)
+  deductions  Decimal  @default(0)
+  
+  employeeId  String   @unique
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model PayrollRun {
+  id          String   @id @default(uuid())
+  month       String   // MM-YYYY
+  basic       Decimal
+  additions   Decimal
+  deductions  Decimal
+  netPay      Decimal
+  status      String   @default("GENERATED") // GENERATED, PAID
+  
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+// ========== ACCOUNTING MODULE (Double-Entry Ledger System) ==========
+
+// Enum for account types
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+// Enum for voucher types
+enum VoucherType {
+  SALES
+  PURCHASE
+  PAYMENT
+  RECEIPT
+  CONTRA
+  JOURNAL
+}
+
+// Enum for posting types
+enum PostingType {
+  DEBIT
+  CREDIT
+}
+
+// Hierarchical Ledger Groups (e.g., Assets > Current Assets > Cash)
+model LedgerGroup {
+  id          String        @id @default(uuid())
+  name        String        // e.g., "Sundry Debtors", "Cash in Hand"
+  code        String
+  type        AccountType   // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  description String?
+  
+  // Self-referential for hierarchy
+  parentId    String?
+  parent      LedgerGroup?  @relation("LedgerGroupHierarchy", fields: [parentId], references: [id])
+  children    LedgerGroup[] @relation("LedgerGroupHierarchy")
+  
+  // Relations
+  ledgers     Ledger[]
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id])
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  @@unique([companyId, code])
+}
+
+// Individual Ledger Account (Chart of Accounts entries)
+model Ledger {
+  id              String        @id @default(uuid())
+  name            String
+  code            String
+  description     String?
+  
+  // Opening balance (for beginning of fiscal year)
+  openingBalance  Decimal       @default(0)
+  openingType     PostingType   @default(DEBIT) // Whether opening is debit or credit
+  
+  // Group relationship
+  groupId         String
+  group           LedgerGroup   @relation(fields: [groupId], references: [id])
+  
+  // Optional link to Party for AR/AP ledgers
+  partyId         String?       @unique
+  party           Party?        @relation(fields: [partyId], references: [id])
+  
+  // Optional link to Bank Account
+  bankAccountId   String?       @unique
+  bankAccount     BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  
+  // Company relation
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id])
+  
+  // Postings - balance is derived from these
+  postings        LedgerPosting[]
+  
+  // Expense Categories linked to this ledger
+  expenseCategories ExpenseCategory[]
+  
+  isSystemLedger  Boolean       @default(false) // Can't be deleted if true
+  isActive        Boolean       @default(true)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([companyId, code])
+}
+
+// Journal Voucher (all transactions create vouchers)
+model Voucher {
+  id              String        @id @default(uuid())
+  voucherNumber   String
+  date            DateTime
+  type            VoucherType   // SALES, PURCHASE, PAYMENT, RECEIPT, CONTRA, JOURNAL
+  
+  // Reference to original document
+  referenceType   String?       // INVOICE, BILL, EXPENSE, PAYMENT, etc.
+  referenceId     String?       // ID of the referenced document
+  
+  narration       String?       // Description/memo
+  
+  // Company relation
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id])
+  
+  // Postings
+  postings        LedgerPosting[]
+  
+  // Audit fields
+  createdById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([companyId, voucherNumber])
+}
+
+// Individual Ledger Posting (Debit/Credit entry)
+model LedgerPosting {
+  id          String      @id @default(uuid())
+  amount      Decimal
+  type        PostingType // DEBIT or CREDIT
+  
+  // Ledger this posting affects
+  ledgerId    String
+  ledger      Ledger      @relation(fields: [ledgerId], references: [id])
+  
+  // Voucher this posting belongs to
+  voucherId   String
+  voucher     Voucher     @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  
+  // Denormalized for easier querying
+  companyId   String
+  
+  // Narration for this specific line (optional)
+  narration   String?
+  
+  createdAt   DateTime    @default(now())
+  
+  @@index([ledgerId])
+  @@index([voucherId])
+  @@index([companyId])
+}
+
+// ========== POS MODULE ==========
+model POSSession {
+  id          String   @id @default(uuid())
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  status      String   @default("OPEN") // OPEN, CLOSED
+  
+  openingCash Decimal
+  closingCash Decimal?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  
+  orders      POSOrder[]
+}
+
+model POSOrder {
+  id          String     @id @default(uuid())
+  orderNumber String
+  total       Decimal
+  paymentMode String     // CASH, CARD, UPI
+  
+  sessionId   String
+  session     POSSession @relation(fields: [sessionId], references: [id])
+  
+  createdAt   DateTime   @default(now())
+}
+
+// ========== SERIAL NUMBER TRACKING (for Electronics) ==========
+model SerialNumber {
+  id            String   @id @default(uuid())
+  serialNumber  String
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  
+  // Status
+  status        String   @default("IN_STOCK") // IN_STOCK, SOLD, RETURNED, DAMAGED
+  
+  // Traceability
+  purchaseBillId  String?  // Which purchase brought this in
+  invoiceId       String?  // Which invoice sold this
+  
+  // Warranty
+  warrantyExpiry DateTime?
+  
+  companyId     String
+  
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([serialNumber, companyId])
+  @@index([productId])
+  @@index([companyId])
+  @@index([status])
+}
+
+// ========== BILL OF MATERIALS (for Manufacturing) ==========
+model BillOfMaterial {
+  id              String    @id @default(uuid())
+  name            String
+  code            String?
+  
+  // Finished Product
+  finishedProductId String
+  finishedProduct   Product @relation("FinishedProduct", fields: [finishedProductId], references: [id])
+  outputQuantity    Decimal @default(1)  // How many finished items this BOM produces
+  
+  // Items/Raw Materials
+  items           BOMItem[]
+  
+  // Status
+  isActive        Boolean  @default(true)
+  
+  // Manufacturing Details
+  laborCost       Decimal  @default(0)
+  overheadCost    Decimal  @default(0)
+  notes           String?
+  
+  companyId       String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([finishedProductId])
+}
+
+model BOMItem {
+  id              String   @id @default(uuid())
+  
+  bomId           String
+  bom             BillOfMaterial @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  
+  // Raw Material
+  productId       String
+  product         Product  @relation("RawMaterial", fields: [productId], references: [id])
+  
+  quantity        Decimal  // Required quantity per finished product
+  unit            String?
+  
+  notes           String?
+  
+  @@index([bomId])
+  @@index([productId])
+}
+
+// ========== GSTR-2B RECONCILIATION ==========
+model GSTR2BRecord {
+  id                String   @id @default(uuid())
+  
+  // From GSTR-2B JSON
+  supplierGstin     String
+  supplierName      String?
+  invoiceNumber     String
+  invoiceDate       DateTime
+  invoiceValue      Decimal
+  taxableValue      Decimal
+  igst              Decimal  @default(0)
+  cgst              Decimal  @default(0)
+  sgst              Decimal  @default(0)
+  cess              Decimal  @default(0)
+  
+  // Return Period
+  returnPeriod      String   // e.g., "112024" for Nov 2024
+  
+  // Matching Status
+  matchStatus       String   @default("PENDING") // PENDING, MATCHED, PARTIALLY_MATCHED, UNMATCHED, MISMATCH
+  
+  // Linked Purchase Bill (if matched)
+  purchaseBillId    String?
+  
+  // Mismatch details
+  mismatchReason    String?  // e.g., "Amount mismatch: Portal ₹5000, Books ₹4500"
+  
+  // Action taken
+  action            String?  // ACCEPT, REJECT, PENDING
+  actionDate        DateTime?
+  actionBy          String?
+  
+  companyId         String
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([supplierGstin, invoiceNumber, returnPeriod, companyId])
+  @@index([companyId])
+  @@index([matchStatus])
+  @@index([returnPeriod])
+}
+
+// ========== UNIT CONVERSION ==========
+model UnitConversion {
+  id              String   @id @default(uuid())
+  
+  // From Unit (e.g., Box)
+  fromUnit        String
+  // To Unit (e.g., Pcs)
+  toUnit          String
+  // Conversion Factor (e.g., 1 Box = 12 Pcs, factor = 12)
+  conversionFactor Decimal
+  
+  // Product-specific conversion (optional)
+  productId       String?
+  
+  // Description
+  description     String?  // e.g., "1 Box contains 12 pieces"
+  
+  companyId       String
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([fromUnit, toUnit, productId, companyId])
+  @@index([companyId])
+  @@index([productId])
+}
+
+// ========== TDS/TCS SUPPORT ==========
+model TDSTCSEntry {
+  id              String   @id @default(uuid())
+  
+  // Type: TDS (Tax Deducted at Source) or TCS (Tax Collected at Source)
+  type            String   // TDS, TCS
+  
+  // Section Code (e.g., 194C, 206C)
+  sectionCode     String
+  
+  // Party details
+  partyId         String?
+  partyName       String
+  partyPan        String?
+  
+  // Transaction reference
+  referenceType   String   // INVOICE, PURCHASE_BILL, PAYMENT
+  referenceId     String
+  referenceNumber String
+  
+  // Amount details
+  baseAmount      Decimal
+  rate            Decimal  // Percentage rate
+  taxAmount       Decimal  // Calculated TDS/TCS amount
+  
+  // Date
+  transactionDate DateTime
+  
+  // Status
+  status          String   @default("PENDING") // PENDING, FILED, PAID
+  
+  // Challan details (after payment)
+  challanNumber   String?
+  challanDate     DateTime?
+  
+  companyId       String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([companyId])
+  @@index([type])
+  @@index([status])
+  @@index([partyId])
+}
