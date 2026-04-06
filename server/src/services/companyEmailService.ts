@@ -149,7 +149,7 @@ export async function sendCompanyEmail(options: CompanyEmailOptions): Promise<bo
         to: [options.to],
         subject: options.subject,
         html: options.html,
-        reply_to: replyTo || undefined,
+        replyTo: replyTo || undefined,
         attachments: options.attachments?.map(a => ({
           filename: a.filename,
           content: a.content.toString('base64'),

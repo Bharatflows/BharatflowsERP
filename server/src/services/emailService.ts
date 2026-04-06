@@ -54,19 +54,19 @@ const sendEmailViaResend = async (options: EmailOptions): Promise<boolean> => {
       content: att.content.toString('base64')
     }));
 
-    // Set reply_to if sender email is provided
-    const reply_to = options.senderEmail || undefined;
+    // Set replyTo if sender email is provided
+    const replyTo = options.senderEmail || undefined;
 
     await resend.emails.send({
       from: 'BharatFlows <admin@bharatflows.com>',
       to: [options.to],
       subject: options.subject,
       html: options.html,
-      reply_to: reply_to,
+      replyTo: replyTo,
       attachments: attachments
     });
 
-    logger.info(`Email sent successfully via Resend to ${options.to}${reply_to ? ` (reply-to: ${options.senderEmail})` : ''}`);
+    logger.info(`Email sent successfully via Resend to ${options.to}${replyTo ? ` (reply-to: ${options.senderEmail})` : ''}`);
     return true;
   } catch (error: any) {
     logger.error('Resend email send error:', error);
