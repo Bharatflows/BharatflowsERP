@@ -9,6 +9,8 @@ import { Response } from 'express';
 import prisma from '../../config/prisma';
 import { AuthRequest } from '../../middleware/auth';
 import { getNextNumber, decrementSequence } from '../../services/sequenceService';
+import eventBus, { EventTypes } from '../../services/eventBus';  // P0-5: Domain events
+import logger from '../../config/logger';
 
 // @desc    Get all GRNs
 // @route   GET /api/v1/purchases/grn
@@ -32,7 +34,7 @@ export const getGRNs = async (req: AuthRequest, res: Response) => {
             data: grns
         });
     } catch (error) {
-        console.error('Error fetching GRNs:', error);
+        logger.error('Error fetching GRNs:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -73,7 +75,7 @@ export const getGRN = async (req: AuthRequest, res: Response) => {
             data: grn
         });
     } catch (error) {
-        console.error('Error fetching GRN:', error);
+        logger.error('Error fetching GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -119,7 +121,9 @@ export const createGRN = async (req: AuthRequest, res: Response) => {
                             productName: item.productName || 'Unknown Product',
                             quantity: Number(item.quantity) || 0,
                             rate: Number(item.rate) || 0,
-                            total: Number(item.total || 0)
+                            total: Number(item.total || 0),
+                            batchNumber: item.batchNumber || null,
+                            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null
                         }))
                     }
                 },
@@ -128,65 +132,46 @@ export const createGRN = async (req: AuthRequest, res: Response) => {
                 }
             });
 
-            // 2. Increase stock for each product and log stock movements
-            for (const item of items) {
-                if (item.productId) {
-                    // Get current stock
-                    const product = await tx.product.findUnique({
-                        where: { id: item.productId },
-                        select: { currentStock: true, trackInventory: true }
-                    });
-
-                    if (product && product.trackInventory) {
-                        const previousStock = product.currentStock;
-                        const quantity = Number(item.quantity);
-                        const newStock = previousStock + quantity;
-
-                        // Update product stock (INCREASE)
-                        await tx.product.update({
-                            where: { id: item.productId },
-                            data: { currentStock: newStock }
-                        });
-
-                        // Log stock movement for audit trail
-                        await tx.stockMovement.create({
-                            data: {
-                                companyId: companyId!,
-                                productId: item.productId,
-                                type: 'PURCHASE',
-                                quantity: quantity,
-                                previousStock,
-                                newStock,
-                                reference: createdGRN.grnNumber,
-                                reason: `Received via GRN ${createdGRN.grnNumber}`,
-                                createdBy: userId!
-                            }
-                        });
-                    }
-                }
-            }
-
-            // 3. Update supplier balance (increase payable)
-            await tx.party.update({
-                where: { id: supplierId },
-                data: {
-                    currentBalance: {
-                        increment: Number(totalAmount || 0)
-                    }
-                }
-            });
-
             return createdGRN;
         });
 
-        console.log(`GRN created: ${grn.grnNumber} - Stock updated, Supplier balance updated`);
+        logger.info(`GRN created: ${grn.grnNumber}`);
+
+        // P0-5: Emit domain event for event-driven processing
+        try {
+            await eventBus.emit({
+                companyId: companyId!,
+                eventType: EventTypes.GOODS_RECEIVED,
+                aggregateType: 'GoodsReceivedNote',
+                aggregateId: grn.id,
+                payload: {
+                    grnId: grn.id,
+                    grnNumber: grn.grnNumber,
+                    supplierId: supplierId,
+                    totalAmount: Number(totalAmount || 0),
+                    items: items.map((item: any) => ({
+                        productId: item.productId,
+                        quantity: Number(item.quantity),
+                        batchNumber: item.batchNumber,
+                        expiryDate: item.expiryDate
+                    }))
+                },
+                metadata: {
+                    userId: userId!,
+                    source: 'api'
+                }
+            });
+            logger.info(`[GRN] Emitted GOODS_RECEIVED event for ${grn.grnNumber}`);
+        } catch (eventError) {
+            logger.warn(`Failed to emit GOODS_RECEIVED event: ${eventError}`);
+        }
 
         res.status(201).json({
             success: true,
             data: grn
         });
     } catch (error) {
-        console.error('Error creating GRN:', error);
+        logger.error('Error creating GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -230,7 +215,7 @@ export const updateGRN = async (req: AuthRequest, res: Response) => {
         });
 
         const updatedGRN = await prisma.goodsReceivedNote.update({
-            where: { id: grnId },
+            where: { id: grnId , companyId: req.user.companyId },
             data: {
                 supplierId,
                 grnDate: new Date(grnDate),
@@ -259,7 +244,7 @@ export const updateGRN = async (req: AuthRequest, res: Response) => {
             data: updatedGRN
         });
     } catch (error) {
-        console.error('Error updating GRN:', error);
+        logger.error('Error updating GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -288,7 +273,17 @@ export const deleteGRN = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.goodsReceivedNote.delete({
-            where: { id: req.params.id }
+            where: { id: req.params.id , companyId: req.user.companyId }
+        });
+
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user!.companyId!,
+            eventType: EventTypes.GRN_DELETED,
+            aggregateType: 'GoodsReceivedNote',
+            aggregateId: grn.id,
+            payload: grn,
+            metadata: { userId: req.user!.id, source: 'api' }
         });
 
         // Decrement the sequence number to reuse the freed number
@@ -299,7 +294,7 @@ export const deleteGRN = async (req: AuthRequest, res: Response) => {
             data: {}
         });
     } catch (error) {
-        console.error('Error deleting GRN:', error);
+        logger.error('Error deleting GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'

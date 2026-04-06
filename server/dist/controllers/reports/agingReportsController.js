@@ -11,10 +11,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAgingPayables = exports.getAgingReceivables = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
+const logger_1 = __importDefault(require("../../config/logger"));
 // Aging Report - Receivables
 const getAgingReceivables = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const invoices = await prisma_1.default.invoice.findMany({
             where: {
@@ -69,7 +69,7 @@ const getAgingReceivables = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get aging receivables error:', error);
+        logger_1.default.error('Get aging receivables error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating aging report'
@@ -80,7 +80,6 @@ exports.getAgingReceivables = getAgingReceivables;
 // Aging Report - Payables
 const getAgingPayables = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const purchases = await prisma_1.default.purchaseOrder.findMany({
             where: {
@@ -133,7 +132,7 @@ const getAgingPayables = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get aging payables error:', error);
+        logger_1.default.error('Get aging payables error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating aging report'

@@ -1,32 +1,36 @@
-import { useState, useEffect } from "react";
-import { bankingService } from "../../services/modules.service";
-import { toast } from "sonner";
+import { useState, useMemo } from "react";
 import {
-  Search,
-  Filter,
-  Download,
   ArrowUpRight,
   ArrowDownLeft,
   Calendar,
   MoreHorizontal,
+  Download,
+  Filter,
+  CreditCard,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  RefreshCw,
+  FileDown,
+  Sheet,
+  ChevronDown
 } from "lucide-react";
+import { DataTable } from "../ui/data-table";
+import { StatsCard } from "../ui/stats-card";
+import { ListFilters } from "../ui/ListFilters";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+import { Badge } from "../ui/badge";
+import { useBankingTransactions } from "../../hooks/useBanking";
+import { cn } from "../../lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
-import { Badge } from "../ui/badge";
-import { cn } from "../../lib/utils";
+import { exportToCSV, exportToExcel, exportToPDF, formatCurrency, formatDate } from "../../lib/exportUtils";
 
 interface Transaction {
   id: string;
@@ -35,174 +39,320 @@ interface Transaction {
   category: string;
   amount: number;
   type: "credit" | "debit";
-  account: string;
+  account: string;  // This might need mapping from accountName if API returns object
   status: "cleared" | "pending" | "failed";
   reference?: string;
+  accountName?: string; // API might return this
 }
 
 export function TransactionList() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
 
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  const { data: response, isLoading, refetch, isFetching } = useBankingTransactions();
 
-  const fetchTransactions = async () => {
-    setLoading(true);
-    try {
-      const response = await bankingService.getTransactions();
-      const mappedTransactions = (response.data || []).map((txn: any) => ({
-        id: txn.id,
-        date: new Date(txn.date).toLocaleDateString("en-IN"),
-        description: txn.description,
-        category: txn.category,
-        amount: Number(txn.amount),
-        type: (txn.type || "debit").toLowerCase(),
-        account: txn.accountName || "Unknown Account",
-        status: (txn.status || "cleared").toLowerCase(),
-        reference: txn.reference
-      }));
-      setTransactions(mappedTransactions);
-    } catch (error) {
-      console.error("Failed to fetch transactions:", error);
-      toast.error("Failed to load transactions");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const transactions: Transaction[] = useMemo(() => {
+    const data = (response as any)?.data || [];
+    return data.map((txn: any) => ({
+      id: txn.id,
+      date: txn.date,
+      description: txn.description,
+      category: txn.category,
+      amount: Number(txn.amount),
+      type: (txn.type || "debit").toLowerCase(),
+      account: txn.accountName || "Unknown Account",
+      status: (txn.status || "cleared").toLowerCase(),
+      reference: txn.reference
+    }));
+  }, [response]);
 
   const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = t.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.account.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === "all" || t.type === filterType;
+    const matchesSearch =
+      t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.account.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = typeFilter === "all" || t.type === typeFilter;
     return matchesSearch && matchesType;
   });
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "cleared": return "badge-success";
+      case "pending": return "badge-pending";
+      case "failed": return "badge-error";
+      default: return "badge-draft";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "cleared": return <CheckCircle className="size-3" />;
+      case "pending": return <AlertCircle className="size-3" />;
+      case "failed": return <XCircle className="size-3" />;
+      default: return null;
+    }
+  };
+
+  const stats = {
+    total: transactions.length,
+    credit: transactions.filter(t => t.type === 'credit').length,
+    debit: transactions.filter(t => t.type === 'debit').length,
+    balance: transactions.reduce((acc, t) => acc + (t.type === 'credit' ? t.amount : -t.amount), 0)
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredTransactions.map(t => ({
+      'Date': formatDate(t.date),
+      'Description': t.description,
+      'Account': t.account,
+      'Category': t.category,
+      'Type': t.type,
+      'Amount': t.amount,
+      'Status': t.status
+    }));
+    exportToCSV(data, 'Transactions', []);
+  };
+
+  const handleExportExcel = () => {
+    const data = filteredTransactions.map(t => ({
+      'Date': formatDate(t.date),
+      'Description': t.description,
+      'Account': t.account,
+      'Category': t.category,
+      'Type': t.type,
+      'Amount': t.amount,
+      'Status': t.status
+    }));
+    exportToExcel(data, 'Transactions', []);
+  };
+
+  const handleExportPDF = () => {
+    const columns = ['Date', 'Description', 'Account', 'Category', 'Type', 'Amount', 'Status'];
+    const data = filteredTransactions.map(t => [
+      formatDate(t.date),
+      t.description,
+      t.account,
+      t.category,
+      t.type,
+      formatCurrency(t.amount),
+      t.status
+    ]);
+    exportToPDF({ title: 'Transaction Report', columns, data, filename: 'Transactions' });
+  };
+
+  const columns = [
+    {
+      header: "Description",
+      cell: (txn: Transaction) => (
+        <div className="flex items-center gap-3">
+          <div className={cn("p-2 rounded-full flex-shrink-0 flex items-center justify-center w-9 h-9",
+            txn.type === 'credit' ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+          )}>
+            {txn.type === 'credit' ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}
+          </div>
+          <div>
+            <p className="font-medium text-foreground truncate max-w-[200px]" title={txn.description}>{txn.description}</p>
+            {txn.reference && <p className="text-xs text-muted-foreground">Ref: {txn.reference}</p>}
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Date",
+      cell: (txn: Transaction) => (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Calendar className="size-3.5" />
+          {formatDate(txn.date)}
+        </div>
+      )
+    },
+    {
+      header: "Account",
+      className: "hidden md:table-cell",
+      cell: (txn: Transaction) => (
+        <span className="text-foreground">{txn.account}</span>
+      )
+    },
+    {
+      header: "Category",
+      className: "hidden lg:table-cell",
+      cell: (txn: Transaction) => (
+        <Badge variant="outline" className="font-normal">{txn.category}</Badge>
+      )
+    },
+    {
+      header: "Amount",
+      className: "text-right",
+      cell: (txn: Transaction) => (
+        <span className={cn("font-medium",
+          txn.type === 'credit' ? "text-emerald-600" : "text-foreground"
+        )}>
+          {txn.type === 'credit' ? "+" : "-"}{formatCurrency(txn.amount)}
+        </span>
+      )
+    },
+    {
+      header: "Status",
+      className: "text-center",
+      cell: (txn: Transaction) => (
+        <div className="flex justify-center">
+          <Badge className={cn("rounded-full px-3 py-1 font-medium gap-1", getStatusColor(txn.status))}>
+            {getStatusIcon(txn.status)}
+            {txn.status}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      header: "Actions",
+      className: "text-center",
+      cell: (txn: Transaction) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem className="rounded-lg">
+              <FileText className="size-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleExportPDF} className="rounded-lg">
+              <Download className="size-4 mr-2" />
+              Download PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    }
+  ];
+
+  const renderMobileItem = (txn: Transaction) => (
+    <div
+      key={txn.id}
+      className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className={cn("p-2 rounded-full flex-shrink-0 flex items-center justify-center w-10 h-10",
+            txn.type === 'credit' ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+          )}>
+            {txn.type === 'credit' ? <ArrowDownLeft className="size-5" /> : <ArrowUpRight className="size-5" />}
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">{txn.description}</h3>
+            <p className="text-sm text-muted-foreground">{txn.account}</p>
+          </div>
+        </div>
+        <Badge className={cn("rounded-full px-3 py-1", getStatusColor(txn.status))}>
+          {txn.status}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground mb-1">Date</p>
+          <p className="font-medium">{formatDate(txn.date)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground mb-1">Amount</p>
+          <p className={cn("font-medium",
+            txn.type === 'credit' ? "text-emerald-600" : "text-foreground"
+          )}>
+            {txn.type === 'credit' ? "+" : "-"}{formatCurrency(txn.amount)}
+          </p>
+        </div>
+        <div>
+          <p className="text-muted-foreground mb-1">Category</p>
+          <Badge variant="outline" className="font-normal">{txn.category}</Badge>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Filters & Search */}
-      <div className="bg-white rounded-xl border border-border p-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search description, account..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          <Select value={filterType} onValueChange={setFilterType}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Transaction Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Transactions</SelectItem>
-              <SelectItem value="credit">Money In (Credit)</SelectItem>
-              <SelectItem value="debit">Money Out (Debit)</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" className="gap-2">
-            <Calendar className="size-4" />
-            This Month
-          </Button>
-
-          <Button variant="outline" className="gap-2">
-            <Download className="size-4" />
-            Export
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          label="Total Transactions"
+          value={stats.total}
+          icon={FileText}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+        <StatsCard
+          label="Net Balance"
+          value={formatCurrency(stats.balance)}
+          icon={CreditCard}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+        <StatsCard
+          label="Money In"
+          value={stats.credit}
+          icon={ArrowDownLeft}
+          gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          shadowColor="shadow-emerald-500/20"
+        />
+        <StatsCard
+          label="Money Out"
+          value={stats.debit}
+          icon={ArrowUpRight}
+          gradient="bg-gradient-to-br from-rose-500 to-rose-600"
+          shadowColor="shadow-rose-500/20"
+        />
       </div>
 
-      {/* Transaction List */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-[#f8fafc] border-b border-border">
-              <tr>
-                <th className="text-left px-6 py-4 text-muted-foreground font-medium">Date</th>
-                <th className="text-left px-6 py-4 text-muted-foreground font-medium">Description</th>
-                <th className="text-left px-6 py-4 text-muted-foreground font-medium">Account</th>
-                <th className="text-left px-6 py-4 text-muted-foreground font-medium">Category</th>
-                <th className="text-right px-6 py-4 text-muted-foreground font-medium">Amount</th>
-                <th className="text-center px-6 py-4 text-muted-foreground font-medium">Status</th>
-                <th className="text-center px-6 py-4 text-muted-foreground font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.map((txn) => (
-                <tr key={txn.id} className="border-b border-border hover:bg-[#f8fafc] group">
-                  <td className="px-6 py-4 text-foreground whitespace-nowrap">
-                    {txn.date}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-2 rounded-full flex-shrink-0",
-                        txn.type === 'credit' ? "bg-[#dcfce7] text-[#16a34a]" : "bg-[#fee2e2] text-[#dc2626]"
-                      )}>
-                        {txn.type === 'credit' ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}
-                      </div>
-                      <div>
-                        <p className="text-foreground font-medium truncate max-w-[200px]" title={txn.description}>{txn.description}</p>
-                        {txn.reference && <p className="text-xs text-muted-foreground">Ref: {txn.reference}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-muted-foreground">
-                    {txn.account}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge variant="secondary" className="font-normal bg-gray-100 text-gray-600">
-                      {txn.category}
-                    </Badge>
-                  </td>
-                  <td className={cn("px-6 py-4 text-right font-semibold",
-                    txn.type === 'credit' ? "text-[#16a34a]" : "text-foreground"
-                  )}>
-                    {txn.type === 'credit' ? "+" : "-"}₹{txn.amount.toLocaleString("en-IN")}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <Badge variant="outline" className={cn(
-                      txn.status === 'cleared' ? "bg-[#d1fae5] text-[#065f46] border-[#a7f3d0]" :
-                        txn.status === 'pending' ? "bg-[#fef3c7] text-[#92400e] border-[#fde68a]" :
-                          "bg-[#fee2e2] text-[#991b1b] border-[#fecaca]"
-                    )}>
-                      {txn.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit Transaction</DropdownMenuItem>
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filteredTransactions.length === 0 && (
-          <div className="p-12 text-center text-muted-foreground">
-            <div className="bg-gray-100 p-4 rounded-full inline-block mb-3">
-              <Filter className="size-6" />
-            </div>
-            <p>No transactions found matching your filters.</p>
-          </div>
-        )}
-      </div>
+      <ListFilters
+        searchPlaceholder="Search transactions..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        onRefresh={refetch}
+        isFetching={isFetching}
+        statusValue={typeFilter}
+        onStatusChange={setTypeFilter}
+        statusOptions={[
+          { value: "credit", label: "Money In (Credit)" },
+          { value: "debit", label: "Money Out (Debit)" },
+        ]}
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2 h-11 rounded-xl">
+              <Download className="size-4" />
+              Export
+              <ChevronDown className="size-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={handleExportCSV} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportExcel} className="rounded-lg">
+              <Sheet className="size-4 mr-2" />
+              Export as Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPDF} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ListFilters>
+
+      <DataTable
+        data={filteredTransactions}
+        columns={columns}
+        mobileRenderer={renderMobileItem}
+        isLoading={isLoading}
+        emptyState={{
+          title: "No transactions found",
+          description: "Record your first transaction to get started",
+          icon: CreditCard
+        }}
+      />
     </div>
   );
 }

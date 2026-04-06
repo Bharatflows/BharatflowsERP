@@ -1,11 +1,12 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth';
-export declare const getUnits: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const createUnit: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const updateUnit: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const deleteUnit: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const getCategories: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const createCategory: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const updateCategory: (req: AuthRequest, res: Response) => Promise<void>;
-export declare const deleteCategory: (req: AuthRequest, res: Response) => Promise<void>;
+import { Request, Response } from 'express';
+export declare const getBusinessCategories: (req: Request, res: Response) => Promise<Response>;
+export declare const getIndustries: (req: Request, res: Response) => Promise<Response>;
+export declare const getBusinessActivities: (req: Request, res: Response) => Promise<Response>;
+export declare const searchBusinessProducts: (req: Request, res: Response) => Promise<Response>;
+export declare const getBusinessCapabilities: (req: Request, res: Response) => Promise<Response>;
+export declare const seedMasterData: (req: Request, res: Response) => Promise<Response>;
+export declare const createCustomIndustry: (req: Request, res: Response) => Promise<Response>;
+export declare const createCustomProduct: (req: Request, res: Response) => Promise<Response>;
+export declare const getPopularProducts: (req: Request, res: Response) => Promise<Response>;
+export declare const getBusinessTypes: (req: Request, res: Response) => Promise<Response>;
 //# sourceMappingURL=masterdataController.d.ts.map

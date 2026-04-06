@@ -667,28 +667,13 @@ export class ValidationException extends HttpException {
 
 ### 3.2 Additional Models Needed
 
+The following models are planned for future phases:
+
 ```prisma
 // Add to schema.prisma
 
-// Audit Logging
-model AuditLog {
-  id          String   @id @default(uuid())
-  entityType  String   // "Invoice", "Product", etc.
-  entityId    String
-  action      String   // "CREATE", "UPDATE", "DELETE"
-  oldValues   Json?
-  newValues   Json?
-  ipAddress   String?
-  userAgent   String?
-  userId      String
-  companyId   String
-  createdAt   DateTime @default(now())
-  
-  @@index([entityType, entityId])
-  @@index([companyId, createdAt])
-}
-
-// Activity Log (User actions)
+// Activity Log (User actions - distinct from CRM Activity)
+// Currently 'AuditLog' covers entity changes, but 'ActivityLog' for login/view actions is pending.
 model ActivityLog {
   id          String   @id @default(uuid())
   action      String   // "logged_in", "created_invoice", etc.
@@ -701,7 +686,7 @@ model ActivityLog {
   @@index([companyId, createdAt])
 }
 
-// Notification
+// Notification (System notifications)
 model Notification {
   id          String   @id @default(uuid())
   type        String   // "LOW_STOCK", "PAYMENT_DUE", etc.
@@ -719,7 +704,7 @@ model Notification {
   @@index([companyId])
 }
 
-// Settings (Company-level)
+// Settings (Company-level configuration store)
 model Settings {
   id                  String   @id @default(uuid())
   category            String   // "invoice", "gst", "general"
@@ -730,7 +715,7 @@ model Settings {
   @@unique([companyId, category, key])
 }
 
-// Document Storage
+// Document Storage (Centralized file management)
 model Document {
   id          String   @id @default(uuid())
   name        String
@@ -748,36 +733,9 @@ model Document {
   @@index([companyId])
 }
 
-// Sequence Generator (for invoice numbers, etc.)
-model Sequence {
-  id          String   @id @default(uuid())
-  prefix      String   // "INV", "PO", "EST"
-  currentValue Int     @default(0)
-  format      String   // "INV-{YYYY}-{SEQ:5}" 
-  fiscalYear  String?
-  companyId   String
-  
-  @@unique([companyId, prefix, fiscalYear])
-}
-
-// Branch/Location (Multi-branch support)
-model Branch {
-  id          String   @id @default(uuid())
-  name        String
-  code        String
-  address     Json?
-  phone       String?
-  email       String?
-  gstin       String?
-  isDefault   Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  companyId   String
-  createdAt   DateTime @default(now())
-  
-  @@unique([companyId, code])
-}
-
-// Payment Record
+// Payment Record (Consolidated Payment entity)
+// Currently handled via 'Transaction' (Banking) and 'GSTPayment'.
+// A unified 'Payment' model linking Invoices/Bills directly is planned.
 model Payment {
   id              String   @id @default(uuid())
   paymentNumber   String
@@ -798,34 +756,17 @@ model Payment {
   @@unique([companyId, paymentNumber])
   @@index([entityType, entityId])
 }
-
-// Message (Internal messaging)
-model Message {
-  id          String   @id @default(uuid())
-  content     String
-  attachments Json?    // Array of attachment info
-  senderId    String
-  receiverId  String?  // null for group/channel
-  channelId   String?
-  read        Boolean  @default(false)
-  readAt      DateTime?
-  companyId   String
-  createdAt   DateTime @default(now())
-  
-  @@index([channelId])
-  @@index([senderId])
-  @@index([receiverId])
-}
-
-model Channel {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // "direct", "group", "announcement"
-  members     Json     // Array of user IDs
-  companyId   String
-  createdAt   DateTime @default(now())
-}
 ```
+
+### 3.3 Implemented Models (Recently Added)
+
+The following models have been implemented in the core schema:
+
+- **AuditLog**: Entity change tracking (Implemented)
+- **Sequence**: Document number generation (Implemented)
+- **Branch**: Multi-location/GSTIN support (Implemented)
+- **Message** & **Conversation**: Internal messaging system (Implemented)
+
 
 ### 3.3 Indexing Strategy
 

@@ -11,8 +11,10 @@
 // Financial Reports
 export {
     getProfitLoss,
+    getProfitLossTrends,
     getBalanceSheet,
-    getDashboardSummary
+    getDashboardSummary,
+    getCashFlowForecast
 } from './financialReportsController';
 
 // Aging Reports
@@ -26,5 +28,14 @@ export {
     getSalesReport,
     getPurchaseReport,
     getInventoryReport,
-    getPartyStatement
+    getPartyStatement,
+    analyzeConcentration
 } from './transactionReportsController';
+
+export {
+    getBudgetVsActual,
+    saveBudget,
+    getBudgetAlerts,
+    getExchangeRates,
+    convertCurrency
+} from './financialReportsController';

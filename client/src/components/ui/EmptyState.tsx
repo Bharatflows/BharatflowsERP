@@ -1,10 +1,10 @@
 import React from 'react';
-import { Package, Users, FileText, TrendingUp, Inbox, Search, Database } from 'lucide-react';
+import { Package, Users, FileText, TrendingUp, Inbox, Search, Database, Receipt } from 'lucide-react';
 
 interface EmptyStateProps {
     title: string;
     description?: string;
-    icon?: 'package' | 'users' | 'file' | 'trending' | 'inbox' | 'search' | 'database' | React.ReactNode;
+    icon?: 'package' | 'users' | 'file' | 'trending' | 'inbox' | 'search' | 'database' | 'receipt' | React.ReactNode;
     action?: {
         label: string;
         onClick: () => void;
@@ -12,14 +12,15 @@ interface EmptyStateProps {
     className?: string;
 }
 
-const iconMap = {
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     package: Package,
     users: Users,
     file: FileText,
     trending: TrendingUp,
     inbox: Inbox,
     search: Search,
-    database: Database
+    database: Database,
+    receipt: Receipt
 };
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -46,7 +47,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             </h3>
 
             {description && (
-                <p className="text-gray-500 dark:text-gray-400 max-w-md mb-6">
+                <p className="text-gray-500 dark:text-gray-400 max-w-sm mb-6 whitespace-normal">
                     {description}
                 </p>
             )}
@@ -54,7 +55,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
             {action && (
                 <button
                     onClick={action.onClick}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-lg shadow-lg shadow-blue-500/25 transition-all duration-200 hover:-translate-y-0.5"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-medium rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 hover:-translate-y-0.5"
                 >
                     {action.label}
                 </button>

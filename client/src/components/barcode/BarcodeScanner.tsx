@@ -38,13 +38,13 @@ export function BarcodeScanner() {
           <div className="flex items-center justify-center border-2 border-dashed rounded-lg p-8 min-h-[300px] bg-accent/50">
             {isScanning ? (
               <div className="text-center space-y-4">
-                <Camera className="size-32 mx-auto text-[#2563eb] animate-pulse" />
+                <Camera className="size-32 mx-auto text-info animate-pulse" />
                 <p className="text-foreground">Scanning...</p>
                 <p className="text-muted-foreground">Point camera at barcode</p>
               </div>
             ) : scannedProduct ? (
               <div className="text-center space-y-4">
-                <CheckCircle className="size-32 mx-auto text-[#10b981]" />
+                <CheckCircle className="size-32 mx-auto text-success" />
                 <p className="text-foreground">Scan Complete!</p>
                 <p className="text-muted-foreground">Product found</p>
               </div>
@@ -73,9 +73,9 @@ export function BarcodeScanner() {
         <CardContent>
           {scannedProduct ? (
             <div className="space-y-4">
-              <div className="p-4 bg-[#f0fdf4] border border-[#86efac] rounded-lg">
+              <div className="p-4 bg-success-light border border-success/30 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="size-5 text-[#10b981]" />
+                  <CheckCircle className="size-5 text-success" />
                   <p className="text-foreground">Product Found</p>
                 </div>
                 <p className="text-muted-foreground">Barcode: {scannedProduct.code}</p>
@@ -103,7 +103,7 @@ export function BarcodeScanner() {
                   </div>
                   <div>
                     <p className="text-muted-foreground">Stock</p>
-                    <p className="text-foreground text-[#10b981]">{scannedProduct.stock} units</p>
+                    <p className="text-foreground text-success">{scannedProduct.stock} units</p>
                   </div>
                 </div>
                 <div>

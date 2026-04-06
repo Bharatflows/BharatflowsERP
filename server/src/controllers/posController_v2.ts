@@ -3,7 +3,8 @@ import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { getNextNumber } from '../services/sequenceService';
-import postingService from '../services/postingService';
+import eventBus, { EventTypes } from '../services/eventBus';  // P0: Domain events
+import logger from '../config/logger';
 
 // POS SESSIONS
 
@@ -35,7 +36,7 @@ export const openSession = async (req: AuthRequest, res: Response) => {
 
         res.status(201).json({ success: true, data: session });
     } catch (error: any) {
-        console.error('Open POS session error:', error);
+        logger.error('Open POS session error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -55,7 +56,7 @@ export const closeSession = async (req: AuthRequest, res: Response) => {
         }
 
         const updatedSession = await prisma.pOSSession.update({
-            where: { id: sessionId },
+            where: { id: sessionId , companyId: req.user.companyId },
             data: {
                 status: 'CLOSED',
                 endTime: new Date(),
@@ -65,7 +66,7 @@ export const closeSession = async (req: AuthRequest, res: Response) => {
 
         res.json({ success: true, data: updatedSession });
     } catch (error: any) {
-        console.error('Close POS session error:', error);
+        logger.error('Close POS session error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -79,7 +80,7 @@ export const createPOSOrder = async (req: AuthRequest, res: Response) => {
         const userId = req.user!.id;
 
         // 1. Verify Session
-        const session = await prisma.pOSSession.findUnique({ where: { id: sessionId } });
+        const session = await prisma.pOSSession.findUnique({ where: { id: sessionId , companyId: req.user.companyId } });
         if (!session || session.status !== 'OPEN') {
             res.status(400).json({ success: false, message: 'Session is closed or invalid' });
             return;
@@ -239,39 +240,42 @@ export const createPOSOrder = async (req: AuthRequest, res: Response) => {
             return { invoice, posOrder };
         });
 
-        // 6. Ledger Posting (Outside Transaction)
+        // 6. P0: Emit domain events for ledger posting
         try {
-            // A. Post Sales (Dr Customer, Cr Sales)
-            await postingService.postSalesInvoice({
-                id: result.invoice.id,
-                invoiceNumber: result.invoice.invoiceNumber,
-                invoiceDate: result.invoice.invoiceDate,
-                customerId: result.invoice.customerId,
-                subtotal: Number(result.invoice.subtotal),
-                totalTax: Number(result.invoice.totalTax),
-                totalAmount: Number(result.invoice.totalAmount),
-                companyId
-            });
-
-            // B. Post Payment (Dr Cash/Bank, Cr Customer)
-            await postingService.postPayment({
+            // A. Emit Invoice Created event
+            await eventBus.emit({
                 companyId,
-                partyId: result.invoice.customerId,
-                mode: paymentMode === 'CASH' ? 'CASH' : 'BANK', // Simplified
-                type: 'RECEIVED',
-                amount: Number(result.invoice.totalAmount),
-                date: new Date(),
-                id: result.posOrder.id,
-                billId: result.posOrder.orderNumber // Using billId to store reference if needed, or just id implies reference. 
-                // schema says billId?: string.
-                // actually postingService uses id as referenceId.
-                // So id: result.posOrder.orderNumber might be better if we want the order number in reference.
-                // BUT id usually expects UUID if it's used for tracing?
-                // Let's use id: result.posOrder.id so it links to the POS Order record correctly.
+                eventType: EventTypes.INVOICE_CREATED,
+                aggregateType: 'Invoice',
+                aggregateId: result.invoice.id,
+                payload: {
+                    invoiceId: result.invoice.id,
+                    invoiceNumber: result.invoice.invoiceNumber,
+                    invoiceDate: result.invoice.invoiceDate.toISOString(),
+                    customerId: result.invoice.customerId,
+                    subtotal: Number(result.invoice.subtotal),
+                    totalTax: Number(result.invoice.totalTax),
+                    totalAmount: Number(result.invoice.totalAmount)
+                },
+                metadata: { userId, source: 'api' }
             });
 
-        } catch (postError) {
-            console.error(`Failed to post ledger for POS ${orderNumber}`, postError);
+            // B. Emit Payment Received event
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PAYMENT_RECEIVED,
+                aggregateType: 'Payment',
+                aggregateId: result.posOrder.id,
+                payload: {
+                    partyId: result.invoice.customerId,
+                    amount: Number(result.invoice.totalAmount),
+                    mode: paymentMode === 'CASH' ? 'CASH' : 'BANK',
+                    invoiceId: result.invoice.id
+                },
+                metadata: { userId, source: 'api' }
+            });
+        } catch (eventError) {
+            logger.warn(`Failed to emit events for POS ${orderNumber}`, eventError);
         }
 
         res.status(201).json({
@@ -280,7 +284,7 @@ export const createPOSOrder = async (req: AuthRequest, res: Response) => {
             invoice: result.invoice
         });
     } catch (error: any) {
-        console.error('Create POS order error:', error);
+        logger.error('Create POS order error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -20,6 +20,8 @@ import {
 } from "lucide-react";
 import { accountingService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { ModuleHeader } from "../ui/module-header";
+import { ACCOUNT_TYPES } from "@/constants";
 
 interface LedgerGroup {
     id: string;
@@ -161,7 +163,7 @@ export function ChartOfAccounts() {
         return (
             <div key={group.id}>
                 <div
-                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors`}
+                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors`}
                     style={{ paddingLeft: `${depth * 16 + 8}px` }}
                     onClick={() => toggleGroup(group.id)}
                 >
@@ -225,41 +227,35 @@ export function ChartOfAccounts() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link to="/accounting">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
+            <ModuleHeader
+                title="Chart of Accounts"
+                description="Manage your ledger accounts and groups"
+                showBackButton={true}
+                backTo="/accounting"
+                icon={<Book className="size-5 text-primary" />}
+                actions={
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={fetchData}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Refresh
                         </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">Chart of Accounts</h1>
-                        <p className="text-muted-foreground">
-                            Manage your ledger accounts and groups
-                        </p>
+                        {groups.length === 0 && (
+                            <Button size="sm" onClick={handleSeedDefaults} disabled={seeding}>
+                                {seeding ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4 mr-2" />
+                                )}
+                                Create Default Chart
+                            </Button>
+                        )}
                     </div>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={fetchData}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
-                    </Button>
-                    {groups.length === 0 && (
-                        <Button onClick={handleSeedDefaults} disabled={seeding}>
-                            {seeding ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                                <Plus className="h-4 w-4 mr-2" />
-                            )}
-                            Create Default Chart
-                        </Button>
-                    )}
-                </div>
-            </div>
+                }
+            />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                {["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map((type) => {
+                {ACCOUNT_TYPES.map((type) => {
                     const count = ledgers.filter((l) => l.group.type === type).length;
                     return (
                         <Card key={type}>

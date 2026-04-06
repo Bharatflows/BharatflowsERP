@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { productsService } from "@/services/modules.service";
+
 interface ScannedProduct {
     barcode: string;
     productName: string;
@@ -29,23 +31,6 @@ export function BarcodeScanner() {
     const [lastScanned, setLastScanned] = useState<ScannedProduct | null>(null);
     const [scanHistory, setScanHistory] = useState<ScannedProduct[]>([]);
     const [soundEnabled, setSoundEnabled] = useState(true);
-
-    // Simulated product lookup
-    const lookupProduct = (barcode: string): ScannedProduct | null => {
-        // Mock product database
-        const products: Record<string, Omit<ScannedProduct, "barcode" | "timestamp">> = {
-            "8901234567890": { productName: "Samsung Galaxy A54", productCode: "PROD-001", sellingPrice: 32999, stock: 15 },
-            "8901234567891": { productName: "iPhone 15 Case", productCode: "PROD-002", sellingPrice: 999, stock: 50 },
-            "8901234567892": { productName: "USB-C Cable 1m", productCode: "PROD-003", sellingPrice: 299, stock: 100 },
-            "8901234567893": { productName: "Wireless Earbuds", productCode: "PROD-004", sellingPrice: 2499, stock: 25 },
-        };
-
-        const product = products[barcode];
-        if (product) {
-            return { ...product, barcode, timestamp: new Date() };
-        }
-        return null;
-    };
 
     const playBeep = useCallback(() => {
         if (soundEnabled) {
@@ -66,16 +51,28 @@ export function BarcodeScanner() {
         }
     }, [soundEnabled]);
 
-    const handleBarcodeScan = useCallback((barcode: string) => {
-        const product = lookupProduct(barcode);
+    const handleBarcodeScan = useCallback(async (barcode: string) => {
+        try {
+            const response = await productsService.getByBarcode(barcode);
 
-        if (product) {
-            playBeep();
-            setLastScanned(product);
-            setScanHistory((prev) => [product, ...prev.slice(0, 19)]);
-            toast.success(`Found: ${product.productName}`);
-        } else {
-            toast.error(`Product not found: ${barcode}`);
+            if (response.success && response.data) {
+                playBeep();
+                const product: ScannedProduct = {
+                    barcode: response.data.barcode || barcode,
+                    productName: response.data.name,
+                    productCode: response.data.code || '',
+                    sellingPrice: Number(response.data.sellingPrice) || 0,
+                    stock: Number(response.data.currentStock) || 0,
+                    timestamp: new Date()
+                };
+                setLastScanned(product);
+                setScanHistory((prev) => [product, ...prev.slice(0, 19)]);
+                toast.success(`Found: ${product.productName}`);
+            } else {
+                toast.error(`Product not found: ${barcode}`);
+            }
+        } catch (error: any) {
+            toast.error(`Error looking up barcode: ${error.message || 'Unknown error'}`);
         }
     }, [playBeep]);
 
@@ -263,7 +260,7 @@ export function BarcodeScanner() {
                                 {scanHistory.map((item, idx) => (
                                     <div
                                         key={idx}
-                                        className="flex items-center justify-between p-2 border rounded hover:bg-muted/50"
+                                        className="flex items-center justify-between p-2 border rounded hover:bg-muted"
                                     >
                                         <div>
                                             <p className="font-medium">{item.productName}</p>
@@ -290,7 +287,7 @@ export function BarcodeScanner() {
                         <Settings className="h-5 w-5" />
                         Test Barcodes (Demo)
                     </CardTitle>
-                    <CardDescription>Click to simulate scanning</CardDescription>
+                    <CardDescription>Click to simulate scanning. These must exist in your inventory with these exact barcode values.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-wrap gap-2">
@@ -307,7 +304,7 @@ export function BarcodeScanner() {
                     </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }
 

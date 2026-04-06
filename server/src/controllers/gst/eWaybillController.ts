@@ -196,7 +196,7 @@ export const updateEWaybill = async (req: AuthRequest, res: Response) => {
         }
 
         const eWaybill = await prisma.eWaybill.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: updateData,
         });
 
@@ -244,7 +244,7 @@ export const extendEWaybill = async (req: AuthRequest, res: Response) => {
 
         // In production, this would call the E-Way Bill extension API
         const eWaybill = await prisma.eWaybill.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: {
                 validUpto: new Date(newValidUpto),
                 vehicleNumber: newVehicleNumber || existing.vehicleNumber,
@@ -295,7 +295,7 @@ export const cancelEWaybill = async (req: AuthRequest, res: Response) => {
 
         // In production, check if within 24 hours and call cancellation API
         const eWaybill = await prisma.eWaybill.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: {
                 status: 'cancelled',
                 errorMessage: reason || 'Cancelled by user',
@@ -344,7 +344,7 @@ export const deleteEWaybill = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.eWaybill.delete({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
         });
 
         return res.json({

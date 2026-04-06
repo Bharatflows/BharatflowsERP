@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Download, Calendar, FileText, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Calendar, FileText, Loader2, RefreshCw, X, Maximize2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -34,6 +34,7 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
   const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
   const [appliedFromDate, setAppliedFromDate] = useState(fromDate);
   const [appliedToDate, setAppliedToDate] = useState(toDate);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   // Fetch real data from backend API
   const { data, isLoading, isFetching, error, refetch } = usePartyLedger(partyId, {
@@ -63,17 +64,17 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
     const typeLower = type.toLowerCase();
     switch (typeLower) {
       case "invoice":
-        return "bg-[#3b82f6]/10 text-[#3b82f6] border-[#3b82f6]/20";
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "payment":
-        return "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20";
+        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
       case "purchase":
-        return "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20";
+        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
       case "credit_note":
-        return "bg-[#f59e0b]/10 text-[#f59e0b] border-[#f59e0b]/20";
+        return "bg-amber-500/10 text-amber-600 border-amber-500/20";
       case "debit_note":
-        return "bg-[#ef4444]/10 text-[#ef4444] border-[#ef4444]/20";
+        return "bg-destructive/10 text-destructive border-destructive/20";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -163,7 +164,7 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
             <CardTitle className="text-muted-foreground">Total Debit</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-[#ef4444]">
+            <p className="text-destructive">
               ₹{totalDebit.toLocaleString("en-IN")}
             </p>
           </CardContent>
@@ -174,7 +175,7 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
             <CardTitle className="text-muted-foreground">Total Credit</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-[#10b981]">
+            <p className="text-emerald-600">
               ₹{totalCredit.toLocaleString("en-IN")}
             </p>
           </CardContent>
@@ -185,7 +186,7 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
             <CardTitle className="text-muted-foreground">Closing Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={cn(closingBalance > 0 ? "text-[#ef4444]" : "text-[#10b981]")}>
+            <p className={cn(closingBalance > 0 ? "text-destructive" : "text-emerald-600")}>
               ₹{Math.abs(closingBalance).toLocaleString("en-IN")}
             </p>
           </CardContent>
@@ -245,104 +246,183 @@ export function PartyLedger({ partyId, partyName, partyType, onBack }: PartyLedg
           <CardTitle>Transaction History</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[#f8fafc] border-b border-border">
-                <tr>
-                  <th className="text-left px-6 py-4 text-muted-foreground">Date</th>
-                  <th className="text-left px-6 py-4 text-muted-foreground">Type</th>
-                  <th className="text-left px-6 py-4 text-muted-foreground">Reference</th>
-                  <th className="text-right px-6 py-4 text-muted-foreground">Debit (₹)</th>
-                  <th className="text-right px-6 py-4 text-muted-foreground">Credit (₹)</th>
-                  <th className="text-right px-6 py-4 text-muted-foreground">Balance (₹)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.length === 0 ? (
+          <div className="flex gap-4 items-start relative pb-4 px-4">
+            <div className={cn("overflow-x-auto transition-all duration-300", selectedTx ? "hidden lg:block lg:flex-1" : "w-full")}>
+              <table className="w-full">
+                <thead className="bg-background border-b border-border">
                   <tr>
-                    <td colSpan={6} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-3">
-                        <FileText className="size-12 text-muted-foreground/50" />
-                        <div>
-                          <p className="text-foreground mb-1">No transactions found</p>
-                          <p className="text-muted-foreground">
-                            Transactions will appear here when invoices or payments are recorded
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+                    <th className="text-left px-6 py-4 text-muted-foreground">Date</th>
+                    <th className="text-left px-6 py-4 text-muted-foreground">Type</th>
+                    <th className="text-left px-6 py-4 text-muted-foreground">Reference</th>
+                    <th className="text-right px-6 py-4 text-muted-foreground">Debit (₹)</th>
+                    <th className="text-right px-6 py-4 text-muted-foreground">Credit (₹)</th>
+                    <th className="text-right px-6 py-4 text-muted-foreground">Balance (₹)</th>
                   </tr>
-                ) : (
-                  transactions.map((transaction, index) => (
-                    <tr key={`${transaction.reference}-${index}`} className="border-b border-border hover:bg-[#f8fafc]/50">
-                      <td className="px-6 py-4">
-                        <p className="text-foreground">
-                          {new Date(transaction.date).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
+                </thead>
+                <tbody>
+                  {transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12">
+                        <div className="flex flex-col items-center gap-3">
+                          <FileText className="size-12 text-muted-foreground/50" />
+                          <div>
+                            <p className="text-foreground mb-1">No transactions found</p>
+                            <p className="text-muted-foreground">
+                              Transactions will appear here when invoices or payments are recorded
+                            </p>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <Badge
-                          variant="outline"
-                          className={cn("border", getTransactionTypeColor(transaction.type))}
-                        >
-                          {getTransactionTypeLabel(transaction.type)}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-foreground">{transaction.reference}</p>
+                    </tr>
+                  ) : (
+                    transactions.map((transaction, index) => (
+                      <tr
+                        key={`${transaction.reference}-${index}`}
+                        className={cn(
+                          "border-b border-border transition-colors cursor-pointer group",
+                          selectedTx?.reference === transaction.reference
+                            ? "bg-orange-50/50 dark:bg-orange-900/20 border-l-4 border-l-orange-500"
+                            : "hover:bg-background/50 border-l-4 border-l-transparent"
+                        )}
+                        onClick={() => {
+                          if (selectedTx?.reference === transaction.reference) setSelectedTx(null);
+                          else setSelectedTx(transaction);
+                        }}
+                      >
+                        <td className="px-6 py-4">
+                          <p className="text-foreground">
+                            {new Date(transaction.date).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge
+                            variant="outline"
+                            className={cn("border", getTransactionTypeColor(transaction.type))}
+                          >
+                            {getTransactionTypeLabel(transaction.type)}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-foreground">{transaction.reference}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <p className={cn(transaction.debit > 0 ? "text-destructive" : "text-muted-foreground")}>
+                            {transaction.debit > 0
+                              ? transaction.debit.toLocaleString("en-IN")
+                              : "-"}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <p className={cn(transaction.credit > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                            {transaction.credit > 0
+                              ? transaction.credit.toLocaleString("en-IN")
+                              : "-"}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <p className="text-foreground">
+                            {transaction.balance.toLocaleString("en-IN")}
+                          </p>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {transactions.length > 0 && (
+                  <tfoot className="bg-muted border-t-2 border-border">
+                    <tr>
+                      <td colSpan={3} className="px-6 py-4">
+                        <p className="text-foreground font-semibold">Total</p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className={cn(transaction.debit > 0 ? "text-[#ef4444]" : "text-muted-foreground")}>
-                          {transaction.debit > 0
-                            ? transaction.debit.toLocaleString("en-IN")
-                            : "-"}
+                        <p className="text-destructive font-semibold">
+                          {totalDebit.toLocaleString("en-IN")}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className={cn(transaction.credit > 0 ? "text-[#10b981]" : "text-muted-foreground")}>
-                          {transaction.credit > 0
-                            ? transaction.credit.toLocaleString("en-IN")
-                            : "-"}
+                        <p className="text-emerald-600 font-semibold">
+                          {totalCredit.toLocaleString("en-IN")}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <p className="text-foreground">
-                          {transaction.balance.toLocaleString("en-IN")}
+                        <p className={cn("font-semibold", closingBalance > 0 ? "text-destructive" : "text-emerald-600")}>
+                          {Math.abs(closingBalance).toLocaleString("en-IN")}
                         </p>
                       </td>
                     </tr>
-                  ))
+                  </tfoot>
                 )}
-              </tbody>
-              {transactions.length > 0 && (
-                <tfoot className="bg-[#f8fafc] border-t-2 border-border">
-                  <tr>
-                    <td colSpan={3} className="px-6 py-4">
-                      <p className="text-foreground font-semibold">Total</p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className="text-[#ef4444] font-semibold">
-                        {totalDebit.toLocaleString("en-IN")}
+              </table>
+            </div>
+
+            {/* Contextual Detail Panel */}
+            {selectedTx && (
+              <div className="w-full lg:w-[380px] shrink-0 bg-card border border-orange-200 dark:border-orange-900/50 rounded-lg shadow-sm sticky top-4 flex flex-col h-[600px] overflow-hidden animate-in slide-in-from-right-8 duration-300">
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-border bg-muted dark:bg-card border-orange-100 dark:border-orange-900/30">
+                  <div className="flex items-center gap-2">
+                    <FileText className="size-4 text-orange-500" />
+                    <h3 className="font-bold text-foreground">
+                      {selectedTx.reference || "Transaction"}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => setSelectedTx(null)}>
+                      <X className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Type</p>
+                      <Badge variant="outline" className={cn("capitalize px-2 py-0.5", getTransactionTypeColor(selectedTx.type))}>
+                        {getTransactionTypeLabel(selectedTx.type)}
+                      </Badge>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Date</p>
+                      <p className="font-medium text-foreground">{new Date(selectedTx.date).toLocaleDateString("en-IN", { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted dark:bg-card p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                      <p className="text-xs text-muted-foreground mb-1">Debit Amount</p>
+                      <p className={cn("text-lg font-bold font-mono", selectedTx.debit > 0 ? "text-destructive" : "text-muted-foreground")}>
+                        ₹{selectedTx.debit.toLocaleString("en-IN")}
                       </p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className="text-[#10b981] font-semibold">
-                        {totalCredit.toLocaleString("en-IN")}
+                    </div>
+                    <div className="bg-muted dark:bg-card p-3 rounded-lg border border-slate-100 dark:border-slate-700">
+                      <p className="text-xs text-muted-foreground mb-1">Credit Amount</p>
+                      <p className={cn("text-lg font-bold font-mono", selectedTx.credit > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+                        ₹{selectedTx.credit.toLocaleString("en-IN")}
                       </p>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className={cn("font-semibold", closingBalance > 0 ? "text-[#ef4444]" : "text-[#10b981]")}>
-                        {Math.abs(closingBalance).toLocaleString("en-IN")}
-                      </p>
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg flex items-center justify-between border border-orange-100 dark:border-orange-900/30">
+                    <span className="font-semibold text-orange-800 dark:text-orange-200">Running Balance</span>
+                    <span className="font-mono text-lg font-bold text-foreground">
+                      ₹{selectedTx.balance.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Fixed Footer Actions */}
+                <div className="p-4 border-t border-border bg-muted dark:bg-card grid grid-cols-1 gap-3 shrink-0">
+                  <Button variant="outline" className="w-full">
+                    <Download className="size-4 mr-2" /> Download Receipt
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

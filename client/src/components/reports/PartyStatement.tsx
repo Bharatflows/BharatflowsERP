@@ -126,8 +126,56 @@ export function PartyStatement() {
     }
   };
 
-  const handleEmailStatement = () => {
-    toast.info("Email functionality coming soon");
+  const handleExport = async (format: 'pdf' | 'excel') => {
+    if (!selectedParty || !statementData) return;
+
+    try {
+      toast.promise(
+        reportsService.exportPartyStatement(selectedParty, format, {
+          startDate: fromDate,
+          endDate: toDate,
+        }),
+        {
+          loading: `Generating ${format.toUpperCase()}...`,
+          success: (blob: any) => {
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `Statement_${statementData.party.name}_${fromDate}_to_${toDate}.${format === 'pdf' ? 'pdf' : 'xlsx'}`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            return `${format.toUpperCase()} exported successfully`;
+          },
+          error: `Failed to export ${format.toUpperCase()}`
+        }
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleEmailStatement = async () => {
+    if (!selectedParty || !party?.email) {
+      toast.error("Party email is missing");
+      return;
+    }
+
+    try {
+      toast.promise(
+        reportsService.emailPartyStatement(selectedParty, {
+          startDate: fromDate,
+          endDate: toDate,
+        }),
+        {
+          loading: "Sending email...",
+          success: "Statement sent to party successfully",
+          error: "Failed to send email"
+        }
+      );
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const party = parties.find((p) => p.id === selectedParty);
@@ -261,11 +309,21 @@ export function PartyStatement() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport('pdf')}
+                    className="border-red-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     PDF
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport('excel')}
+                    className="border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300"
+                  >
                     <Download className="h-4 w-4 mr-2" />
                     Excel
                   </Button>
@@ -404,7 +462,7 @@ export function PartyStatement() {
                           </TableRow>
                         ))}
                         {/* Summary Row */}
-                        <TableRow className="bg-muted/50 font-semibold">
+                        <TableRow className="bg-muted font-semibold">
                           <TableCell colSpan={3} className="text-right">
                             Total
                           </TableCell>

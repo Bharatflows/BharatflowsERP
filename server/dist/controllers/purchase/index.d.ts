@@ -7,7 +7,7 @@
  * - purchaseBillController.ts
  * - grnController.ts
  */
-export { getPurchaseOrders, getPurchaseOrder, createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, updatePurchaseOrderStatus } from './purchaseOrderController';
+export { getPurchaseOrders, getPurchaseOrder, createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder, updatePurchaseOrderStatus, convertPOToGRN, convertPOToBill } from './purchaseOrderController';
 export { getPurchaseBills, getPurchaseBill, createPurchaseBill, updatePurchaseBill, deletePurchaseBill } from './purchaseBillController';
 export { getGRNs, getGRN, createGRN, updateGRN, deleteGRN } from './grnController';
 //# sourceMappingURL=index.d.ts.map

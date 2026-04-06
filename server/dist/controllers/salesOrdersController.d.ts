@@ -6,4 +6,5 @@ export declare const createSalesOrder: (req: AuthRequest, res: Response) => Prom
 export declare const updateSalesOrder: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const deleteSalesOrder: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const convertSalesOrderToInvoice: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const convertSalesOrderToChallan: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 //# sourceMappingURL=salesOrdersController.d.ts.map

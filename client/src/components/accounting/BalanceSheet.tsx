@@ -1,20 +1,20 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
 import {
     RefreshCw,
     Loader2,
-    ArrowLeft,
-    Download,
     Calendar,
     Building,
     Wallet,
     PiggyBank,
+    Download
 } from "lucide-react";
 import { Input } from "../ui/input";
+import { Button } from "../ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { accountingService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { ModuleHeader } from "../ui/module-header";
+import { cn } from "@/lib/utils";
 
 interface TrialBalanceEntry {
     ledgerId: string;
@@ -119,62 +119,73 @@ export function BalanceSheet() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link to="/accounting">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
+            <ModuleHeader
+                title="Balance Sheet"
+                description="Financial position as of the selected date (Assets = Liabilities + Equity)"
+                showBackButton={true}
+                backTo="/accounting"
+                icon={<Building className="size-5 text-primary" />}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 bg-muted p-1.5 rounded-lg border">
+                            <Calendar className="h-4 w-4 text-muted-foreground ml-1" />
+                            <Input
+                                type="date"
+                                value={asOfDate}
+                                onChange={(e) => setAsOfDate(e.target.value)}
+                                className="w-32 h-7 p-0 border-0 bg-transparent text-sm"
+                            />
+                        </div>
+                        <Button variant="outline" size="sm" onClick={fetchData}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Refresh
                         </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">Balance Sheet</h1>
-                        <p className="text-muted-foreground">
-                            Assets = Liabilities + Equity
-                        </p>
+                        <Button variant="outline" size="sm" onClick={handleExport}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Export
+                        </Button>
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="date"
-                            value={asOfDate}
-                            onChange={(e) => setAsOfDate(e.target.value)}
-                            className="w-40 border-0 bg-transparent"
-                        />
-                    </div>
-                    <Button variant="outline" onClick={fetchData}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
-                    </Button>
-                    <Button variant="outline" onClick={handleExport}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                    </Button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Balance Check */}
-            <Card className={isBalanced ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}>
-                <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+            <Card className={cn(
+                "border-0 shadow-sm relative overflow-hidden",
+                isBalanced ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"
+            )}>
+                <CardContent className="p-4 flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-2 font-medium">
                         {isBalanced ? (
-                            <span className="text-green-700">✓ Balance Sheet is balanced</span>
+                            <span className="flex items-center gap-2">
+                                <span className="p-1 bg-emerald-500 rounded-full text-white">
+                                    <RefreshCw className="size-3" />
+                                </span>
+                                Balance Sheet is balanced
+                            </span>
                         ) : (
-                            <span className="text-red-700">⚠ Balance Sheet is NOT balanced</span>
+                            <span className="flex items-center gap-2">
+                                <span className="p-1 bg-rose-500 rounded-full text-white">
+                                    <RefreshCw className="size-3" />
+                                </span>
+                                Balance Sheet is NOT balanced
+                            </span>
                         )}
                     </div>
                     <div className="flex gap-8 text-sm">
-                        <div>
-                            <span className="text-muted-foreground mr-2">Assets:</span>
-                            <span className="font-bold">{formatCurrency(totalAssets)}</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs uppercase tracking-wider opacity-60">Total Assets</span>
+                            <span className="font-bold text-lg font-mono">{formatCurrency(totalAssets)}</span>
                         </div>
-                        <div>
-                            <span className="text-muted-foreground mr-2">Liabilities + Equity:</span>
-                            <span className="font-bold">{formatCurrency(totalLiabilitiesAndEquity)}</span>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs uppercase tracking-wider opacity-60">Liabilities + Equity</span>
+                            <span className="font-bold text-lg font-mono">{formatCurrency(totalLiabilitiesAndEquity)}</span>
                         </div>
                     </div>
                 </CardContent>
+                <div className={cn(
+                    "absolute left-0 top-0 h-full w-1",
+                    isBalanced ? "bg-emerald-500" : "bg-rose-500"
+                )} />
             </Card>
 
             {/* Balance Sheet Layout */}

@@ -41,6 +41,7 @@ export type SyncEventType =
     | 'sync:completed'
     | 'sync:failed'
     | 'sync:conflict'
+    | 'sync:conflict_pending_manual' // New: needs manual resolution
     | 'network:online'
     | 'network:offline'
     | 'queue:changed';
@@ -51,6 +52,49 @@ export interface SyncEvent {
 }
 
 type SyncEventListener = (event: SyncEvent) => void;
+
+/**
+ * Conflict Resolution Strategy
+ * 
+ * Phase 3: Tiered conflict resolution rules:
+ * 1. SERVER_WINS - For financial data (invoices, payments) - data integrity > convenience
+ * 2. LAST_WRITE_WINS - For drafts and non-critical data - convenience > data integrity  
+ * 3. MANUAL_MERGE - For parties/products - requires user review
+ */
+export type ConflictStrategy = 'SERVER_WINS' | 'LAST_WRITE_WINS' | 'MANUAL_MERGE';
+
+// Determine resolution strategy based on entity type
+function getConflictStrategy(entity: SyncQueueItem['entity'], data: Record<string, unknown>): ConflictStrategy {
+    // Financial entities - server always wins to preserve data integrity
+    if (entity === 'invoices' || entity === 'posOrders') {
+        return 'SERVER_WINS';
+    }
+
+    // Draft documents - last write wins
+    if (entity === 'estimates' || entity === 'salesOrders' || entity === 'purchaseOrders') {
+        const status = data.status as string | undefined;
+        if (status === 'DRAFT' || status === 'draft') {
+            return 'LAST_WRITE_WINS';
+        }
+        // Non-draft (finalized) orders - server wins
+        return 'SERVER_WINS';
+    }
+
+    // Parties and Products - require manual merge for edits
+    if (entity === 'parties' || entity === 'products') {
+        return 'MANUAL_MERGE';
+    }
+
+    // Default fallback
+    return 'LAST_WRITE_WINS';
+}
+
+// Compare timestamps to determine winner for LAST_WRITE_WINS
+function isClientNewer(clientData: Record<string, unknown>, serverData: Record<string, unknown>): boolean {
+    const clientTime = new Date(clientData.updatedAt as string || '1970-01-01').getTime();
+    const serverTime = new Date(serverData.updatedAt as string || '1970-01-01').getTime();
+    return clientTime > serverTime;
+}
 
 // ============ SYNC SERVICE CLASS ============
 
@@ -167,6 +211,59 @@ class SyncService {
     }
 
     /**
+     * Get pending conflicts that need manual resolution
+     */
+    async getPendingConflicts(): Promise<Array<{ entity: string; entityId: string; localData: unknown; syncStatus: string }>> {
+        const conflicts: Array<{ entity: string; entityId: string; localData: unknown; syncStatus: string }> = [];
+
+        const entities: SyncQueueItem['entity'][] = ['parties', 'products', 'invoices', 'estimates', 'salesOrders', 'purchaseOrders'];
+
+        for (const entity of entities) {
+            const table = db[entity];
+            const items = await table.where('syncStatus').equals('conflict').toArray();
+            for (const item of items) {
+                conflicts.push({
+                    entity,
+                    entityId: (item as { id: string }).id,
+                    localData: item,
+                    syncStatus: 'conflict'
+                });
+            }
+        }
+
+        return conflicts;
+    }
+
+    /**
+     * Resolve a conflict manually
+     * @param entity - The entity type
+     * @param entityId - The record ID
+     * @param resolution - 'keep_local' to keep client data, 'use_server' to accept server data
+     * @param serverData - The server data (required if resolution is 'use_server')
+     */
+    async resolveConflict(
+        entity: SyncQueueItem['entity'],
+        entityId: string,
+        resolution: 'keep_local' | 'use_server',
+        serverData?: Record<string, unknown>
+    ): Promise<void> {
+        if (resolution === 'use_server' && serverData) {
+            // Accept server data
+            await this.mergeServerData(entity, serverData);
+            await db.syncQueue.where('entityId').equals(entityId).delete();
+        } else {
+            // Keep local data - mark as pending for re-sync
+            await this.updateSyncStatus(entity, entityId, 'pending');
+            // Trigger sync to push local version
+            if (this.isOnline && !this.isSyncing) {
+                this.sync();
+            }
+        }
+
+        this.emit({ type: 'queue:changed', data: { pendingCount: await db.syncQueue.count() } });
+    }
+
+    /**
      * Trigger a manual sync
      */
     async sync(): Promise<boolean> {
@@ -229,17 +326,50 @@ class SyncService {
                 await db.syncQueue.where('entityId').equals(applied.id).delete();
             }
 
-            // Handle conflicts (Last Write Wins - server wins for now)
+            // Handle conflicts with tiered resolution strategy
             for (const conflict of response.conflicts) {
-                this.emit({ type: 'sync:conflict', data: conflict });
+                const entity = conflict.entity as SyncQueueItem['entity'];
+                const clientData = await this.getLocalRecord(entity, conflict.id);
+                const strategy = getConflictStrategy(entity, clientData as Record<string, unknown> || {});
 
-                if (conflict.resolution === 'server_wins') {
-                    // Update local with server data
-                    await this.mergeServerData(conflict.entity as SyncQueueItem['entity'], conflict.serverData);
+                switch (strategy) {
+                    case 'SERVER_WINS':
+                        // Financial data - server always wins for data integrity
+                        this.emit({ type: 'sync:conflict', data: { ...conflict, strategy, resolution: 'auto' } });
+                        await this.mergeServerData(entity, conflict.serverData);
+                        await db.syncQueue.where('entityId').equals(conflict.id).delete();
+                        break;
+
+                    case 'LAST_WRITE_WINS':
+                        // For drafts - compare timestamps
+                        const clientWins = isClientNewer(clientData as Record<string, unknown> || {}, conflict.serverData);
+                        this.emit({ type: 'sync:conflict', data: { ...conflict, strategy, resolution: clientWins ? 'client' : 'server' } });
+
+                        if (clientWins) {
+                            // Keep local data, mark as pending (retry will push to server)
+                            await this.updateSyncStatus(entity, conflict.id, 'pending');
+                        } else {
+                            // Server is newer - accept server data
+                            await this.mergeServerData(entity, conflict.serverData);
+                            await db.syncQueue.where('entityId').equals(conflict.id).delete();
+                        }
+                        break;
+
+                    case 'MANUAL_MERGE':
+                        // Parties/Products - flag for manual resolution
+                        await this.updateSyncStatus(entity, conflict.id, 'conflict');
+                        this.emit({
+                            type: 'sync:conflict_pending_manual',
+                            data: {
+                                ...conflict,
+                                strategy,
+                                clientData,
+                                message: `Conflict on ${entity}: local and server versions differ. Manual review required.`
+                            }
+                        });
+                        // Don't remove from queue - keep for manual resolution
+                        break;
                 }
-
-                // Remove from queue
-                await db.syncQueue.where('entityId').equals(conflict.id).delete();
             }
 
             // Apply server changes from other devices

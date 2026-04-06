@@ -18,6 +18,7 @@ const DEFAULT_SEQUENCES: Record<string, { prefix: string; format: string }> = {
     PRODUCT: { prefix: 'PROD', format: '{PREFIX}-{SEQ:4}' },
     CREDIT_NOTE: { prefix: 'CN', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
     DEBIT_NOTE: { prefix: 'DN', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
+    STOCK_ADJUSTMENT: { prefix: 'SA', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
 };
 
 /**
@@ -123,6 +124,9 @@ export async function getNextNumber(
                 break;
             case 'DEBIT_NOTE':
                 existingCount = await prisma.debitNote.count({ where: { companyId } });
+                break;
+            case 'STOCK_ADJUSTMENT':
+                existingCount = await prisma.stockAdjustment.count({ where: { companyId } });
                 break;
             default:
                 existingCount = 0;
@@ -261,6 +265,9 @@ export async function getSequence(companyId: string, documentType: string) {
                     break;
                 case 'CREDIT_NOTE':
                     existingCount = await prisma.creditNote.count({ where: { companyId } });
+                    break;
+                case 'STOCK_ADJUSTMENT':
+                    existingCount = await prisma.stockAdjustment.count({ where: { companyId } });
                     break;
                 default:
                     existingCount = 0;

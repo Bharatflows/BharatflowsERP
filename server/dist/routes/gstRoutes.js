@@ -38,22 +38,36 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const auth_1 = require("../middleware/auth");
+const rateLimiter_1 = require("../middleware/rateLimiter");
 const gstController = __importStar(require("../controllers/gstController"));
 const gstPaymentsController = __importStar(require("../controllers/gst/gstPaymentsController"));
 const eInvoiceController = __importStar(require("../controllers/gst/eInvoiceController"));
 const eWaybillController = __importStar(require("../controllers/gst/eWaybillController"));
+const gstAdditions = __importStar(require("../controllers/gstAdditionsController"));
 const router = express_1.default.Router();
 router.use(auth_1.protect);
+router.use(rateLimiter_1.sensitiveOpsLimiter); // Apply strict rate limiting to all GST endpoints
 // GSTR Reports
 router.get('/dashboard', gstController.getGSTDashboard);
+router.get('/history', gstController.getGSTHistory);
+// Export Reports
+router.get('/gstr1/excel', gstController.exportGSTR1Excel);
+router.get('/gstr3b/excel', gstController.exportGSTR3BExcel);
 router.get('/gstr1', gstController.generateGSTR1);
 router.get('/gstr3b', gstController.generateGSTR3B);
+// New Summary Endpoints for Dashboard
+router.get('/reports/gstr1', gstController.getGSTR1ReportSummary);
+router.get('/reports/gstr3b', gstController.getGSTR3BReportSummary);
 // HSN/SAC Management
 router.get('/hsn-summary', gstController.getHSNSummary);
 // ITC Ledger
 router.get('/itc-ledger', gstController.getITCLedger);
 // File GST Return
 router.post('/file-return', gstController.fileGSTReturn);
+// ============ Live Portal Sync (PrimeSync+) ============
+router.post('/sync-gstr2b', gstController.syncGSTR2B);
+router.get('/gstr2b-records', gstController.getGSTR2BRecords);
+router.post('/invoices/:id/einvoice', gstController.generateEInvoice);
 // E-Way Bill (legacy endpoint)
 router.post('/eway-bill', gstController.createEWayBill);
 // ============ GST Payments ============
@@ -78,5 +92,17 @@ router.put('/e-waybills/:id', eWaybillController.updateEWaybill);
 router.post('/e-waybills/:id/extend', eWaybillController.extendEWaybill);
 router.post('/e-waybills/:id/cancel', eWaybillController.cancelEWaybill);
 router.delete('/e-waybills/:id', eWaybillController.deleteEWaybill);
+// ============ TDS/TCS ============
+router.get('/tds-tcs', gstAdditions.getTDSTCSEntries);
+router.post('/tds-tcs', gstAdditions.createTDSTCSEntry);
+// ============ GSTR-2B Recon ============
+router.get('/gstr-2b', gstAdditions.getGSTR2BRecords);
+router.post('/gstr-2b/upload', gstAdditions.uploadGSTR2B);
+router.put('/gstr-2b/:id/reconcile', gstAdditions.reconcileGSTR2B);
+// ============ P2: GST Amendments ============
+router.get('/amendments', gstController.getAmendments);
+router.post('/amendments', gstController.createAmendment);
+// ============ P2: B2C Large & Exports ============
+router.get('/gstr1-extended', gstController.getGSTR1Extended);
 exports.default = router;
 //# sourceMappingURL=gstRoutes.js.map

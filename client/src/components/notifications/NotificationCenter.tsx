@@ -150,13 +150,13 @@ export function NotificationCenter() {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case "critical":
-        return <AlertCircle className="size-5 text-[#ef4444]" />;
+        return <AlertCircle className="size-5 text-destructive" />;
       case "warning":
-        return <AlertTriangle className="size-5 text-[#f97316]" />;
+        return <AlertTriangle className="size-5 text-warning" />;
       case "info":
-        return <Info className="size-5 text-[#2563eb]" />;
+        return <Info className="size-5 text-blue-600 dark:text-blue-400" />;
       case "success":
-        return <CheckCircle className="size-5 text-[#10b981]" />;
+        return <CheckCircle className="size-5 text-emerald-600 dark:text-emerald-400" />;
       default:
         return <Bell className="size-5" />;
     }
@@ -165,13 +165,13 @@ export function NotificationCenter() {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case "critical":
-        return <Badge className="bg-[#ef4444] text-white">Critical</Badge>;
+        return <Badge variant="destructive">Critical</Badge>;
       case "warning":
-        return <Badge className="bg-[#f97316] text-white">Warning</Badge>;
+        return <Badge className="bg-warning text-white hover:bg-warning/90">Warning</Badge>;
       case "info":
-        return <Badge className="bg-[#2563eb] text-white">Info</Badge>;
+        return <Badge className="bg-blue-600 hover:bg-blue-700">Info</Badge>;
       case "success":
-        return <Badge className="bg-[#10b981] text-white">Success</Badge>;
+        return <Badge className="bg-emerald-600 hover:bg-emerald-700">Success</Badge>;
       default:
         return <Badge variant="outline">{type}</Badge>;
     }
@@ -200,7 +200,7 @@ export function NotificationCenter() {
                 <p className="text-muted-foreground mb-2">Total Alerts</p>
                 <p className="text-foreground">{notifications.length}</p>
               </div>
-              <Bell className="size-8 text-[#2563eb]" />
+              <Bell className="size-8 text-blue-600 dark:text-blue-400" />
             </div>
           </CardContent>
         </Card>
@@ -212,7 +212,7 @@ export function NotificationCenter() {
                 <p className="text-muted-foreground mb-2">Unread</p>
                 <p className="text-foreground">{unreadCount}</p>
               </div>
-              <BellOff className="size-8 text-[#f97316]" />
+              <BellOff className="size-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
@@ -222,9 +222,9 @@ export function NotificationCenter() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-2">Critical</p>
-                <p className="text-foreground text-[#ef4444]">{criticalCount}</p>
+                <p className="text-foreground text-destructive">{criticalCount}</p>
               </div>
-              <AlertCircle className="size-8 text-[#ef4444]" />
+              <AlertCircle className="size-8 text-destructive" />
             </div>
           </CardContent>
         </Card>
@@ -234,9 +234,9 @@ export function NotificationCenter() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-2">Warnings</p>
-                <p className="text-foreground text-[#f97316]">{warningCount}</p>
+                <p className="text-foreground text-warning">{warningCount}</p>
               </div>
-              <AlertTriangle className="size-8 text-[#f97316]" />
+              <AlertTriangle className="size-8 text-warning" />
             </div>
           </CardContent>
         </Card>
@@ -299,34 +299,31 @@ export function NotificationCenter() {
                   return (
                     <div
                       key={notification.id}
-                      className={`p-4 border rounded-lg transition-all ${
-                        notification.read
-                          ? "bg-white"
-                          : "bg-accent border-l-4 border-l-[#2563eb]"
-                      }`}
+                      className={`p-4 border rounded-lg transition-all ${notification.read
+                        ? "bg-card"
+                        : "bg-accent border-l-4 border-l-blue-600 dark:border-l-blue-400"
+                        }`}
                     >
                       <div className="flex items-start gap-4">
                         <div
-                          className={`p-3 rounded-lg flex-shrink-0 ${
-                            notification.type === "critical"
-                              ? "bg-[#ef4444]/10"
-                              : notification.type === "warning"
-                              ? "bg-[#f97316]/10"
+                          className={`p-3 rounded-lg flex-shrink-0 ${notification.type === "critical"
+                            ? "bg-destructive/10"
+                            : notification.type === "warning"
+                              ? "bg-warning/10"
                               : notification.type === "success"
-                              ? "bg-[#10b981]/10"
-                              : "bg-[#2563eb]/10"
-                          }`}
+                                ? "bg-emerald-500/10"
+                                : "bg-blue-500/10"
+                            }`}
                         >
                           <Icon
-                            className={`size-6 ${
-                              notification.type === "critical"
-                                ? "text-[#ef4444]"
-                                : notification.type === "warning"
-                                ? "text-[#f97316]"
+                            className={`size-6 ${notification.type === "critical"
+                              ? "text-destructive"
+                              : notification.type === "warning"
+                                ? "text-warning"
                                 : notification.type === "success"
-                                ? "text-[#10b981]"
-                                : "text-[#2563eb]"
-                            }`}
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-blue-600 dark:text-blue-400"
+                              }`}
                           />
                         </div>
 
@@ -338,7 +335,7 @@ export function NotificationCenter() {
                                   {notification.title}
                                 </p>
                                 {!notification.read && (
-                                  <div className="size-2 rounded-full bg-[#2563eb]" />
+                                  <div className="size-2 rounded-full bg-blue-600" />
                                 )}
                               </div>
                               <p className="text-muted-foreground">

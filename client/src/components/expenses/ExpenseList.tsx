@@ -1,42 +1,48 @@
-import { useState, useEffect } from "react";
-import { expensesService } from "../../services/modules.service";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { useState, useMemo } from "react";
+import {
+  FileText,
+  Calendar,
+  MoreVertical,
+  Edit,
+  Trash2,
+  CheckCircle,
+  Clock,
+  Download,
+  Plus,
+  FileDown,
+  Sheet,
+  ChevronDown,
+  CreditCard,
+  IndianRupee,
+  CheckCheck
+} from "lucide-react";
+import { DataTable } from "../ui/data-table";
+import { StatsCard } from "../ui/stats-card";
+import { ListFilters } from "../ui/ListFilters";
+import { exportToCSV, exportToExcel, exportToPDF, formatCurrency, formatDate } from "../../lib/exportUtils";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
 import {
-  Search,
-  Filter,
-  Download,
-  MoreVertical,
-  Edit,
-  Trash2,
-  FileText,
-  CheckCircle,
-  Clock,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { cn } from "../../lib/utils";
 import { toast } from "sonner";
+import { useExpenses, useDeleteExpense, useApproveExpense, useMarkAsPaid } from "../../hooks/useExpenses";
+import { useFYOptions } from "../../hooks/useFinancialYears";
 
 interface Expense {
   id: string;
@@ -54,297 +60,492 @@ interface Expense {
 
 interface ExpenseListProps {
   onEditExpense: (expenseId: string) => void;
+  onCreateNew?: () => void;
 }
 
-export function ExpenseList({ onEditExpense }: ExpenseListProps) {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ExpenseList({ onEditExpense, onCreateNew }: ExpenseListProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fyFilter, setFyFilter] = useState("all");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchExpenses();
-  }, []);
+  const { options: fyOptions } = useFYOptions();
 
-  const fetchExpenses = async () => {
-    setLoading(true);
-    try {
-      const response = await expensesService.getAll();
-      const mappedExpenses = (response.data || []).map((exp: any) => ({
-        id: exp.id,
-        expenseNumber: exp.expenseNumber,
-        date: exp.date,
-        description: exp.description,
-        category: exp.category,
-        vendor: exp.vendor || '',
-        amount: Number(exp.amount),
-        paymentMethod: exp.paymentMethod || '',
-        status: (exp.status || 'pending').toLowerCase(),
-        receiptUrl: exp.receiptUrl,
-        notes: exp.notes
-      }));
-      setExpenses(mappedExpenses);
-    } catch (error) {
-      console.error("Failed to fetch expenses:", error);
-      toast.error("Failed to load expenses");
-    } finally {
-      setLoading(false);
+  // Data fetching hooks
+  const { data: expensesData, isLoading: loading, isFetching, refetch } = useExpenses();
+  const deleteMutation = useDeleteExpense();
+  const approveMutation = useApproveExpense();
+  const markPaidMutation = useMarkAsPaid();
+
+  // Map API response to component format
+  const expenses: Expense[] = useMemo(() => {
+    const expensesArray = (expensesData?.data as any) || [];
+    return expensesArray.map((exp: any) => ({
+      id: exp.id,
+      expenseNumber: exp.expenseNumber,
+      date: exp.date,
+      description: exp.description,
+      category: exp.category,
+      vendor: exp.vendor || '',
+      amount: Number(exp.amount),
+      paymentMethod: exp.paymentMethod || '',
+      status: (exp.status || 'pending').toLowerCase(),
+      receiptUrl: exp.receiptUrl,
+      notes: exp.notes
+    }));
+  }, [expensesData]);
+
+  const categories = useMemo(() =>
+    ["Rent", "Salaries", "Utilities", "Transport", "Marketing", "Office Supplies", "Business Meals", ...new Set(expenses.map(e => e.category))].filter((v, i, a) => a.indexOf(v) === i && v !== "all"),
+    [expenses]);
+
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const handleApprove = (id: string) => {
+    approveMutation.mutate(id);
+  };
 
-  const categories = [
-    "all",
-    "Rent",
-    "Salaries",
-    "Utilities",
-    "Transport",
-    "Marketing",
-    "Office Supplies",
-    "Business Meals",
-  ];
+  const handleMarkPaid = (id: string) => {
+    markPaidMutation.mutate(id);
+  };
 
   const filteredExpenses = expenses.filter((expense) => {
     const matchesSearch =
       expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (expense.expenseNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       expense.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory =
-      filterCategory === "all" || expense.category === filterCategory;
-    const matchesStatus = filterStatus === "all" || expense.status === filterStatus;
+      categoryFilter === "all" || expense.category === categoryFilter;
+    const matchesStatus = statusFilter === "all" || expense.status === statusFilter;
+    // Note: FY filtering would ideally be server-side or require checking date ranges
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
-  const handleDelete = async (expenseId: string) => {
-    try {
-      await expensesService.delete(expenseId);
-      setExpenses(expenses.filter((e) => e.id !== expenseId));
-      toast.success("Expense deleted successfully");
-    } catch (error) {
-      console.error("Failed to delete expense:", error);
-      toast.error("Failed to delete expense");
-    }
-  };
-
-  const handleApprove = async (expenseId: string) => {
-    try {
-      await expensesService.approve(expenseId);
-      setExpenses(
-        expenses.map((e) =>
-          e.id === expenseId ? { ...e, status: "approved" as const } : e
-        )
-      );
-      toast.success("Expense approved");
-    } catch (error) {
-      console.error("Failed to approve expense:", error);
-      toast.error("Failed to approve expense");
-    }
-  };
-
-  const handleMarkPaid = async (expenseId: string) => {
-    try {
-      await expensesService.markAsPaid(expenseId);
-      setExpenses(
-        expenses.map((e) => (e.id === expenseId ? { ...e, status: "paid" as const } : e))
-      );
-      toast.success("Expense marked as paid");
-    } catch (error) {
-      console.error("Failed to mark expense as paid:", error);
-      toast.error("Failed to mark expense as paid");
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "paid":
-        return (
-          <Badge className="bg-[#10b981] text-white">
-            <CheckCircle className="size-3 mr-1" />
-            Paid
-          </Badge>
-        );
-      case "pending":
-        return (
-          <Badge className="bg-[#f97316] text-white">
-            <Clock className="size-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case "approved":
-        return (
-          <Badge className="bg-[#2563eb] text-white">
-            <CheckCircle className="size-3 mr-1" />
-            Approved
-          </Badge>
-        );
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case "paid": return "badge-paid";
+      case "pending": return "badge-draft"; // Using draft styling for pending
+      case "approved": return "badge-sent"; // Using sent styling for approved
+      default: return "badge-draft";
     }
   };
 
-  const totalAmount = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "paid": return <CheckCircle className="size-3" />;
+      case "pending": return <Clock className="size-3" />;
+      case "approved": return <CheckCheck className="size-3" />; // Double check for approved
+      default: return null;
+    }
+  };
+
+  const stats = {
+    total: expenses.length,
+    pending: expenses.filter(e => e.status === "pending").length,
+    approved: expenses.filter(e => e.status === "approved").length,
+    totalAmount: expenses.reduce((sum, e) => sum + e.amount, 0),
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredExpenses.map(e => ({
+      'Expense #': e.expenseNumber || '-',
+      'Date': formatDate(e.date),
+      'Description': e.description,
+      'Category': e.category,
+      'Vendor': e.vendor,
+      'Amount': e.amount,
+      'Status': e.status
+    }));
+    exportToCSV(data, 'Expenses');
+  };
+
+  const handleExportExcel = () => {
+    const data = filteredExpenses.map(e => ({
+      'Expense #': e.expenseNumber || '-',
+      'Date': formatDate(e.date),
+      'Description': e.description,
+      'Category': e.category,
+      'Vendor': e.vendor,
+      'Amount': e.amount,
+      'Status': e.status
+    }));
+    exportToExcel(data, 'Expenses');
+  };
+
+  const handleExportPDF = () => {
+    const columns = ['Expense #', 'Date', 'Description', 'Category', 'Vendor', 'Amount', 'Status'];
+    const data = filteredExpenses.map(e => [
+      e.expenseNumber || '-',
+      formatDate(e.date),
+      e.description,
+      e.category,
+      e.vendor,
+      formatCurrency(e.amount),
+      e.status
+    ]);
+    exportToPDF({ title: 'Expenses Report', columns, data, filename: 'Expenses' });
+  };
+
+  const columns = [
+    {
+      header: "Expense Info",
+      cell: (expense: Expense) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+            <FileText className="size-4" />
+          </div>
+          <div>
+            <p className="text-foreground font-medium">{expense.description}</p>
+            <p className="text-muted-foreground text-xs font-mono">{expense.expenseNumber || expense.id.slice(0, 8)}</p>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Date",
+      cell: (expense: Expense) => (
+        <span className="text-muted-foreground">{formatDate(expense.date)}</span>
+      )
+    },
+    {
+      header: "Category",
+      cell: (expense: Expense) => (
+        <Badge variant="outline" className="font-normal">{expense.category}</Badge>
+      )
+    },
+    {
+      header: "Vendor",
+      className: "hidden lg:table-cell",
+      cell: (expense: Expense) => (
+        <span className="text-foreground">{expense.vendor}</span>
+      )
+    },
+    {
+      header: "Amount",
+      className: "text-right",
+      cell: (expense: Expense) => (
+        <span className="text-foreground font-medium">{formatCurrency(expense.amount)}</span>
+      )
+    },
+    {
+      header: "Status",
+      className: "text-center",
+      cell: (expense: Expense) => (
+        <div className="flex justify-center">
+          <Badge className={cn("rounded-full px-3 py-1 font-medium gap-1", getStatusColor(expense.status))}>
+            {getStatusIcon(expense.status)}
+            {expense.status === "paid" ? "Paid" : expense.status === "approved" ? "Approved" : "Pending"}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      header: "Actions",
+      className: "text-center",
+      cell: (expense: Expense) => (
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onEditExpense(expense.id)}
+          >
+            <Edit className="size-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuItem onClick={() => onEditExpense(expense.id)} className="rounded-lg">
+                <Edit className="size-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg">
+                <FileText className="size-4 mr-2" />
+                View Receipt
+              </DropdownMenuItem>
+
+              {expense.status === "pending" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleApprove(expense.id)} className="rounded-lg text-blue-600 focus:text-blue-700">
+                    <CheckCheck className="size-4 mr-2" />
+                    Approve
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleMarkPaid(expense.id)} className="rounded-lg text-emerald-600 focus:text-emerald-700">
+                    <CheckCircle className="size-4 mr-2" />
+                    Mark as Paid
+                  </DropdownMenuItem>
+                </>
+              )}
+              {expense.status === "approved" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleMarkPaid(expense.id)} className="rounded-lg text-emerald-600 focus:text-emerald-700">
+                    <CheckCircle className="size-4 mr-2" />
+                    Mark as Paid
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive rounded-lg" onClick={() => handleDelete(expense.id)}>
+                <Trash2 className="size-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )
+    }
+  ];
+
+  const renderMobileItem = (expense: Expense) => (
+    <div
+      key={expense.id}
+      className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
+      onClick={() => onEditExpense(expense.id)}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-sm">
+            <FileText className="size-5" />
+          </div>
+          <div>
+            <h3 className="font-medium text-foreground">{expense.description}</h3>
+            <p className="text-sm text-muted-foreground">{expense.vendor}</p>
+          </div>
+        </div>
+        <Badge className={cn("rounded-full px-3 py-1", getStatusColor(expense.status))}>
+          {expense.status}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground mb-1">Date</p>
+          <p className="font-medium">{formatDate(expense.date)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground mb-1">Amount</p>
+          <p className="font-medium">{formatCurrency(expense.amount)}</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground mb-1">Category</p>
+          <Badge variant="outline" className="font-normal">{expense.category}</Badge>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-2 border-t border-border">
+        {expense.status === 'pending' && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 rounded-xl"
+            onClick={(e) => { e.stopPropagation(); handleApprove(expense.id); }}
+          >
+            Approve
+          </Button>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 rounded-xl"
+          onClick={(e) => { e.stopPropagation(); onEditExpense(expense.id); }}
+        >
+          Edit
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl">
+              <MoreVertical className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem className="text-destructive rounded-lg" onClick={() => handleDelete(expense.id)}>
+              <Trash2 className="size-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <CardTitle>All Expenses</CardTitle>
-            <CardDescription>
-              {filteredExpenses.length} expenses • Total: ₹
-              {totalAmount.toLocaleString("en-IN")}
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          label="Total Expenses"
+          value={stats.total}
+          icon={FileText}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+        <StatsCard
+          label="Pending"
+          value={stats.pending}
+          icon={Clock}
+          gradient="bg-gradient-to-br from-amber-500 to-amber-600"
+          shadowColor="shadow-amber-500/20"
+        />
+        <StatsCard
+          label="Approved"
+          value={stats.approved}
+          icon={CheckCircle}
+          gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          shadowColor="shadow-emerald-500/20"
+        />
+        <StatsCard
+          label="Total Value"
+          value={formatCurrency(stats.totalAmount)}
+          icon={IndianRupee}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+      </div>
+
+      <ListFilters
+        searchPlaceholder="Search expenses..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        onRefresh={refetch}
+        isFetching={isFetching}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+        statusOptions={[
+          { value: "paid", label: "Paid" },
+          { value: "pending", label: "Pending" },
+          { value: "approved", label: "Approved" },
+        ]}
+      >
+        {/* Category filter */}
+        <div className="w-[160px]">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full justify-between h-11 rounded-xl">
+                <span className="truncate">
+                  {categoryFilter === "all" ? "Categories" : categoryFilter}
+                </span>
+                <ChevronDown className="size-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[160px] rounded-xl max-h-[300px] overflow-auto">
+              <DropdownMenuItem onClick={() => setCategoryFilter("all")}>
+                All Categories
+              </DropdownMenuItem>
+              {categories.map(cat => (
+                <DropdownMenuItem key={cat} onClick={() => setCategoryFilter(cat)}>
+                  {cat}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* FY filter */}
+        <div className="w-[140px]">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full justify-between h-11 rounded-xl">
+                <span className="truncate">
+                  {fyOptions.find(opt => opt.value === fyFilter)?.label?.split(' ')[0] || "All Years"}
+                </span>
+                <ChevronDown className="size-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[140px] rounded-xl">
+              <DropdownMenuItem onClick={() => setFyFilter("all")}>
+                All Years
+              </DropdownMenuItem>
+              {fyOptions.map(fy => (
+                <DropdownMenuItem key={fy.value} onClick={() => setFyFilter(fy.value)}>
+                  {fy.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Export dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2 h-11 rounded-xl">
               <Download className="size-4" />
               Export
+              <ChevronDown className="size-3" />
             </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search expenses..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat === "all" ? "All Categories" : cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={handleExportCSV} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportExcel} className="rounded-lg">
+              <Sheet className="size-4 mr-2" />
+              Export as Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPDF} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ListFilters>
 
-        {/* Expenses Table */}
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Expense ID</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="hidden lg:table-cell">Vendor</TableHead>
-                <TableHead className="hidden md:table-cell">Payment</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredExpenses.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    No expenses found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
-                      {new Date(expense.date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                      })}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{expense.expenseNumber || expense.id.slice(0, 8)}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-foreground">{expense.description}</p>
-                        <p className="text-muted-foreground lg:hidden">{expense.vendor}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{expense.category}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {expense.vendor}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {expense.paymentMethod}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      ₹{expense.amount.toLocaleString("en-IN")}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(expense.status)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEditExpense(expense.id)}>
-                            <Edit className="size-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="size-4 mr-2" />
-                            View Receipt
-                          </DropdownMenuItem>
-                          {expense.status === "pending" && (
-                            <>
-                              <DropdownMenuItem onClick={() => handleApprove(expense.id)}>
-                                <CheckCircle className="size-4 mr-2" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleMarkPaid(expense.id)}>
-                                <CheckCircle className="size-4 mr-2" />
-                                Mark as Paid
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                          {expense.status === "approved" && (
-                            <DropdownMenuItem onClick={() => handleMarkPaid(expense.id)}>
-                              <CheckCircle className="size-4 mr-2" />
-                              Mark as Paid
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(expense.id)}
-                          >
-                            <Trash2 className="size-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+      <DataTable
+        data={filteredExpenses}
+        columns={columns}
+        mobileRenderer={renderMobileItem}
+        isLoading={loading}
+        onRowClick={(expense) => onEditExpense(expense.id)}
+        emptyState={{
+          title: "No expenses found",
+          description: "Record your first expense to get started",
+          icon: CreditCard,
+          action: onCreateNew ? (
+            <Button onClick={onCreateNew} className="rounded-xl">
+              <Plus className="size-4 mr-2" />
+              Record Expense
+            </Button>
+          ) : undefined
+        }}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Expense?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this expense?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div >
   );
 }
-

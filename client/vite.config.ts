@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+// Force Restart
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
@@ -17,27 +18,28 @@ export default defineConfig({
         name: 'BharatFlow',
         short_name: 'BharatFlow',
         description: 'BharatFlow - Comprehensive MSME Operating System',
-        theme_color: '#ffffff',
+        theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         scope: '/',
+        orientation: 'portrait',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'logo.svg',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/svg+xml'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'logo.svg',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/svg+xml'
           },
           {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
+            src: 'logo.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable any'
           }
         ]
       },
@@ -121,6 +123,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
     host: true,
     open: true,
   },

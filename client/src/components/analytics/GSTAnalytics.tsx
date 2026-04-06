@@ -1,9 +1,17 @@
 import { useState, useEffect } from "react";
-import { ArrowUp, ArrowDown, TrendingUp, Calendar, Loader2, RefreshCw } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Button } from "../ui/button";
 import { gstService } from "../../services/modules.service";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
+import { chartColors } from "@/lib/chartColors";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface GSTDashboardData {
   currentMonth: string;
@@ -29,16 +37,23 @@ interface GSTDashboardData {
 }
 
 export function GSTAnalytics() {
+  const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<GSTDashboardData | null>(null);
 
   const fetchGSTData = async () => {
     setLoading(true);
     try {
-      const response = await gstService.getDashboard();
+      const [dashResponse, historyResponse] = await Promise.all([
+        gstService.getDashboard(),
+        gstService.getGSTHistory()
+      ]);
 
-      if (response.success && response.data) {
-        setDashboardData(response.data);
+      if (dashResponse.success && dashResponse.data) {
+        setDashboardData(dashResponse.data);
+      }
+      if (historyResponse.success && historyResponse.data) {
+        setHistory(historyResponse.data);
       }
     } catch (error) {
       console.error("Failed to fetch GST data:", error);
@@ -55,7 +70,7 @@ export function GSTAnalytics() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="size-8 animate-spin text-primary" />
+        <MIcon name="autorenew" className="text-[32px] animate-spin text-primary" />
       </div>
     );
   }
@@ -74,27 +89,17 @@ export function GSTAnalytics() {
   const pendingITC = Math.max(0, currentStats.inputTax - currentStats.outputTax);
   const itcUtilizationPercent = totalITC > 0 ? ((utilizedITC / totalITC) * 100) : 0;
 
-  // Generate mock monthly data for chart (since API doesn't provide historical)
-  const monthlyGST = (() => {
-    const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const monthsToShow = Math.min(6, currentMonth >= 3 ? currentMonth - 2 : currentMonth + 10);
-
-    return months.slice(0, monthsToShow).map((month, i) => {
-      const factor = 0.7 + (i / monthsToShow) * 0.3;
-      return {
-        month,
-        input: Math.round(currentStats.inputTax * factor * (0.8 + Math.random() * 0.4)),
-        output: Math.round(currentStats.outputTax * factor * (0.8 + Math.random() * 0.4)),
-        net: Math.round(currentStats.taxLiability * factor * (0.8 + Math.random() * 0.4)),
-      };
-    });
-  })();
+  // Real history data for chart
+  const monthlyGST = history.length > 0 ? history.map(item => ({
+    month: item.month,
+    input: item.paid,
+    output: item.collected,
+    net: item.net
+  })) : [];
 
   const itcUtilization = [
-    { name: "Utilized", value: utilizedITC, color: "#10b981" },
-    { name: "Pending", value: pendingITC, color: "#f59e0b" },
+    { name: "Utilized", value: utilizedITC, color: chartColors.success },
+    { name: "Pending", value: pendingITC, color: chartColors.warning },
   ].filter(item => item.value > 0);
 
   // GST by rate breakdown (simplified)
@@ -110,105 +115,105 @@ export function GSTAnalytics() {
   const filingStatusList = dashboardData?.filingStatus || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[24px]">
       {/* Refresh Button */}
       <div className="flex justify-end">
-        <Button onClick={fetchGSTData} variant="outline" size="sm">
-          <RefreshCw className="size-4 mr-2" /> Refresh
+        <Button onClick={fetchGSTData} variant="outline" size="sm" className="gap-[8px] h-[32px] px-[12px] rounded-[8px] font-bold border-border">
+          <MIcon name="autorenew" className="text-[16px]" /> Refresh
         </Button>
       </div>
 
       {/* Summary Cards - Mobile Optimized */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-info-light p-4 rounded-lg border border-info/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Input GST (ITC)</p>
-            <div className="bg-[#3b82f6]/10 p-2 rounded">
-              <ArrowDown className="size-4 text-[#3b82f6]" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px]">
+        <div className="bg-sky-50 dark:bg-sky-900/20 p-[24px] rounded-[16px] border border-sky-200 dark:border-sky-800">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-sky-800 dark:text-sky-300">Input GST (ITC)</p>
+            <div className="bg-sky-100 dark:bg-sky-800/50 p-[8px] rounded-[8px]">
+              <MIcon name="arrow_downward" className="text-[20px] text-sky-600 dark:text-sky-400" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-sky-900 dark:text-sky-100 mb-[4px]">
             ₹{currentStats.inputTax.toLocaleString("en-IN")}
           </p>
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">Available credit</span>
+          <div className="flex items-center gap-[4px]">
+            <span className="text-body-sm font-medium text-sky-600 dark:text-sky-400">Available credit</span>
           </div>
         </div>
 
-        <div className="bg-success-light p-4 rounded-lg border border-success/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Output GST</p>
-            <div className="bg-[#10b981]/10 p-2 rounded">
-              <ArrowUp className="size-4 text-[#10b981]" />
+        <div className="bg-emerald-50 dark:bg-emerald-900/20 p-[24px] rounded-[16px] border border-emerald-200 dark:border-emerald-800">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-emerald-800 dark:text-emerald-300">Output GST</p>
+            <div className="bg-emerald-100 dark:bg-emerald-800/50 p-[8px] rounded-[8px]">
+              <MIcon name="arrow_upward" className="text-[20px] text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-emerald-900 dark:text-emerald-100 mb-[4px]">
             ₹{currentStats.outputTax.toLocaleString("en-IN")}
           </p>
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">Tax collected</span>
+          <div className="flex items-center gap-[4px]">
+            <span className="text-body-sm font-medium text-emerald-600 dark:text-emerald-400">Tax collected</span>
           </div>
         </div>
 
-        <div className="bg-warning-light p-4 rounded-lg border border-warning/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Net Liability</p>
-            <div className="bg-[#f59e0b]/10 p-2 rounded">
-              <TrendingUp className="size-4 text-[#f59e0b]" />
+        <div className="bg-amber-50 dark:bg-amber-900/20 p-[24px] rounded-[16px] border border-amber-200 dark:border-amber-800">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-amber-800 dark:text-amber-300">Net Liability</p>
+            <div className="bg-amber-100 dark:bg-amber-800/50 p-[8px] rounded-[8px]">
+              <MIcon name="trending_up" className="text-[20px] text-amber-600 dark:text-amber-400" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-amber-900 dark:text-amber-100 mb-[4px]">
             ₹{currentStats.taxLiability.toLocaleString("en-IN")}
           </p>
-          <div className="flex items-center gap-1">
-            <span className={currentStats.taxLiability > 0 ? "text-orange-600" : "text-green-600"}>
+          <div className="flex items-center gap-[4px]">
+            <span className={cn("text-body-sm font-bold", currentStats.taxLiability > 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
               {currentStats.taxLiability > 0 ? "Payable" : "No liability"}
             </span>
           </div>
         </div>
 
-        <div className="bg-purple-light p-4 rounded-lg border border-purple/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">ITC Utilization</p>
-            <div className="bg-[#a855f7]/10 p-2 rounded">
-              <Calendar className="size-4 text-[#a855f7]" />
+        <div className="bg-purple-50 dark:bg-purple-900/20 p-[24px] rounded-[16px] border border-purple-200 dark:border-purple-800">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-purple-800 dark:text-purple-300">ITC Utilization</p>
+            <div className="bg-purple-100 dark:bg-purple-800/50 p-[8px] rounded-[8px]">
+              <MIcon name="event" className="text-[20px] text-purple-600 dark:text-purple-400" />
             </div>
           </div>
-          <p className="text-foreground mb-1">{itcUtilizationPercent.toFixed(1)}%</p>
-          <div className="flex items-center gap-1">
-            <span className="text-muted-foreground">of available ITC</span>
+          <p className="text-3xl font-black text-purple-900 dark:text-purple-100 mb-[4px]">{itcUtilizationPercent.toFixed(1)}%</p>
+          <div className="flex items-center gap-[4px]">
+            <span className="text-body-sm font-medium text-purple-600 dark:text-purple-400">of available ITC</span>
           </div>
         </div>
       </div>
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         {/* GST Trend Chart */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">GST Trend</h3>
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">GST Trend</h3>
           {monthlyGST.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={monthlyGST}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} />
-                <Legend />
-                <Line type="monotone" dataKey="input" stroke="#3b82f6" name="Input GST" strokeWidth={2} />
-                <Line type="monotone" dataKey="output" stroke="#10b981" name="Output GST" strokeWidth={2} />
-                <Line type="monotone" dataKey="net" stroke="#f59e0b" name="Net Liability" strokeWidth={2} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.slateGrid} vertical={false} />
+                <XAxis dataKey="month" stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+                <YAxis stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                <Tooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Line type="monotone" dataKey="input" stroke={chartColors.primary} name="Input GST" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="output" stroke="#10B981" name="Output GST" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="net" stroke="#F59E0B" name="Net Liability" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+            <div className="flex items-center justify-center h-[300px] text-muted-foreground font-medium">
               No trend data available
             </div>
           )}
         </div>
 
         {/* ITC Utilization Pie Chart */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">ITC Utilization</h3>
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">ITC Utilization</h3>
           {itcUtilization.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={250}>
@@ -220,7 +225,7 @@ export function GSTAnalytics() {
                     labelLine={false}
                     label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     outerRadius={80}
-                    fill="#8884d8"
+                    fill={chartColors.muted}
                     dataKey="value"
                   >
                     {itcUtilization.map((entry, index) => (
@@ -230,17 +235,17 @@ export function GSTAnalytics() {
                   <Tooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="mt-4 space-y-2">
+              <div className="mt-[16px] space-y-[8px]">
                 {itcUtilization.map((item) => (
                   <div key={item.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-[8px]">
                       <div
-                        className="w-3 h-3 rounded"
+                        className="w-[12px] h-[12px] rounded-full"
                         style={{ backgroundColor: item.color }}
                       />
-                      <span className="text-muted-foreground">{item.name}</span>
+                      <span className="text-body-sm font-medium text-muted-foreground">{item.name}</span>
                     </div>
-                    <span className="text-foreground">
+                    <span className="text-body font-bold text-foreground">
                       ₹{item.value.toLocaleString("en-IN")}
                     </span>
                   </div>
@@ -248,7 +253,7 @@ export function GSTAnalytics() {
               </div>
             </>
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+            <div className="flex items-center justify-center h-[300px] text-muted-foreground font-medium">
               No ITC data available
             </div>
           )}
@@ -256,44 +261,46 @@ export function GSTAnalytics() {
       </div>
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         {/* GST by Rate */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">GST Collection by Rate</h3>
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">GST Collection by Rate</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={gstByRate}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="rate" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} />
-              <Bar dataKey="amount" fill="#3b82f6" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.slateGrid} vertical={false} />
+              <XAxis dataKey="rate" stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+              <YAxis stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+              <Tooltip formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'var(--tw-colors-slate-100)', opacity: 0.1 }} />
+              <Bar dataKey="amount" fill={chartColors.brandDark} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Upcoming Filings */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Upcoming GST Filings</h3>
-          <div className="space-y-3">
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Upcoming GST Filings</h3>
+          <div className="space-y-[12px]">
             {upcomingFilings.length > 0 ? (
               upcomingFilings.slice(0, 5).map((filing, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-[#f8fafc] rounded-lg border border-border"
+                  className="flex items-center justify-between py-[12px] border-b last:border-0 border-slate-100 dark:border-slate-800"
                 >
                   <div>
-                    <p className="text-foreground">{filing.returnType}</p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-body font-bold text-foreground">{filing.returnType}</p>
+                    <p className="text-body-sm text-muted-foreground font-medium">
                       Due: {new Date(filing.dueDate).toLocaleDateString("en-IN")}
                     </p>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm ${filing.daysLeft <= 5
-                        ? "bg-red-100 text-red-700"
+                    className={cn(
+                      "px-[12px] py-[4px] rounded-[6px] text-[12px] font-bold tracking-wider uppercase",
+                      filing.daysLeft <= 5
+                        ? "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
                         : filing.daysLeft <= 10
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300"
+                          : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                    )}
                   >
                     {filing.daysLeft} days
                   </span>
@@ -307,21 +314,23 @@ export function GSTAnalytics() {
               ].map((filing, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 bg-[#f8fafc] rounded-lg border border-border"
+                  className="flex items-center justify-between py-[12px] border-b last:border-0 border-slate-100 dark:border-slate-800"
                 >
                   <div>
-                    <p className="text-foreground">{filing.returnType}</p>
-                    <p className="text-muted-foreground text-sm">
+                    <p className="text-body font-bold text-foreground">{filing.returnType}</p>
+                    <p className="text-body-sm text-muted-foreground font-medium">
                       Due: {filing.dueDate.toLocaleDateString("en-IN")}
                     </p>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-sm ${filing.daysLeft <= 5
-                        ? "bg-red-100 text-red-700"
+                    className={cn(
+                      "px-[12px] py-[4px] rounded-[6px] text-[12px] font-bold tracking-wider uppercase",
+                      filing.daysLeft <= 5
+                        ? "bg-rose-100 dark:bg-rose-900/30 text-rose-800 dark:text-rose-300"
                         : filing.daysLeft <= 10
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300"
+                          : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                    )}
                   >
                     {filing.daysLeft} days
                   </span>
@@ -334,37 +343,41 @@ export function GSTAnalytics() {
 
       {/* Filing Status */}
       {filingStatusList.length > 0 && (
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Filing Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Filing Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
             {filingStatusList.map((filing, index) => (
               <div
                 key={index}
-                className={`p-4 rounded-lg border ${filing.status === 'FILED'
-                    ? 'bg-green-50 border-green-200'
+                className={cn(
+                  "p-[16px] rounded-[12px] border",
+                  filing.status === 'FILED'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800'
                     : filing.status === 'PENDING'
-                      ? 'bg-yellow-50 border-yellow-200'
-                      : 'bg-gray-50 border-gray-200'
-                  }`}
+                      ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                      : 'bg-muted dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                )}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium">{filing.returnType}</span>
+                <div className="flex items-center justify-between mb-[8px]">
+                  <span className="text-body font-bold text-foreground">{filing.returnType}</span>
                   <span
-                    className={`px-2 py-1 rounded text-xs ${filing.status === 'FILED'
-                        ? 'bg-green-100 text-green-700'
+                    className={cn(
+                      "px-[8px] py-[4px] rounded-[6px] text-[10px] font-bold tracking-wider uppercase",
+                      filing.status === 'FILED'
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
                         : filing.status === 'PENDING'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
+                          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                          : 'bg-slate-200 dark:bg-slate-700 text-foreground dark:text-muted-foreground'
+                    )}
                   >
                     {filing.status}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-body-sm font-medium text-muted-foreground">
                   Due: {new Date(filing.dueDate).toLocaleDateString("en-IN")}
                 </p>
                 {filing.filedDate && (
-                  <p className="text-sm text-green-600">
+                  <p className="text-body-sm font-bold text-emerald-600 dark:text-emerald-400 mt-[4px]">
                     Filed: {new Date(filing.filedDate).toLocaleDateString("en-IN")}
                   </p>
                 )}

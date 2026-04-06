@@ -11,6 +11,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { PrismaClient } from '@prisma/client';
+import { eventBus, EventTypes } from '../services/eventBus';
+import logger from '../config/logger';
 
 const prisma = new PrismaClient();
 
@@ -97,7 +99,7 @@ export const sync = async (req: AuthRequest, res: Response) => {
                     conflicts.push(result.data as ConflictChange);
                 }
             } catch (error) {
-                console.error(`Error processing change for ${change.entity}:${change.id}:`, error);
+                logger.error(`Error processing change for ${change.entity}:${change.id}:`, error);
                 // Continue with other changes
             }
         }
@@ -115,7 +117,7 @@ export const sync = async (req: AuthRequest, res: Response) => {
             syncTimestamp
         });
     } catch (error) {
-        console.error('Sync error:', error);
+        logger.error('Sync error:', error);
         return res.status(500).json({ message: 'Sync failed', error: (error as Error).message });
     }
 };
@@ -212,6 +214,28 @@ async function processCreate(
     // Log the sync action
     await logSyncAction(companyId, userId, deviceId, entity, serverId, 'create', cleanData);
 
+    // Emit domain event
+    let eventType = '';
+    switch (entity) {
+        case 'parties': eventType = EventTypes.PARTY_CREATED; break;
+        case 'products': eventType = EventTypes.PRODUCT_CREATED; break;
+        case 'invoices': eventType = EventTypes.INVOICE_CREATED; break;
+        case 'estimates': eventType = EventTypes.ESTIMATE_CREATED; break;
+        case 'salesOrders': eventType = EventTypes.SALES_ORDER_CREATED; break;
+        case 'purchaseOrders': eventType = EventTypes.PURCHASE_ORDER_CREATED; break;
+    }
+
+    if (eventType) {
+        await eventBus.emit({
+            companyId,
+            eventType,
+            aggregateType: entityModelMap[entity] || entity,
+            aggregateId: serverId,
+            payload: { ...cleanData, id: serverId },
+            metadata: { userId, deviceId, source: 'sync' }
+        });
+    }
+
     return {
         type: 'applied',
         data: { id, serverId, entity }
@@ -234,12 +258,41 @@ async function processUpdate(
         return processCreate(change, companyId, userId, deviceId);
     }
 
+    // SAFETY CHECK (P1): Prevent offline updates to finalized documents
+    if (!validateSyncUpdate(entity, serverRecord)) {
+        logger.warn(`[SYNC] Blocked update to finalized document ${entity}:${id}`);
+        // Return conflict with server wins (effectively ignoring the client update)
+        return {
+            type: 'conflict',
+            data: {
+                id,
+                entity,
+                serverData: serverRecord as Record<string, unknown>,
+                resolution: 'server_wins'
+            }
+        };
+    }
+
     // Check for conflicts (Last Write Wins based on timestamp)
     const serverUpdatedAt = new Date((serverRecord as { updatedAt: Date }).updatedAt);
     const clientUpdatedAt = new Date(clientTimestamp);
 
     if (serverUpdatedAt > clientUpdatedAt) {
         // Server has newer data - conflict, server wins
+        const conflict = await prisma.syncConflict.create({
+            data: {
+                companyId,
+                userId,
+                entityType: entity,
+                entityId: id,
+                clientVersion: data as any, // Cast to JSON
+                serverVersion: serverRecord as any, // Cast to JSON
+                status: 'RESOLVED_SERVER', // Auto-resolve to server for LWW
+                resolvedAt: new Date(),
+                resolvedBy: 'SYSTEM_LWW'
+            }
+        });
+
         return {
             type: 'conflict',
             data: {
@@ -261,7 +314,27 @@ async function processUpdate(
     cleanData.lastModifiedBy = `${userId}:${deviceId}`;
     cleanData.updatedAt = new Date();
 
-    await updateServerRecord(entity, id, cleanData);
+    await updateServerRecord(entity, id, cleanData, companyId);
+
+    // Emit domain event for side effects
+    let eventType = '';
+    switch (entity) {
+        case 'parties': eventType = EventTypes.PARTY_UPDATED; break;
+        case 'products': eventType = EventTypes.PRODUCT_UPDATED; break;
+        case 'invoices': eventType = EventTypes.INVOICE_UPDATED; break;
+        // Add others if available
+    }
+
+    if (eventType) {
+        await eventBus.emit({
+            companyId,
+            eventType,
+            aggregateType: entityModelMap[entity] || entity,
+            aggregateId: id,
+            payload: cleanData,
+            metadata: { userId, deviceId, source: 'sync' }
+        });
+    }
 
     // Log the sync action
     await logSyncAction(companyId, userId, deviceId, entity, id, 'update', cleanData);
@@ -307,25 +380,25 @@ async function getServerRecord(entity: string, id: string, companyId: string): P
     }
 }
 
-async function updateServerRecord(entity: string, id: string, data: Record<string, unknown>): Promise<void> {
+async function updateServerRecord(entity: string, id: string, data: Record<string, unknown>, companyId: string): Promise<void> {
     switch (entity) {
         case 'parties':
-            await prisma.party.update({ where: { id }, data: data as Parameters<typeof prisma.party.update>[0]['data'] });
+            await prisma.party.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.party.update>[0]['data'] });
             break;
         case 'products':
-            await prisma.product.update({ where: { id }, data: data as Parameters<typeof prisma.product.update>[0]['data'] });
+            await prisma.product.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.product.update>[0]['data'] });
             break;
         case 'invoices':
-            await prisma.invoice.update({ where: { id }, data: data as Parameters<typeof prisma.invoice.update>[0]['data'] });
+            await prisma.invoice.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.invoice.update>[0]['data'] });
             break;
         case 'estimates':
-            await prisma.estimate.update({ where: { id }, data: data as Parameters<typeof prisma.estimate.update>[0]['data'] });
+            await prisma.estimate.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.estimate.update>[0]['data'] });
             break;
         case 'salesOrders':
-            await prisma.salesOrder.update({ where: { id }, data: data as Parameters<typeof prisma.salesOrder.update>[0]['data'] });
+            await prisma.salesOrder.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.salesOrder.update>[0]['data'] });
             break;
         case 'purchaseOrders':
-            await prisma.purchaseOrder.update({ where: { id }, data: data as Parameters<typeof prisma.purchaseOrder.update>[0]['data'] });
+            await prisma.purchaseOrder.update({ where: { id, companyId: companyId }, data: data as Parameters<typeof prisma.purchaseOrder.update>[0]['data'] });
             break;
     }
 }
@@ -474,7 +547,7 @@ async function logSyncAction(
     changes: Record<string, unknown>
 ): Promise<void> {
     // This would log to a SyncLog table if you add it to the schema
-    console.log(`[SYNC] ${action} ${entity}:${entityId} by ${userId}:${deviceId}`);
+    logger.info(`[SYNC] ${action} ${entity}:${entityId} by ${userId}:${deviceId}`);
 }
 
 // ============ INITIAL SYNC ============
@@ -524,7 +597,7 @@ export const initialSync = async (req: AuthRequest, res: Response) => {
             syncTimestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Initial sync error:', error);
+        logger.error('Initial sync error:', error);
         return res.status(500).json({ message: 'Initial sync failed', error: (error as Error).message });
     }
 };
@@ -550,3 +623,37 @@ export const getSyncStatus = async (req: AuthRequest, res: Response) => {
         return res.status(500).json({ message: 'Failed to get sync status' });
     }
 };
+
+/**
+ * Validate if a sync update is allowed based on entity status.
+ * Returns false if the update should be blocked (e.g., trying to edit a POSTED invoice).
+ */
+function validateSyncUpdate(entity: string, serverRecord: any): boolean {
+    if (!serverRecord) return true;
+
+    // Invoices: Block updates if POSTED, PAID, PARTIALLY_PAID, CANCELLED
+    if (entity === 'invoices') {
+        const restrictedStatuses = ['POSTED', 'PAID', 'PARTIALLY_PAID', 'CANCELLED'];
+        if (restrictedStatuses.includes(serverRecord.status)) {
+            return false;
+        }
+    }
+
+    // Sales Orders: Block if CONFIRMED, SHIPPED, COMPLETED, CANCELLED
+    if (entity === 'salesOrders') {
+        const restrictedStatuses = ['CONFIRMED', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+        if (restrictedStatuses.includes(serverRecord.status)) {
+            return false;
+        }
+    }
+
+    // Purchase Orders: Block if CONFIRMED, RECEIVED, COMPLETED, CANCELLED
+    if (entity === 'purchaseOrders') {
+        const restrictedStatuses = ['CONFIRMED', 'RECEIVED', 'COMPLETED', 'CANCELLED'];
+        if (restrictedStatuses.includes(serverRecord.status)) {
+            return false;
+        }
+    }
+
+    return true;
+}

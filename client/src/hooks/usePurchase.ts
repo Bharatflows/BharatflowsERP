@@ -13,6 +13,8 @@ export const purchaseKeys = {
     bill: (id: string) => [...purchaseKeys.bills(), id] as const,
     grns: () => [...purchaseKeys.all, 'grns'] as const,
     grn: (id: string) => [...purchaseKeys.grns(), id] as const,
+    debitNotes: () => [...purchaseKeys.all, 'debitNotes'] as const,
+    debitNote: (id: string) => [...purchaseKeys.debitNotes(), id] as const,
 };
 
 // ============ PURCHASE ORDERS ============
@@ -152,6 +154,23 @@ export function useDeletePurchaseBill() {
     });
 }
 
+export function useUpdatePurchaseBill() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: any }) =>
+            purchaseService.updateBill(id, data),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: purchaseKeys.bill(id) });
+            queryClient.invalidateQueries({ queryKey: purchaseKeys.bills() });
+            toast.success('Purchase bill updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to update purchase bill');
+        },
+    });
+}
+
 // ============ GRN ============
 
 export function useGRNs(params?: QueryParams) {
@@ -213,6 +232,54 @@ export function useUpdateGRN() {
         },
         onError: (error: any) => {
             toast.error(error.message || 'Failed to update GRN');
+        },
+    });
+}
+
+// ============ DEBIT NOTES ============
+
+export function useDebitNotes(params?: QueryParams) {
+    return useQuery({
+        queryKey: [...purchaseKeys.debitNotes(), params],
+        queryFn: () => purchaseService.getDebitNotes(params),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useDebitNote(id: string) {
+    return useQuery({
+        queryKey: purchaseKeys.debitNote(id),
+        queryFn: () => purchaseService.getDebitNoteById(id),
+        enabled: !!id,
+    });
+}
+
+export function useCreateDebitNote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: any) => purchaseService.createDebitNote(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: purchaseKeys.debitNotes() });
+            toast.success('Debit note created successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to create debit note');
+        },
+    });
+}
+
+export function useDeleteDebitNote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => purchaseService.deleteDebitNote(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: purchaseKeys.debitNotes() });
+            toast.success('Debit note deleted successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to delete debit note');
         },
     });
 }

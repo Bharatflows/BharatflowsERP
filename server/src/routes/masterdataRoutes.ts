@@ -1,36 +1,28 @@
 import express from 'express';
-import { protect } from '../middleware/auth';
 import {
-    getUnits,
-    createUnit,
-    updateUnit,
-    deleteUnit,
-    getCategories,
-    createCategory,
-    updateCategory,
-    deleteCategory
+    getBusinessCategories,
+    getIndustries,
+    getBusinessActivities,
+    searchBusinessProducts,
+    getBusinessCapabilities,
+    seedMasterData,
+    createCustomIndustry,
+    createCustomProduct,
+    getPopularProducts,
+    getBusinessTypes
 } from '../controllers/masterdataController';
 
 const router = express.Router();
 
-router.use(protect);
-
-// Units routes
-router.route('/units')
-    .get(getUnits)
-    .post(createUnit);
-
-router.route('/units/:id')
-    .put(updateUnit)
-    .delete(deleteUnit);
-
-// Categories routes
-router.route('/categories')
-    .get(getCategories)
-    .post(createCategory);
-
-router.route('/categories/:id')
-    .put(updateCategory)
-    .delete(deleteCategory);
+router.get('/categories', getBusinessCategories);
+router.get('/industries', getIndustries);
+router.post('/industries', createCustomIndustry);
+router.get('/activities', getBusinessActivities);
+router.get('/products', searchBusinessProducts);
+router.get('/products/popular', getPopularProducts);
+router.post('/products', createCustomProduct);
+router.get('/capabilities', getBusinessCapabilities);
+router.get('/business-types', getBusinessTypes);
+router.post('/seed', seedMasterData);
 
 export default router;

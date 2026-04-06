@@ -10,6 +10,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.initializeSocket = initializeSocket;
 exports.isUserOnline = isUserOnline;
 exports.getOnlineUsersInCompany = getOnlineUsersInCompany;
+exports.setIOInstance = setIOInstance;
+exports.sendNotificationToUser = sendNotificationToUser;
 const socket_io_1 = require("socket.io");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const prisma_1 = __importDefault(require("../config/prisma"));
@@ -45,7 +47,7 @@ function initializeSocket(httpServer) {
                 return next(new Error('User not found or inactive'));
             }
             socket.userId = user.id;
-            socket.companyId = user.companyId;
+            socket.companyId = user.companyId ?? undefined; // P0-1: companyId is now optional
             socket.userName = user.name;
             next();
         }
@@ -157,7 +159,6 @@ function initializeSocket(httpServer) {
                             messageId: msg.id,
                             userId,
                         })),
-                        skipDuplicates: true,
                     });
                     // Notify senders their messages were read
                     const senderIds = [...new Set(messages.map((m) => m.senderId))];
@@ -229,5 +230,22 @@ function isUserOnline(userId) {
 function getOnlineUsersInCompany(userIds) {
     return userIds.filter((id) => onlineUsers.has(id));
 }
-exports.default = { initializeSocket, isUserOnline, getOnlineUsersInCompany };
+/**
+ * Send a real-time notification to a specific user
+ * Called by NotificationService after saving to database
+ */
+let ioInstance = null;
+function setIOInstance(io) {
+    ioInstance = io;
+}
+function sendNotificationToUser(userId, notification) {
+    if (ioInstance) {
+        ioInstance.to(`user:${userId}`).emit('notification:new', notification);
+        logger_1.default.info(`Socket notification sent to user ${userId}`);
+    }
+    else {
+        logger_1.default.warn('Socket.IO instance not available for sending notification');
+    }
+}
+exports.default = { initializeSocket, isUserOnline, getOnlineUsersInCompany, sendNotificationToUser };
 //# sourceMappingURL=index.js.map

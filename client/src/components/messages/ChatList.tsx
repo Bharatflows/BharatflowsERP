@@ -616,7 +616,7 @@ function ContactItem({
 
   return (
     <div
-      className={`flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors ${disabled ? "opacity-50 pointer-events-none" : ""
+      className={`flex items-center gap-3 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors ${disabled ? "opacity-50 pointer-events-none" : ""
         }`}
       onClick={onClick}
     >
@@ -667,11 +667,11 @@ function ChatItem({
 }) {
   return (
     <div
-      className="flex items-center gap-3 p-4 hover:bg-muted/50 cursor-pointer transition-colors group border-l-2 border-transparent hover:border-primary"
+      className="flex items-center gap-3 p-4 hover:bg-muted cursor-pointer transition-colors group border-l-2 border-transparent hover:border-primary"
       onClick={onClick}
     >
       <div className="relative">
-        <Avatar className="h-12 w-12 border border-border/50">
+        <Avatar className="h-12 w-12 border border-border">
           <AvatarFallback
             className={`font-medium ${chat.partyType === "Customer"
               ? "bg-emerald-100 text-emerald-700"

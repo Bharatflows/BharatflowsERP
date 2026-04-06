@@ -17,18 +17,18 @@ interface Sequence {
 }
 
 const DOCUMENT_TYPE_LABELS: Record<string, { label: string; description: string; color: string }> = {
-    INVOICE: { label: "Invoice", description: "Sales invoices", color: "bg-emerald-100 text-emerald-700" },
-    ESTIMATE: { label: "Estimate", description: "Cost estimates", color: "bg-blue-100 text-blue-700" },
-    QUOTATION: { label: "Quotation", description: "Price quotations", color: "bg-purple-100 text-purple-700" },
-    SALES_ORDER: { label: "Sales Order", description: "Sales orders", color: "bg-amber-100 text-amber-700" },
-    DELIVERY_CHALLAN: { label: "Delivery Challan", description: "Delivery notes", color: "bg-cyan-100 text-cyan-700" },
-    PURCHASE_ORDER: { label: "Purchase Order", description: "Purchase orders", color: "bg-orange-100 text-orange-700" },
-    PURCHASE_BILL: { label: "Purchase Bill", description: "Vendor bills", color: "bg-rose-100 text-rose-700" },
-    GRN: { label: "GRN", description: "Goods received", color: "bg-teal-100 text-teal-700" },
-    CUSTOMER: { label: "Customer", description: "Customer codes", color: "bg-indigo-100 text-indigo-700" },
-    SUPPLIER: { label: "Supplier", description: "Supplier codes", color: "bg-pink-100 text-pink-700" },
-    PRODUCT: { label: "Product", description: "Product codes", color: "bg-lime-100 text-lime-700" },
-    EMPLOYEE: { label: "Employee", description: "Employee IDs", color: "bg-slate-100 text-slate-700" },
+    INVOICE: { label: "Invoice", description: "Sales invoices", color: "badge-paid" },
+    ESTIMATE: { label: "Estimate", description: "Cost estimates", color: "badge-sent" },
+    QUOTATION: { label: "Quotation", description: "Price quotations", color: "badge-active" },
+    SALES_ORDER: { label: "Sales Order", description: "Sales orders", color: "badge-partial" },
+    DELIVERY_CHALLAN: { label: "Delivery Challan", description: "Delivery notes", color: "badge-completed" },
+    PURCHASE_ORDER: { label: "Purchase Order", description: "Purchase orders", color: "badge-partial" },
+    PURCHASE_BILL: { label: "Purchase Bill", description: "Vendor bills", color: "badge-overdue" },
+    GRN: { label: "GRN", description: "Goods received", color: "badge-completed" },
+    CUSTOMER: { label: "Customer", description: "Customer codes", color: "badge-sent" },
+    SUPPLIER: { label: "Supplier", description: "Supplier codes", color: "badge-cancelled" },
+    PRODUCT: { label: "Product", description: "Product codes", color: "badge-paid" },
+    EMPLOYEE: { label: "Employee", description: "Employee IDs", color: "badge-draft" },
 };
 
 // Format placeholders and preview
@@ -157,15 +157,15 @@ export function DocumentNumberSettings() {
     return (
         <div className="space-y-6">
             {/* Header Info */}
-            <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
+            <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
                 <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
-                        <div className="p-3 bg-indigo-100 rounded-xl">
-                            <Hash className="size-6 text-indigo-600" />
+                        <div className="p-3 bg-primary/20 rounded-xl">
+                            <Hash className="size-6 text-primary" />
                         </div>
                         <div className="flex-1">
-                            <h3 className="font-semibold text-lg text-indigo-900">Document Numbering</h3>
-                            <p className="text-sm text-indigo-700 mt-1">
+                            <h3 className="font-semibold text-lg text-foreground">Document Numbering</h3>
+                            <p className="text-sm text-muted-foreground mt-1">
                                 Configure auto-generated numbers for invoices, orders, and other documents.
                                 Each new document will automatically get the next number in sequence.
                             </p>
@@ -281,7 +281,7 @@ export function DocumentNumberSettings() {
                                             <div className="flex items-center gap-2 text-sm">
                                                 <Eye className="size-4 text-muted-foreground" />
                                                 <span className="text-muted-foreground">Preview:</span>
-                                                <code className="px-2 py-1 bg-slate-100 rounded text-primary font-medium">
+                                                <code className="px-2 py-1 bg-muted rounded text-primary font-medium">
                                                     {formatPreview(currentPrefix, currentNextNumber, currentFormat)}
                                                 </code>
                                             </div>
@@ -324,7 +324,7 @@ export function DocumentNumberSettings() {
                                         <div className="flex items-center gap-2 pt-3 border-t text-sm">
                                             <Eye className="size-4 text-muted-foreground" />
                                             <span className="text-muted-foreground">Next:</span>
-                                            <code className="px-2 py-1 bg-slate-100 rounded text-primary font-medium">
+                                            <code className="px-2 py-1 bg-muted rounded text-primary font-medium">
                                                 {formatPreview(currentPrefix, currentNextNumber, currentFormat)}
                                             </code>
                                         </div>

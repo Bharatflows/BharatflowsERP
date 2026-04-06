@@ -1,7 +1,47 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendReminder = exports.deletePaymentReminder = exports.updatePaymentReminder = exports.createPaymentReminder = exports.getPaymentReminders = exports.getDashboardSummary = exports.deleteTransaction = exports.createTransaction = exports.getTransactions = exports.deleteAccount = exports.updateAccount = exports.createAccount = exports.getAccount = exports.getAccounts = void 0;
+exports.syncBankAccount = exports.getCashFlowForecast = exports.getCashFlowTrends = exports.sendReminder = exports.deletePaymentReminder = exports.updatePaymentReminder = exports.createPaymentReminder = exports.getPaymentReminders = exports.getDashboardSummary = exports.deleteTransaction = exports.createTransaction = exports.getTransactions = exports.deleteAccount = exports.updateAccount = exports.createAccount = exports.getAccount = exports.getAccounts = void 0;
 const client_1 = require("@prisma/client");
+const bankingIntegrationService_1 = require("../services/bankingIntegrationService");
+const auditService_1 = require("../services/auditService"); // D1: Audit logging
+const eventBus_1 = __importStar(require("../services/eventBus"));
+const logger_1 = __importDefault(require("../config/logger"));
 const prisma = new client_1.PrismaClient();
 // @desc    Get all bank accounts
 // @route   GET /api/v1/banking/accounts
@@ -20,7 +60,7 @@ const getAccounts = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching bank accounts:', error);
+        logger_1.default.error('Error fetching bank accounts:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -52,7 +92,7 @@ const getAccount = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching bank account:', error);
+        logger_1.default.error('Error fetching bank account:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -86,7 +126,7 @@ const createAccount = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error creating bank account:', error);
+        logger_1.default.error('Error creating bank account:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -130,7 +170,7 @@ const updateAccount = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error updating bank account:', error);
+        logger_1.default.error('Error updating bank account:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -165,7 +205,7 @@ const deleteAccount = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error deleting bank account:', error);
+        logger_1.default.error('Error deleting bank account:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -198,7 +238,7 @@ const getTransactions = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching transactions:', error);
+        logger_1.default.error('Error fetching transactions:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -257,8 +297,28 @@ const createTransaction = async (req, res) => {
             // 3. Update account balance
             await tx.bankAccount.update({
                 where: { id: accountId },
-                data: { balance: newBalance }
+                data: {
+                    balance: newBalance,
+                    updatedAt: new Date()
+                }
             });
+            // Emit event for Ledger Posting
+            await eventBus_1.default.emit({
+                companyId: companyId,
+                eventType: eventBus_1.EventTypes.BANK_TRANSACTION_CREATED,
+                aggregateType: 'Transaction',
+                aggregateId: transaction.id,
+                payload: {
+                    transactionId: transaction.id,
+                    accountId,
+                    date: transaction.date,
+                    amount: transactionAmount,
+                    type,
+                    description: description || '',
+                    category: category || 'General'
+                },
+                metadata: { userId: req.user?.id || 'system', source: 'api' }
+            }, tx);
             // 4. If partyId is provided, update party balance
             if (partyId) {
                 await tx.party.update({
@@ -274,14 +334,27 @@ const createTransaction = async (req, res) => {
             }
             return { transaction, newBalance };
         });
-        console.log(`Transaction created: ${result.transaction.id} - Bank balance updated to ${result.newBalance}`);
+        logger_1.default.info(`Transaction created: ${result.transaction.id} - Bank balance updated to ${result.newBalance}`);
+        // D1: Audit log for transaction creation
+        try {
+            await auditService_1.AuditService.logChange(companyId, req.user?.id || 'system', 'INVOICE', // Using INVOICE as closest EntityType for Transaction
+            result.transaction.id, 'CREATE', null, {
+                description: result.transaction.description,
+                amount: Number(result.transaction.amount),
+                type: result.transaction.type,
+                accountId
+            }, req.ip || 'UNKNOWN', req.headers['user-agent'] || 'UNKNOWN', 'BANKING');
+        }
+        catch (auditError) {
+            logger_1.default.warn('Failed to log transaction audit:', auditError);
+        }
         res.status(201).json({
             success: true,
             data: result.transaction
         });
     }
     catch (error) {
-        console.error('Error creating transaction:', error);
+        logger_1.default.error('Error creating transaction:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Server Error'
@@ -325,13 +398,24 @@ const deleteTransaction = async (req, res) => {
                 where: { id: transactionId }
             });
         });
+        // D1: Audit log for transaction deletion
+        try {
+            await auditService_1.AuditService.logChange(companyId, req.user?.id || 'system', 'INVOICE', existingTransaction.id, 'DELETE', {
+                description: existingTransaction.description,
+                amount: Number(existingTransaction.amount),
+                type: existingTransaction.type
+            }, null, req.ip || 'UNKNOWN', req.headers['user-agent'] || 'UNKNOWN', 'BANKING');
+        }
+        catch (auditError) {
+            logger_1.default.warn('Failed to log transaction delete audit:', auditError);
+        }
         res.json({
             success: true,
             message: 'Transaction deleted and balance reversed'
         });
     }
     catch (error) {
-        console.error('Error deleting transaction:', error);
+        logger_1.default.error('Error deleting transaction:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -370,7 +454,7 @@ const getDashboardSummary = async (req, res) => {
             where: {
                 companyId,
                 status: 'overdue',
-                dueDate: { lt: new Date() }
+                scheduledFor: { lt: new Date() }
             }
         });
         res.json({
@@ -382,7 +466,11 @@ const getDashboardSummary = async (req, res) => {
                     number: `**** ${acc.accountNumber.slice(-4)}`,
                     balance: Number(acc.balance),
                     type: acc.type,
-                    trend: Number(acc.balance) >= 0 ? 'up' : 'down'
+                    trend: Number(acc.balance) >= 0 ? 'up' : 'down',
+                    // Integration Meta
+                    provider: acc.provider,
+                    syncActive: acc.syncActive,
+                    lastSyncAt: acc.lastSyncAt
                 })),
                 summary: {
                     totalBalance,
@@ -403,7 +491,7 @@ const getDashboardSummary = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching dashboard summary:', error);
+        logger_1.default.error('Error fetching dashboard summary:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -428,32 +516,32 @@ const getPaymentReminders = async (req, res) => {
             where: {
                 companyId,
                 status: 'upcoming',
-                dueDate: { lt: new Date() }
+                scheduledFor: { lt: new Date() }
             },
             data: { status: 'overdue' }
         });
         const reminders = await prisma.paymentReminder.findMany({
             where: whereClause,
-            include: { party: true },
-            orderBy: { dueDate: 'asc' }
+            include: { party: true, invoice: true },
+            orderBy: { scheduledFor: 'asc' }
         });
         res.json({
             success: true,
             count: reminders.length,
             data: reminders.map(r => ({
                 id: r.id,
-                partyName: r.party.name,
-                amount: Number(r.amount),
-                dueDate: r.dueDate,
+                partyName: r.party?.name || 'Unknown',
+                amount: Number(r.invoice?.totalAmount || 0),
+                dueDate: r.scheduledFor,
                 type: r.type,
                 status: r.status,
-                description: r.description,
-                lastReminded: r.lastRemindedAt
+                description: r.message,
+                lastReminded: r.sentAt
             }))
         });
     }
     catch (error) {
-        console.error('Error fetching payment reminders:', error);
+        logger_1.default.error('Error fetching payment reminders:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -481,11 +569,11 @@ const createPaymentReminder = async (req, res) => {
                 companyId: companyId,
                 partyId,
                 invoiceId,
-                amount: Number(amount),
-                dueDate: new Date(dueDate),
+                // amount is derived from invoice
+                scheduledFor: new Date(dueDate),
                 type,
                 status,
-                description
+                message: description || ''
             },
             include: { party: true }
         });
@@ -495,7 +583,7 @@ const createPaymentReminder = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error creating payment reminder:', error);
+        logger_1.default.error('Error creating payment reminder:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -524,10 +612,10 @@ const updatePaymentReminder = async (req, res) => {
         const reminder = await prisma.paymentReminder.update({
             where: { id: reminderId },
             data: {
-                ...(amount !== undefined && { amount: Number(amount) }),
-                ...(dueDate && { dueDate: new Date(dueDate) }),
+                // amount cannot be updated here as it's from invoice
+                ...(dueDate && { scheduledFor: new Date(dueDate) }),
                 ...(status && { status }),
-                ...(description !== undefined && { description })
+                ...(description !== undefined && { message: description })
             },
             include: { party: true }
         });
@@ -537,7 +625,7 @@ const updatePaymentReminder = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error updating payment reminder:', error);
+        logger_1.default.error('Error updating payment reminder:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -571,7 +659,7 @@ const deletePaymentReminder = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error deleting payment reminder:', error);
+        logger_1.default.error('Error deleting payment reminder:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -599,7 +687,7 @@ const sendReminder = async (req, res) => {
         }
         const reminder = await prisma.paymentReminder.update({
             where: { id: reminderId },
-            data: { lastRemindedAt: new Date() },
+            data: { sentAt: new Date() },
             include: { party: true }
         });
         // In the future, this could send email/SMS notifications
@@ -610,7 +698,7 @@ const sendReminder = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error sending reminder:', error);
+        logger_1.default.error('Error sending reminder:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -618,4 +706,167 @@ const sendReminder = async (req, res) => {
     }
 };
 exports.sendReminder = sendReminder;
+// @desc    Get Cash Flow Monthly Trends
+// @route   GET /api/v1/banking/cash-flow-trends
+const getCashFlowTrends = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const monthsToFetch = 6;
+        const trends = [];
+        for (let i = 0; i < monthsToFetch; i++) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+            const startDate = new Date(year, month - 1, 1);
+            const endDate = new Date(year, month, 0, 23, 59, 59);
+            const transactions = await prisma.transaction.findMany({
+                where: {
+                    companyId,
+                    date: { gte: startDate, lte: endDate }
+                },
+                select: { amount: true, type: true }
+            });
+            const inflow = transactions
+                .filter(t => t.type === 'credit')
+                .reduce((sum, t) => sum + Number(t.amount), 0);
+            const outflow = transactions
+                .filter(t => t.type === 'debit')
+                .reduce((sum, t) => sum + Number(t.amount), 0);
+            trends.unshift({
+                month: date.toLocaleString('default', { month: 'short' }),
+                year,
+                inflow,
+                outflow,
+                net: inflow - outflow
+            });
+        }
+        res.json({
+            success: true,
+            data: trends
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Error fetching cash flow trends:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+exports.getCashFlowTrends = getCashFlowTrends;
+// @desc    Get Cash Flow Forecast
+// @route   GET /api/v1/banking/cash-flow-forecast
+// @access  Private
+const getCashFlowForecast = async (req, res) => {
+    try {
+        const companyId = req.user?.companyId;
+        const monthsInPast = 6;
+        const monthsToForecast = 6;
+        // 1. Calculate historical average monthly inflow/outflow
+        const pastDate = new Date();
+        pastDate.setMonth(pastDate.getMonth() - monthsInPast);
+        const historicalTransactions = await prisma.transaction.findMany({
+            where: {
+                companyId,
+                date: { gte: pastDate }
+            },
+            select: { amount: true, type: true }
+        });
+        const totalInflow = historicalTransactions
+            .filter(t => t.type === 'credit')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const totalOutflow = historicalTransactions
+            .filter(t => t.type === 'debit')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+        const avgInflow = totalInflow / monthsInPast;
+        const avgOutflow = totalOutflow / monthsInPast;
+        // 2. Get current balance
+        const accounts = await prisma.bankAccount.findMany({
+            where: { companyId },
+            select: { balance: true }
+        });
+        const currentBalance = accounts.reduce((sum, acc) => sum + Number(acc.balance), 0);
+        // 3. Generate forecast
+        const forecast = [];
+        let projectedBalance = currentBalance;
+        for (let i = 1; i <= monthsToForecast; i++) {
+            const date = new Date();
+            date.setMonth(date.getMonth() + i);
+            // Slightly adjust avg based on simple growth/seasonality if needed
+            // For now, keep it simple
+            const monthlyNet = avgInflow - avgOutflow;
+            projectedBalance += monthlyNet;
+            forecast.push({
+                month: date.toLocaleString('default', { month: 'short' }),
+                year: date.getFullYear(),
+                inflow: Math.round(avgInflow),
+                outflow: Math.round(avgOutflow),
+                balance: Math.round(projectedBalance)
+            });
+        }
+        // 4. Dynamic Alerts
+        const alerts = [];
+        if (projectedBalance < 0) {
+            alerts.push({
+                type: 'critical',
+                message: `Projected cash deficit of ${Math.round(Math.abs(projectedBalance))} expected by ${forecast[monthsToForecast - 1].month} ${forecast[monthsToForecast - 1].year}.`,
+                action: 'Review pending payments or arrange financing.'
+            });
+        }
+        else if (projectedBalance < currentBalance * 0.5) {
+            alerts.push({
+                type: 'warning',
+                message: 'Cash reserves are projected to decline by more than 50% in the next 6 months.',
+                action: 'Consider reducing discretionary expenses.'
+            });
+        }
+        else {
+            alerts.push({
+                type: 'info',
+                message: 'Cash flow is projected to remain stable over the next 6 months.',
+                action: 'Good time to consider investment opportunities.'
+            });
+        }
+        res.json({
+            success: true,
+            data: {
+                currentBalance,
+                avgInflow: Math.round(avgInflow),
+                avgOutflow: Math.round(avgOutflow),
+                forecast,
+                alerts
+            }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Error calculating cash flow forecast:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server Error'
+        });
+    }
+};
+exports.getCashFlowForecast = getCashFlowForecast;
+// @desc    Sync Bank Account with Provider
+// @route   POST /api/v1/banking/accounts/:id/sync
+// @access  Private
+const syncBankAccount = async (req, res) => {
+    try {
+        const accountId = req.params.id;
+        const companyId = req.user?.companyId;
+        if (!companyId)
+            throw new Error('Unauthorized');
+        const result = await bankingIntegrationService_1.BankingIntegrationService.syncTransactions(accountId, companyId);
+        res.json(result);
+    }
+    catch (error) {
+        logger_1.default.error('Error syncing bank account:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Server Error'
+        });
+    }
+};
+exports.syncBankAccount = syncBankAccount;
 //# sourceMappingURL=bankingController.js.map

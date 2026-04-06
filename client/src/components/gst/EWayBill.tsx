@@ -32,69 +32,7 @@ interface EWayBillData {
 export function EWayBill() {
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Mock e-way bill data
-  const ewayBills: EWayBillData[] = [
-    {
-      id: "1",
-      ewbNumber: "351234567890",
-      date: "2024-11-22",
-      invoiceNumber: "INV-2024-045",
-      customerName: "Sharma Traders Pvt Ltd",
-      fromState: "Maharashtra",
-      toState: "Gujarat",
-      distance: 450,
-      vehicleNumber: "MH12AB1234",
-      transportMode: "Road",
-      amount: 245600,
-      status: "active",
-      validUpto: "2024-11-25",
-    },
-    {
-      id: "2",
-      ewbNumber: "351234567891",
-      date: "2024-11-20",
-      invoiceNumber: "INV-2024-043",
-      customerName: "Patel Distributors",
-      fromState: "Maharashtra",
-      toState: "Rajasthan",
-      distance: 780,
-      vehicleNumber: "MH14CD5678",
-      transportMode: "Road",
-      amount: 567800,
-      status: "active",
-      validUpto: "2024-11-27",
-    },
-    {
-      id: "3",
-      ewbNumber: "351234567892",
-      date: "2024-11-15",
-      invoiceNumber: "INV-2024-040",
-      customerName: "Kumar Enterprises",
-      fromState: "Maharashtra",
-      toState: "Karnataka",
-      distance: 850,
-      vehicleNumber: "MH02EF9012",
-      transportMode: "Road",
-      amount: 456700,
-      status: "expired",
-      validUpto: "2024-11-18",
-    },
-    {
-      id: "4",
-      ewbNumber: "351234567893",
-      date: "2024-11-18",
-      invoiceNumber: "INV-2024-041",
-      customerName: "Reddy Industries Ltd",
-      fromState: "Maharashtra",
-      toState: "Telangana",
-      distance: 680,
-      vehicleNumber: "MH20GH3456",
-      transportMode: "Road",
-      amount: 678900,
-      status: "cancelled",
-      validUpto: "2024-11-21",
-    },
-  ];
+  const [ewayBills, setEwayBills] = useState<EWayBillData[]>([]);
 
   const filteredBills = ewayBills.filter((bill) => {
     const matchesSearch =
@@ -111,11 +49,11 @@ export function EWayBill() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-[#d1fae5] text-[#065f46] border-[#a7f3d0]";
+        return "bg-green-100 text-green-800 border-green-300";
       case "expired":
-        return "bg-[#fef3c7] text-[#92400e] border-[#fde68a]";
+        return "bg-amber-100 text-amber-800 border-amber-300";
       case "cancelled":
-        return "bg-[#fee2e2] text-[#991b1b] border-[#fecaca]";
+        return "bg-red-100 text-red-800 border-red-300";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -215,7 +153,7 @@ export function EWayBill() {
       <div className="bg-white rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#f8fafc] border-b border-border">
+            <thead className="bg-background border-b border-border">
               <tr>
                 <th className="text-left px-6 py-4 text-muted-foreground">EWB Number</th>
                 <th className="text-left px-6 py-4 text-muted-foreground">Invoice</th>
@@ -233,7 +171,7 @@ export function EWayBill() {
                 <tr
                   key={bill.id}
                   className={cn(
-                    "border-b border-border hover:bg-[#f8fafc] transition-colors",
+                    "border-b border-border hover:bg-background transition-colors",
                     index === filteredBills.length - 1 && "border-b-0"
                   )}
                 >
@@ -340,19 +278,19 @@ export function EWayBill() {
             <h4 className="text-foreground">When is E-Way Bill Required?</h4>
             <ul className="space-y-2 text-muted-foreground">
               <li className="flex gap-2">
-                <span className="text-[#10b981]">✓</span>
+                <span className="text-success">✓</span>
                 <span>For movement of goods worth more than ₹50,000</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#10b981]">✓</span>
+                <span className="text-success">✓</span>
                 <span>For inter-state movement of goods</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#10b981]">✓</span>
+                <span className="text-success">✓</span>
                 <span>For intra-state movement in some states</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#10b981]">✓</span>
+                <span className="text-success">✓</span>
                 <span>For import/export of goods</span>
               </li>
             </ul>
@@ -362,19 +300,19 @@ export function EWayBill() {
             <h4 className="text-foreground">Validity Period</h4>
             <ul className="space-y-2 text-muted-foreground">
               <li className="flex gap-2">
-                <span className="text-[#2563eb]">•</span>
+                <span className="text-primary">•</span>
                 <span>Less than 100 km: 1 day</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#2563eb]">•</span>
+                <span className="text-primary">•</span>
                 <span>100-300 km: 3 days</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#2563eb]">•</span>
+                <span className="text-primary">•</span>
                 <span>300-500 km: 5 days</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-[#2563eb]">•</span>
+                <span className="text-primary">•</span>
                 <span>More than 1000 km: 15 days</span>
               </li>
             </ul>
@@ -383,9 +321,9 @@ export function EWayBill() {
       </div>
 
       {/* Information Box */}
-      <div className="bg-[#dbeafe] border border-[#93c5fd] rounded-xl p-6">
+      <div className="bg-info-light border border-info/30 rounded-xl p-6">
         <div className="flex gap-3">
-          <Truck className="size-5 text-[#2563eb] flex-shrink-0 mt-0.5" />
+          <Truck className="size-5 text-primary flex-shrink-0 mt-0.5" />
           <div>
             <h4 className="text-foreground mb-2">Important Information</h4>
             <ul className="space-y-1 text-muted-foreground list-disc list-inside">

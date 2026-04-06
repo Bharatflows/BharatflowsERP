@@ -39,20 +39,40 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const auth_1 = require("../middleware/auth");
 const reportsController = __importStar(require("../controllers/reports"));
+const accountingController = __importStar(require("../controllers/accountingController"));
+const exportController = __importStar(require("../controllers/reports/exportController"));
+const ageingController = __importStar(require("../controllers/ageingController"));
 const router = express_1.default.Router();
 router.use(auth_1.protect);
 // Financial Reports
 router.get('/dashboard', reportsController.getDashboardSummary);
-router.get('/profit-loss', reportsController.getProfitLoss);
-router.get('/balance-sheet', reportsController.getBalanceSheet);
-// Aging Reports
+router.get('/profit-loss', accountingController.getProfitLoss);
+router.get('/profit-loss-trends', reportsController.getProfitLossTrends);
+router.get('/balance-sheet', accountingController.getBalanceSheet);
+router.get('/cash-flow-forecast', reportsController.getCashFlowForecast);
+// Aging Reports (Legacy)
 router.get('/aging-receivables', reportsController.getAgingReceivables);
 router.get('/aging-payables', reportsController.getAgingPayables);
+// P0: Enhanced Ageing Reports with Party Breakdown
+router.get('/ageing/receivables', ageingController.getReceivablesAgeing);
+router.get('/ageing/payables', ageingController.getPayablesAgeing);
+router.get('/ageing/msme-compliance', ageingController.getMSMEComplianceReport);
 // Business Reports
 router.get('/sales', reportsController.getSalesReport);
 router.get('/purchase', reportsController.getPurchaseReport);
 router.get('/inventory', reportsController.getInventoryReport);
 // Party Statement
 router.get('/party-statement/:partyId', reportsController.getPartyStatement);
+// Export Reports (CSV/Excel)
+router.get('/export/:type', exportController.exportReport);
+// P2: Budget vs Actual
+router.get('/budget-vs-actual', reportsController.getBudgetVsActual);
+router.post('/budget', reportsController.saveBudget);
+router.get('/budget-alerts', reportsController.getBudgetAlerts);
+// P2: Supplier Dependency Analysis
+router.get('/supplier-dependency', reportsController.analyzeConcentration);
+// P2: Exchange Rates
+router.get('/exchange-rates', reportsController.getExchangeRates);
+router.post('/convert-currency', reportsController.convertCurrency);
 exports.default = router;
 //# sourceMappingURL=reportsRoutes.js.map

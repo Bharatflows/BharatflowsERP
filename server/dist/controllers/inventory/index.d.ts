@@ -6,6 +6,6 @@
  * - stockController.ts (adjustments, transfers, movements, valuation)
  * - warehouseController.ts (CRUD)
  */
-export { adjustStock, getLowStock, transferStock, getStockHistory, getStockMovements, getInventoryValuation } from './stockController';
+export { adjustStock, getLowStock, transferStock, getStockHistory, getStockMovements, getInventoryValuation, createBatch, getBatches } from './stockController';
 export { createWarehouse, getWarehouses, updateWarehouse, deleteWarehouse } from './warehouseController';
 //# sourceMappingURL=index.d.ts.map

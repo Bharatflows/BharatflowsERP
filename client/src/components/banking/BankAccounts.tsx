@@ -1,16 +1,5 @@
 import { useState, useEffect } from "react";
 import { bankingService } from "../../services/modules.service";
-import {
-  Plus,
-  MoreVertical,
-  CreditCard,
-  Landmark,
-  Edit,
-  Trash2,
-  Copy,
-  CheckCircle,
-  Wallet,
-} from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -38,6 +27,13 @@ import {
 } from "../ui/select";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface BankAccount {
   id: string;
@@ -125,23 +121,23 @@ export function BankAccounts() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="bg-primary/10 p-3 rounded-xl">
-              <Landmark className="size-6 text-primary" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm p-[24px]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-[16px]">
+          <div className="flex items-start gap-[16px]">
+            <div className="bg-primary/10 p-[12px] rounded-[12px]">
+              <MIcon name="account_balance" className="text-[24px] text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-foreground mb-1">Bank Accounts</h2>
-              <p className="text-muted-foreground text-sm">
+              <h2 className="text-2xl font-bold text-foreground mb-[4px]">Bank Accounts</h2>
+              <p className="text-body-sm font-medium text-muted-foreground">
                 Manage your business bank accounts and cash ledgers
               </p>
             </div>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2 h-10">
-                <Plus className="size-4" /> Add Account
+              <Button className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold">
+                <MIcon name="add" className="text-[18px]" /> Add Account
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -227,11 +223,11 @@ export function BankAccounts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         {accounts.map((account) => (
           <div
             key={account.id}
-            className="bg-card rounded-xl border border-border/50 shadow-sm p-6 hover:shadow-md transition-all group relative overflow-hidden"
+            className="bg-card rounded-[16px] border border-border shadow-sm p-[24px] hover:shadow-md transition-all group relative overflow-hidden"
           >
             {/* Gradient Overlay based on type */}
             <div className={cn("absolute top-0 right-0 w-32 h-32 bg-gradient-to-br to-transparent rounded-bl-full opacity-10 pointer-events-none",
@@ -240,88 +236,88 @@ export function BankAccounts() {
                   "from-violet-500"
             )} />
 
-            <div className="flex justify-between items-start mb-4 relative z-10">
-              <div className="flex items-center gap-4">
-                <div className={cn("p-3 rounded-xl",
-                  account.type === 'Cash' ? "bg-blue-50" :
-                    account.type === 'Credit' ? "bg-amber-50" :
-                      "bg-violet-50"
+            <div className="flex justify-between items-start mb-[16px] relative z-10">
+              <div className="flex items-center gap-[16px]">
+                <div className={cn("p-[12px] rounded-[12px]",
+                  account.type === 'Cash' ? "bg-blue-50 dark:bg-blue-900/40" :
+                    account.type === 'Credit' ? "bg-amber-50 dark:bg-amber-900/40" :
+                      "bg-violet-50 dark:bg-violet-900/40"
                 )}>
                   {account.type === 'Cash' ? (
-                    <Wallet className={cn("size-6",
-                      account.type === 'Cash' ? "text-blue-600" : "text-violet-600"
+                    <MIcon name="account_balance_wallet" className={cn("text-[24px]",
+                      account.type === 'Cash' ? "text-blue-600 dark:text-blue-400" : "text-violet-600 dark:text-violet-400"
                     )} />
                   ) : (
-                    <Landmark className={cn("size-6",
-                      account.type === 'Credit' ? "text-amber-600" : "text-violet-600"
+                    <MIcon name="account_balance" className={cn("text-[24px]",
+                      account.type === 'Credit' ? "text-amber-600 dark:text-amber-400" : "text-violet-600 dark:text-violet-400"
                     )} />
                   )}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg text-foreground">{account.name}</h3>
-                  <p className="text-sm text-muted-foreground">{account.bankName} • {account.type}</p>
+                  <h3 className="text-h3 font-bold text-foreground mb-[4px]">{account.name}</h3>
+                  <p className="text-body-sm font-medium text-muted-foreground">{account.bankName} • {account.type}</p>
                 </div>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreVertical className="size-4" />
+                  <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity h-[32px] w-[32px] rounded-[8px]">
+                    <MIcon name="more_vert" className="text-[18px] text-muted-foreground" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
-                    <Edit className="size-4 mr-2" /> Edit Details
+                <DropdownMenuContent align="end" className="rounded-[12px] border-border p-[8px] min-w-[160px]">
+                  <DropdownMenuItem className="rounded-[8px] text-body-sm font-medium text-foreground dark:text-muted-foreground gap-[8px] px-[12px] py-[8px] cursor-pointer">
+                    <MIcon name="edit" className="text-[16px] text-muted-foreground" /> Edit Details
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
-                    <Trash2 className="size-4 mr-2" /> Deactivate
+                  <DropdownMenuItem className="text-red-600 rounded-[8px] text-body-sm font-medium gap-[8px] px-[12px] py-[8px] cursor-pointer focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/20">
+                    <MIcon name="delete" className="text-[16px]" /> Deactivate
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
-            <div className="space-y-5 relative z-10">
+            <div className="space-y-[20px] relative z-10">
               <div>
-                <p className="text-sm text-muted-foreground mb-1 font-medium">Available Balance</p>
-                <h2 className={cn("text-3xl font-bold tracking-tight", account.balance < 0 ? "text-rose-600" : "text-foreground")}>
+                <p className="text-body-sm font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Available Balance</p>
+                <h2 className={cn("text-3xl font-bold", account.balance < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground")}>
                   ₹{Math.abs(account.balance).toLocaleString("en-IN")}
-                  <span className="text-base font-normal text-muted-foreground ml-2">
+                  <span className="text-body font-medium text-muted-foreground ml-[8px]">
                     {account.balance >= 0 ? 'Cr' : 'Dr'}
                   </span>
                 </h2>
               </div>
 
               {account.type !== 'Cash' && (
-                <div className="p-4 bg-muted/30 rounded-xl border border-border/50 space-y-3">
-                  <div className="flex justify-between items-center text-sm">
+                <div className="p-[16px] bg-muted dark:bg-slate-950 border border-border rounded-[12px] space-y-[12px]">
+                  <div className="flex justify-between items-center text-body-sm">
                     <span className="text-muted-foreground font-medium">Account No</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-foreground bg-background px-2 py-0.5 rounded border border-border/50">{account.accountNumber}</span>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(account.accountNumber)}>
-                        <Copy className="size-3 text-muted-foreground" />
+                    <div className="flex items-center gap-[8px]">
+                      <span className="font-mono text-foreground dark:text-muted-foreground font-bold bg-card px-[8px] py-[4px] rounded-[6px] border border-border">{account.accountNumber}</span>
+                      <Button variant="ghost" size="icon" className="h-[24px] w-[24px]" onClick={() => copyToClipboard(account.accountNumber)}>
+                        <MIcon name="content_copy" className="text-[14px] text-muted-foreground" />
                       </Button>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-sm">
+                  <div className="flex justify-between items-center text-body-sm">
                     <span className="text-muted-foreground font-medium">IFSC</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-foreground bg-background px-2 py-0.5 rounded border border-border/50">{account.ifsc}</span>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(account.ifsc)}>
-                        <Copy className="size-3 text-muted-foreground" />
+                    <div className="flex items-center gap-[8px]">
+                      <span className="font-mono text-foreground dark:text-muted-foreground font-bold bg-card px-[8px] py-[4px] rounded-[6px] border border-border">{account.ifsc}</span>
+                      <Button variant="ghost" size="icon" className="h-[24px] w-[24px]" onClick={() => copyToClipboard(account.ifsc)}>
+                        <MIcon name="content_copy" className="text-[14px] text-muted-foreground" />
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t border-border/50">
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle className="size-3.5 text-emerald-600" />
+              <div className="flex items-center justify-between text-[12px] font-medium text-muted-foreground pt-[16px] border-t border-border">
+                <div className="flex items-center gap-[6px]">
+                  <MIcon name="check_circle" className="text-[14px] text-emerald-600 dark:text-emerald-500" />
                   Last Reconciled: {account.lastReconciled}
                 </div>
-                <Badge variant="outline" className={cn("gap-1",
-                  account.status === 'active' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-muted text-muted-foreground"
+                <Badge variant="outline" className={cn("gap-[4px] px-[8px] py-[2px] rounded-[6px] text-[10px] font-bold tracking-wider",
+                  account.status === 'active' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800" : "bg-muted text-muted-foreground border-border"
                 )}>
-                  <div className={cn("size-1.5 rounded-full", account.status === 'active' ? "bg-emerald-600" : "bg-gray-500")} />
+                  <div className={cn("w-[6px] h-[6px] rounded-full", account.status === 'active' ? "bg-emerald-600 dark:bg-emerald-500" : "bg-slate-500")} />
                   {account.status.toUpperCase()}
                 </Badge>
               </div>

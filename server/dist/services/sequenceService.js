@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getNextNumber = getNextNumber;
+exports.decrementSequence = decrementSequence;
 exports.getSequences = getSequences;
 exports.getSequence = getSequence;
 exports.updateSequence = updateSequence;
@@ -24,6 +25,9 @@ const DEFAULT_SEQUENCES = {
     SUPPLIER: { prefix: 'SUPP', format: '{PREFIX}-{SEQ:4}' },
     EMPLOYEE: { prefix: 'EMP', format: '{PREFIX}-{SEQ:4}' },
     PRODUCT: { prefix: 'PROD', format: '{PREFIX}-{SEQ:4}' },
+    CREDIT_NOTE: { prefix: 'CN', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
+    DEBIT_NOTE: { prefix: 'DN', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
+    STOCK_ADJUSTMENT: { prefix: 'SA', format: '{PREFIX}-{YEAR}-{SEQ:3}' },
 };
 /**
  * Formats a sequence number based on the format pattern
@@ -56,52 +60,108 @@ function formatSequenceNumber(prefix, nextNumber, format) {
 }
 /**
  * Gets the next document number for a given document type
- * Creates the sequence if it doesn't exist
+ * Counts actual documents in the database to determine the next number
  */
 async function getNextNumber(companyId, documentType) {
     try {
-        // Get or create sequence with atomic operation
-        const sequence = await prisma_1.default.$transaction(async (tx) => {
-            // Try to find existing sequence
-            let seq = await tx.sequence.findFirst({
-                where: {
+        // Get the sequence configuration (for prefix and format)
+        let seq = await prisma_1.default.sequence.findFirst({
+            where: {
+                companyId,
+                documentType,
+                fiscalYear: null,
+            },
+        });
+        // Create sequence config if it doesn't exist
+        if (!seq) {
+            const defaults = DEFAULT_SEQUENCES[documentType] || {
+                prefix: documentType.substring(0, 3).toUpperCase(),
+                format: '{PREFIX}-{SEQ:4}',
+            };
+            seq = await prisma_1.default.sequence.create({
+                data: {
                     companyId,
                     documentType,
-                    fiscalYear: null, // For non-fiscal-year-based sequences
+                    prefix: defaults.prefix,
+                    format: defaults.format,
+                    nextNumber: 1, // This is now just a fallback, actual count comes from DB
                 },
             });
-            // Create sequence if it doesn't exist
-            if (!seq) {
-                const defaults = DEFAULT_SEQUENCES[documentType] || {
-                    prefix: documentType.substring(0, 3).toUpperCase(),
-                    format: '{PREFIX}-{SEQ:4}',
-                };
-                seq = await tx.sequence.create({
-                    data: {
-                        companyId,
-                        documentType,
-                        prefix: defaults.prefix,
-                        format: defaults.format,
-                        nextNumber: 1,
-                    },
-                });
-            }
-            // Increment the sequence number
-            const updatedSeq = await tx.sequence.update({
-                where: { id: seq.id },
-                data: { nextNumber: seq.nextNumber + 1 },
-            });
-            // Return the original sequence (before increment) for this document
-            return { ...seq, nextNumber: seq.nextNumber };
-        });
+        }
+        // Count existing documents in the database to determine the next number
+        let existingCount = 0;
+        switch (documentType) {
+            case 'INVOICE':
+                existingCount = await prisma_1.default.invoice.count({ where: { companyId } });
+                break;
+            case 'ESTIMATE':
+                existingCount = await prisma_1.default.estimate.count({ where: { companyId } });
+                break;
+            case 'QUOTATION':
+                existingCount = await prisma_1.default.quotation.count({ where: { companyId } });
+                break;
+            case 'SALES_ORDER':
+                existingCount = await prisma_1.default.salesOrder.count({ where: { companyId } });
+                break;
+            case 'DELIVERY_CHALLAN':
+                existingCount = await prisma_1.default.deliveryChallan.count({ where: { companyId } });
+                break;
+            case 'PURCHASE_ORDER':
+                existingCount = await prisma_1.default.purchaseOrder.count({ where: { companyId } });
+                break;
+            case 'PURCHASE_BILL':
+                existingCount = await prisma_1.default.purchaseBill.count({ where: { companyId } });
+                break;
+                break;
+            case 'CREDIT_NOTE':
+                existingCount = await prisma_1.default.creditNote.count({ where: { companyId } });
+                break;
+            case 'DEBIT_NOTE':
+                existingCount = await prisma_1.default.debitNote.count({ where: { companyId } });
+                break;
+            case 'STOCK_ADJUSTMENT':
+                existingCount = await prisma_1.default.stockAdjustment.count({ where: { companyId } });
+                break;
+            default:
+                existingCount = 0;
+        }
+        // Next number is count + 1
+        const nextNumber = existingCount + 1;
         // Format and return the number
-        const formattedNumber = formatSequenceNumber(sequence.prefix, sequence.nextNumber, sequence.format);
-        logger_1.default.info(`Generated ${documentType} number: ${formattedNumber} for company ${companyId}`);
+        const formattedNumber = formatSequenceNumber(seq.prefix, nextNumber, seq.format);
+        logger_1.default.info(`Generated ${documentType} number: ${formattedNumber} for company ${companyId} (count: ${existingCount})`);
         return formattedNumber;
     }
     catch (error) {
         logger_1.default.error(`Error generating sequence number for ${documentType}:`, error);
         throw new Error(`Failed to generate ${documentType} number: ${error.message}`);
+    }
+}
+/**
+ * Decrements the sequence number for a given document type
+ * Called when a document is deleted to reuse the freed number
+ * Note: This will never decrement below 1
+ */
+async function decrementSequence(companyId, documentType) {
+    try {
+        const sequence = await prisma_1.default.sequence.findFirst({
+            where: {
+                companyId,
+                documentType,
+                fiscalYear: null,
+            },
+        });
+        if (sequence && sequence.nextNumber > 1) {
+            await prisma_1.default.sequence.update({
+                where: { id: sequence.id },
+                data: { nextNumber: sequence.nextNumber - 1 },
+            });
+            logger_1.default.info(`Decremented ${documentType} sequence to ${sequence.nextNumber - 1} for company ${companyId}`);
+        }
+    }
+    catch (error) {
+        logger_1.default.error(`Error decrementing sequence for ${documentType}:`, error);
+        // Don't throw - sequence decrement failure shouldn't break delete operations
     }
 }
 /**
@@ -140,67 +200,73 @@ async function getSequences(companyId) {
 }
 /**
  * Gets a specific sequence for a document type
- * If no sequence exists, calculates the next number based on existing documents
+ * Always calculates the next number based on existing documents in the database
  */
 async function getSequence(companyId, documentType) {
     try {
         const sequence = await prisma_1.default.sequence.findFirst({
             where: { companyId, documentType },
         });
-        if (!sequence) {
-            const defaults = DEFAULT_SEQUENCES[documentType] || {
-                prefix: documentType.substring(0, 3).toUpperCase(),
-                format: '{PREFIX}-{SEQ:4}',
-            };
-            // Count existing documents to determine the next number
-            let existingCount = 0;
-            try {
-                switch (documentType) {
-                    case 'INVOICE':
-                        existingCount = await prisma_1.default.invoice.count({ where: { companyId } });
-                        break;
-                    case 'ESTIMATE':
-                        existingCount = await prisma_1.default.estimate.count({ where: { companyId } });
-                        break;
-                    case 'QUOTATION':
-                        existingCount = await prisma_1.default.quotation.count({ where: { companyId } });
-                        break;
-                    case 'SALES_ORDER':
-                        existingCount = await prisma_1.default.salesOrder.count({ where: { companyId } });
-                        break;
-                    case 'DELIVERY_CHALLAN':
-                        existingCount = await prisma_1.default.deliveryChallan.count({ where: { companyId } });
-                        break;
-                    case 'PURCHASE_ORDER':
-                        existingCount = await prisma_1.default.purchaseOrder.count({ where: { companyId } });
-                        break;
-                    case 'PURCHASE_BILL':
-                        existingCount = await prisma_1.default.purchaseBill.count({ where: { companyId } });
-                        break;
-                    case 'GRN':
-                        existingCount = await prisma_1.default.goodsReceivedNote.count({ where: { companyId } });
-                        break;
-                    default:
-                        existingCount = 0;
-                }
+        // Get defaults for prefix/format
+        const defaults = DEFAULT_SEQUENCES[documentType] || {
+            prefix: documentType.substring(0, 3).toUpperCase(),
+            format: '{PREFIX}-{SEQ:4}',
+        };
+        // Always count existing documents to determine the next number
+        let existingCount = 0;
+        try {
+            switch (documentType) {
+                case 'INVOICE':
+                    existingCount = await prisma_1.default.invoice.count({ where: { companyId } });
+                    break;
+                case 'ESTIMATE':
+                    existingCount = await prisma_1.default.estimate.count({ where: { companyId } });
+                    break;
+                case 'QUOTATION':
+                    existingCount = await prisma_1.default.quotation.count({ where: { companyId } });
+                    break;
+                case 'SALES_ORDER':
+                    existingCount = await prisma_1.default.salesOrder.count({ where: { companyId } });
+                    break;
+                case 'DELIVERY_CHALLAN':
+                    existingCount = await prisma_1.default.deliveryChallan.count({ where: { companyId } });
+                    break;
+                case 'PURCHASE_ORDER':
+                    existingCount = await prisma_1.default.purchaseOrder.count({ where: { companyId } });
+                    break;
+                case 'PURCHASE_BILL':
+                    existingCount = await prisma_1.default.purchaseBill.count({ where: { companyId } });
+                    break;
+                case 'GRN':
+                    existingCount = await prisma_1.default.goodsReceivedNote.count({ where: { companyId } });
+                    break;
+                    break;
+                case 'CREDIT_NOTE':
+                    existingCount = await prisma_1.default.creditNote.count({ where: { companyId } });
+                    break;
+                case 'STOCK_ADJUSTMENT':
+                    existingCount = await prisma_1.default.stockAdjustment.count({ where: { companyId } });
+                    break;
+                default:
+                    existingCount = 0;
             }
-            catch (countError) {
-                logger_1.default.warn(`Could not count existing ${documentType} documents:`, countError);
-            }
-            const nextNumber = existingCount + 1;
-            return {
-                id: `default-${documentType}`,
-                documentType,
-                prefix: defaults.prefix,
-                format: defaults.format,
-                nextNumber,
-                fiscalYear: null,
-                companyId,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
         }
-        return sequence;
+        catch (countError) {
+            logger_1.default.warn(`Could not count existing ${documentType} documents:`, countError);
+        }
+        const nextNumber = existingCount + 1;
+        // Return sequence config with the count-based nextNumber
+        return {
+            id: sequence?.id || `default-${documentType}`,
+            documentType,
+            prefix: sequence?.prefix || defaults.prefix,
+            format: sequence?.format || defaults.format,
+            nextNumber, // Always use count-based number
+            fiscalYear: sequence?.fiscalYear || null,
+            companyId,
+            createdAt: sequence?.createdAt || new Date(),
+            updatedAt: sequence?.updatedAt || new Date(),
+        };
     }
     catch (error) {
         logger_1.default.error(`Error fetching sequence for ${documentType}:`, error);
@@ -250,6 +316,7 @@ function previewNextNumber(prefix, nextNumber, format) {
 }
 exports.default = {
     getNextNumber,
+    decrementSequence,
     getSequences,
     getSequence,
     updateSequence,

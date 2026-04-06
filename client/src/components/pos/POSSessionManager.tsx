@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { PageLayout } from '../system/PageLayout';
+import FormSection from '../system/FormSection';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Banknote } from "lucide-react";
 import { posService } from '../../services/modules.service';
+import { toast } from "sonner";
 
 const POSSessionManager = () => {
     const [openingCash, setOpeningCash] = useState('');
@@ -13,10 +16,10 @@ const POSSessionManager = () => {
             const res = await posService.openSession(Number(openingCash));
             if (res.success) {
                 setSession(res.data);
-                alert('Session Opened!');
+                toast.success('Session Opened!');
             }
         } catch (error: any) {
-            alert('Error: ' + error.message);
+            toast.error('Error: ' + error.message);
         }
     };
 
@@ -29,49 +32,71 @@ const POSSessionManager = () => {
             const res = await posService.closeSession(session.id, Number(closingCash));
             if (res.success) {
                 setSession(null);
-                alert('Session Closed!');
+                toast.success('Session Closed!');
             }
         } catch (error: any) {
-            alert('Error: ' + error.message);
+            toast.error('Error: ' + error.message);
         }
     };
 
     return (
-        <Card className="w-full max-w-md mx-auto mt-10">
-            <CardHeader>
-                <CardTitle>POS Session</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <PageLayout
+            title="POS Session"
+            description="Manage your Point of Sale sessions"
+        >
+            <div className="max-w-md mx-auto">
                 {!session ? (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="text-sm font-medium">Opening Cash</label>
-                            <Input
-                                type="number"
-                                value={openingCash}
-                                onChange={(e) => setOpeningCash(e.target.value)}
-                                placeholder="0.00"
-                            />
+                    <FormSection
+                        icon={Banknote}
+                        title="Open New Session"
+                        description="Enter opening cash amount to start selling"
+                    >
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Opening Cash</label>
+                                <Input
+                                    type="number"
+                                    value={openingCash}
+                                    onChange={(e) => setOpeningCash(e.target.value)}
+                                    placeholder="Enter amount (e.g. 500)"
+                                />
+                            </div>
+                            <Button onClick={handleOpenSession} className="w-full">
+                                Open Session
+                            </Button>
                         </div>
-                        <Button className="w-full" onClick={handleOpenSession}>Open Session</Button>
-                    </div>
+                    </FormSection>
                 ) : (
-                    <div className="space-y-4 text-center">
-                        <div className="p-4 bg-green-50 text-green-700 rounded-md">
-                            Session is ACTIVE
+                    <FormSection
+                        icon={Banknote}
+                        title="Active Session"
+                        description={`Started at ${new Date(session.startTime).toLocaleTimeString()}`}
+                        iconColor="text-green-600"
+                        iconBg="bg-green-100"
+                    >
+                        <div className="space-y-4">
+                            <div className="p-4 bg-muted rounded-lg space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Status</span>
+                                    <span className="font-medium text-green-600">Active</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Opening Cash</span>
+                                    <span className="font-medium">₹{session.openingCash}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Session ID</span>
+                                    <span className="font-medium text-xs font-mono">{session.id}</span>
+                                </div>
+                            </div>
+                            <Button variant="destructive" onClick={handleCloseSession} className="w-full">
+                                Close Session
+                            </Button>
                         </div>
-                        <p>Session ID: {session.id}</p>
-                        <p>Started: {new Date(session.startTime).toLocaleString()}</p>
-                        <Button variant="destructive" className="w-full" onClick={handleCloseSession}>
-                            Close Session
-                        </Button>
-                        <Button variant="outline" className="w-full mt-2" onClick={() => window.location.href = '/pos/terminal'}>
-                            Go to Terminal
-                        </Button>
-                    </div>
+                    </FormSection>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </PageLayout>
     );
 };
 

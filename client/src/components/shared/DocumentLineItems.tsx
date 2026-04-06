@@ -69,7 +69,7 @@ export function DocumentLineItems({
         <Card className="border rounded-xl">
             <CardContent className="p-0">
                 {/* Header */}
-                <div className="grid grid-cols-12 gap-2 p-4 bg-muted/50 rounded-t-xl font-medium text-sm text-muted-foreground">
+                <div className="grid grid-cols-12 gap-2 p-4 bg-muted rounded-t-xl font-medium text-sm text-muted-foreground">
                     <div className="col-span-4">Product / Service</div>
                     <div className="col-span-1 text-center">Qty</div>
                     <div className="col-span-1">Unit</div>

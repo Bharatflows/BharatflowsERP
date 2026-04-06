@@ -3,15 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
-import {
-    Search,
-    CheckCircle,
-    XCircle,
-    Loader2,
-    FileText,
-    AlertTriangle,
-} from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+    <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+        {name}
+    </span>
+);
 
 interface HSNResult {
     hsnCode: string;
@@ -82,37 +82,37 @@ export function HSNValidator() {
     };
 
     return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-[24px] p-[24px] animate-fade-in">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-bold">HSN Code Validator</h1>
-                <p className="text-muted-foreground">
+                <h1 className="text-3xl font-bold text-foreground">HSN Code Validator</h1>
+                <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">
                     Validate HSN codes and get GST rates automatically
                 </p>
             </div>
 
             {/* Search Card */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Search className="h-5 w-5" />
+            <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                <CardHeader className="p-[24px] pb-[16px]">
+                    <CardTitle className="flex items-center gap-[8px] text-2xl font-bold text-foreground">
+                        <MIcon name="search" className="text-[20px]" />
                         Validate HSN Code
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="flex gap-4">
+                <CardContent className="p-[24px] pt-0">
+                    <div className="flex gap-[16px]">
                         <Input
                             placeholder="Enter HSN code (e.g., 8517)"
                             value={hsnCode}
                             onChange={(e) => setHsnCode(e.target.value.replace(/\D/g, ""))}
-                            className="max-w-xs font-mono text-lg"
+                            className="max-w-xs font-mono text-body h-[44px] rounded-[8px] border-slate-200"
                             maxLength={8}
                         />
-                        <Button onClick={validateHSN} disabled={loading}>
+                        <Button onClick={validateHSN} disabled={loading} className="gap-[8px] h-[44px] px-[24px] rounded-[8px] font-bold">
                             {loading ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <MIcon name="sync" className="text-[18px] animate-spin" />
                             ) : (
-                                <Search className="h-4 w-4 mr-2" />
+                                <MIcon name="search" className="text-[18px]" />
                             )}
                             Validate
                         </Button>
@@ -121,25 +121,25 @@ export function HSNValidator() {
                     {/* Result */}
                     {result && (
                         <div
-                            className={`mt-4 p-4 rounded-lg border ${result.isValid
-                                    ? "bg-green-50 border-green-200"
-                                    : "bg-red-50 border-red-200"
+                            className={`mt-[24px] p-[16px] rounded-[12px] border ${result.isValid
+                                ? "bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800"
+                                : "bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800"
                                 }`}
                         >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-[12px]">
                                 {result.isValid ? (
-                                    <CheckCircle className="h-6 w-6 text-green-600" />
+                                    <MIcon name="check_circle" className="text-[24px] text-green-600 dark:text-green-500" />
                                 ) : (
-                                    <XCircle className="h-6 w-6 text-red-600" />
+                                    <MIcon name="cancel" className="text-[24px] text-red-600 dark:text-red-500" />
                                 )}
                                 <div>
-                                    <p className="font-mono text-xl font-bold">{result.hsnCode}</p>
-                                    <p className={result.isValid ? "text-green-700" : "text-red-700"}>
+                                    <p className="font-mono text-2xl font-bold text-foreground mb-[2px]">{result.hsnCode}</p>
+                                    <p className={`font-medium ${result.isValid ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
                                         {result.description}
                                     </p>
                                 </div>
                                 {result.isValid && (
-                                    <Badge className="ml-auto bg-green-100 text-green-700">
+                                    <Badge className="ml-auto bg-green-100 text-green-700 hover:bg-green-200 border-0 font-bold rounded-[6px]">
                                         GST: {result.gstRate}%
                                     </Badge>
                                 )}
@@ -150,25 +150,25 @@ export function HSNValidator() {
             </Card>
 
             {/* Common HSN Codes Reference */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+            <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                <CardHeader className="p-[24px] pb-[16px]">
+                    <CardTitle className="flex items-center gap-[8px] text-2xl font-bold text-foreground">
+                        <MIcon name="description" className="text-[20px]" />
                         Common HSN Codes
                     </CardTitle>
-                    <CardDescription>Quick reference for frequently used codes</CardDescription>
+                    <CardDescription className="text-body-sm text-muted-foreground font-medium">Quick reference for frequently used codes</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <CardContent className="p-[24px] pt-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[12px]">
                         {commonHSNCodes.map((code) => (
                             <div
                                 key={code.code}
                                 onClick={() => setHsnCode(code.code)}
-                                className="p-3 border rounded-lg cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
+                                className="p-[16px] border border-border rounded-[12px] cursor-pointer hover:border-primary hover:bg-primary/5 transition-all group"
                             >
-                                <p className="font-mono font-bold text-lg">{code.code}</p>
-                                <p className="text-sm text-muted-foreground">{code.desc}</p>
-                                <Badge variant="outline" className="mt-1">
+                                <p className="font-mono font-bold text-body text-foreground group-hover:text-primary transition-colors">{code.code}</p>
+                                <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">{code.desc}</p>
+                                <Badge variant="outline" className="mt-[8px] font-bold text-[11px] rounded-[4px] bg-muted dark:bg-card">
                                     {code.rate}% GST
                                 </Badge>
                             </div>
@@ -179,17 +179,17 @@ export function HSNValidator() {
 
             {/* Search History */}
             {searchHistory.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Searches</CardTitle>
+                <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                    <CardHeader className="p-[24px] pb-[16px]">
+                        <CardTitle className="text-2xl font-bold text-foreground">Recent Searches</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap gap-2">
+                    <CardContent className="p-[24px] pt-0">
+                        <div className="flex flex-wrap gap-[8px]">
                             {searchHistory.map((item, idx) => (
                                 <Badge
                                     key={idx}
                                     variant={item.isValid ? "default" : "destructive"}
-                                    className="cursor-pointer"
+                                    className={`cursor-pointer font-bold px-[12px] py-[6px] rounded-[8px] ${item.isValid ? "bg-slate-900 hover:bg-muted text-white" : ""}`}
                                     onClick={() => setHsnCode(item.hsnCode)}
                                 >
                                     {item.hsnCode}

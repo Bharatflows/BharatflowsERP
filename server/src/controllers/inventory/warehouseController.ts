@@ -5,11 +5,13 @@
  * Split from inventoryController.ts for better maintainability.
  */
 
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../../config/prisma';
+import logger from '../../config/logger';
+import { ProtectedRequest } from '../../middleware/auth';
 
 // Create Warehouse
-export const createWarehouse = async (req: Request, res: Response) => {
+export const createWarehouse = async (req: ProtectedRequest, res: Response) => {
     try {
         const {
             name,
@@ -21,7 +23,6 @@ export const createWarehouse = async (req: Request, res: Response) => {
             isDefault
         } = req.body;
 
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const warehouse = await prisma.warehouse.create({
@@ -42,7 +43,7 @@ export const createWarehouse = async (req: Request, res: Response) => {
             data: warehouse
         });
     } catch (error: any) {
-        console.error('Create warehouse error:', error);
+        logger.error('Create warehouse error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error creating warehouse'
@@ -51,9 +52,8 @@ export const createWarehouse = async (req: Request, res: Response) => {
 };
 
 // Get All Warehouses
-export const getWarehouses = async (req: Request, res: Response) => {
+export const getWarehouses = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const warehouses = await prisma.warehouse.findMany({
@@ -71,7 +71,7 @@ export const getWarehouses = async (req: Request, res: Response) => {
             data: warehouses
         });
     } catch (error: any) {
-        console.error('Get warehouses error:', error);
+        logger.error('Get warehouses error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching warehouses'
@@ -80,10 +80,9 @@ export const getWarehouses = async (req: Request, res: Response) => {
 };
 
 // Update Warehouse
-export const updateWarehouse = async (req: Request, res: Response) => {
+export const updateWarehouse = async (req: ProtectedRequest, res: Response) => {
     try {
         const { id } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const warehouse = await prisma.warehouse.findFirst({
@@ -98,7 +97,7 @@ export const updateWarehouse = async (req: Request, res: Response) => {
         }
 
         const updatedWarehouse = await prisma.warehouse.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: req.body
         });
 
@@ -107,7 +106,7 @@ export const updateWarehouse = async (req: Request, res: Response) => {
             data: updatedWarehouse
         });
     } catch (error: any) {
-        console.error('Update warehouse error:', error);
+        logger.error('Update warehouse error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error updating warehouse'
@@ -116,10 +115,9 @@ export const updateWarehouse = async (req: Request, res: Response) => {
 };
 
 // Delete Warehouse (soft delete)
-export const deleteWarehouse = async (req: Request, res: Response) => {
+export const deleteWarehouse = async (req: ProtectedRequest, res: Response) => {
     try {
         const { id } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const warehouse = await prisma.warehouse.findFirst({
@@ -134,7 +132,7 @@ export const deleteWarehouse = async (req: Request, res: Response) => {
         }
 
         await prisma.warehouse.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: { isActive: false }
         });
 
@@ -143,7 +141,7 @@ export const deleteWarehouse = async (req: Request, res: Response) => {
             message: 'Warehouse deleted successfully'
         });
     } catch (error: any) {
-        console.error('Delete warehouse error:', error);
+        logger.error('Delete warehouse error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error deleting warehouse'

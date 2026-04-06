@@ -3,19 +3,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { BarcodeGenerator } from "./BarcodeGenerator";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { ProductLookup } from "./ProductLookup";
+import { ModuleHeader } from "../ui/module-header";
+import { QrCode } from "lucide-react";
 
 export function BarcodeModule() {
   const [activeTab, setActiveTab] = useState("generate");
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div className="p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-foreground mb-2">Barcode & QR Code Management</h1>
-          <p className="text-muted-foreground">
-            Generate barcodes, scan products, and manage inventory with QR codes
-          </p>
-        </div>
+        <ModuleHeader
+          title="Barcode & QR Code Management"
+          description="Generate barcodes, scan products, and manage inventory with QR codes"
+          showBackButton={true}
+          backTo="/dashboard"
+          icon={<QrCode className="size-5 text-primary" />}
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto pb-2">

@@ -1,13 +1,13 @@
 import { ArrowLeft, Edit, FileText, RefreshCw, Download, Send } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import type { Quotation } from "./QuotationModule";
+import type { Quotation } from "../../types";
 
 interface QuotationDetailProps {
   quotation: Quotation;
   onBack: () => void;
   onEdit: () => void;
-  onConvertToSO: (quotation: Quotation) => void;
+  onConvertToSO: (id: string) => void;
 }
 
 export function QuotationDetail({
@@ -74,8 +74,8 @@ export function QuotationDetail({
           </Button>
           {(quotation.status === "Accepted" || quotation.status === "Sent") && (
             <Button
-              onClick={() => onConvertToSO(quotation)}
-              className="bg-[#10b981] hover:bg-[#059669] flex-1 sm:flex-initial"
+              onClick={() => onConvertToSO(quotation.id)}
+              className="bg-emerald-600 hover:bg-emerald-700 flex-1 sm:flex-initial"
               size="sm"
             >
               <RefreshCw className="size-4 mr-2" />
@@ -86,7 +86,7 @@ export function QuotationDetail({
       </div>
 
       {/* Quotation Preview */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
+      <div className="card-base overflow-hidden">
         {/* Header Section */}
         <div className="bg-primary text-white p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -108,11 +108,15 @@ export function QuotationDetail({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h3 className="text-foreground mb-3">Bill To:</h3>
-              <p className="text-foreground mb-1">{quotation.partyName}</p>
+              <p className="text-foreground mb-1">{quotation.customer?.name || "N/A"}</p>
               <p className="text-muted-foreground mb-1">
-                GSTIN: {quotation.partyGSTIN}
+                GSTIN: {quotation.customer?.gstin || "No GSTIN"}
               </p>
-              <p className="text-muted-foreground">{quotation.partyAddress}</p>
+              <p className="text-muted-foreground">
+                {quotation.customer?.billingAddress ?
+                  `${quotation.customer.billingAddress.address || ""}, ${quotation.customer.billingAddress.city || ""}, ${quotation.customer.billingAddress.state || ""} - ${quotation.customer.billingAddress.pincode || ""}`
+                  : "No address provided"}
+              </p>
             </div>
             <div className="space-y-2">
               <div className="flex flex-col sm:flex-row sm:justify-between">
@@ -136,7 +140,7 @@ export function QuotationDetail({
               {quotation.convertedToSO && (
                 <div className="flex flex-col sm:flex-row sm:justify-between">
                   <p className="text-muted-foreground">Converted to:</p>
-                  <p className="text-[#10b981]">{quotation.convertedToSO}</p>
+                  <p className="text-emerald-600">{quotation.convertedToSO}</p>
                 </div>
               )}
             </div>
@@ -145,7 +149,7 @@ export function QuotationDetail({
           {/* Items Table - Desktop */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-[#f8fafc] border-y border-border">
+              <thead className="bg-background border-y border-border">
                 <tr>
                   <th className="text-left p-3 text-muted-foreground">#</th>
                   <th className="text-left p-3 text-muted-foreground">Product/Service</th>
@@ -164,15 +168,15 @@ export function QuotationDetail({
                     <td className="p-3 text-foreground">{item.productName}</td>
                     <td className="p-3 text-muted-foreground">{item.hsn}</td>
                     <td className="p-3 text-right text-foreground">
-                      {item.quantity} {item.unit}
+                      {item.quantity} {item.product?.unit || item.unit || ""}
                     </td>
                     <td className="p-3 text-right text-foreground">
-                      ₹{item.rate.toFixed(2)}
+                      ₹{Number(item.rate).toFixed(2)}
                     </td>
-                    <td className="p-3 text-right text-foreground">{item.discount}%</td>
-                    <td className="p-3 text-right text-foreground">{item.taxRate}%</td>
+                    <td className="p-3 text-right text-foreground">{item.discount || 0}%</td>
+                    <td className="p-3 text-right text-foreground">{Number(item.taxRate).toFixed(0)}%</td>
                     <td className="p-3 text-right text-foreground">
-                      ₹{item.amount.toFixed(2)}
+                      ₹{Number(item.total || item.amount).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -196,25 +200,25 @@ export function QuotationDetail({
                   <div>
                     <p className="text-muted-foreground">Quantity</p>
                     <p className="text-foreground">
-                      {item.quantity} {item.unit}
+                      {item.quantity} {item.product?.unit || item.unit || ""}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Rate</p>
-                    <p className="text-foreground">₹{item.rate.toFixed(2)}</p>
+                    <p className="text-foreground">₹{Number(item.rate).toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Discount</p>
-                    <p className="text-foreground">{item.discount}%</p>
+                    <p className="text-foreground">{item.discount || 0}%</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Tax</p>
-                    <p className="text-foreground">{item.taxRate}%</p>
+                    <p className="text-foreground">{Number(item.taxRate).toFixed(0)}%</p>
                   </div>
                 </div>
                 <div className="pt-2 border-t border-border flex justify-between">
                   <p className="text-muted-foreground">Amount:</p>
-                  <p className="text-foreground">₹{item.amount.toFixed(2)}</p>
+                  <p className="text-foreground">₹{Number(item.total || item.amount).toFixed(2)}</p>
                 </div>
               </div>
             ))}
@@ -222,28 +226,18 @@ export function QuotationDetail({
 
           {/* Totals */}
           <div className="flex justify-end">
-            <div className="w-full md:w-80 space-y-2 bg-[#f8fafc] p-4 rounded-lg">
+            <div className="w-full md:w-80 space-y-2 bg-background p-4 rounded-lg">
               <div className="flex justify-between">
                 <p className="text-muted-foreground">Subtotal:</p>
-                <p className="text-foreground">₹{quotation.subtotal.toFixed(2)}</p>
+                <p className="text-foreground">₹{Number(quotation.subtotal).toFixed(2)}</p>
               </div>
               <div className="flex justify-between">
-                <p className="text-muted-foreground">CGST:</p>
-                <p className="text-foreground">₹{quotation.cgst.toFixed(2)}</p>
+                <p className="text-muted-foreground">Total Tax:</p>
+                <p className="text-foreground">₹{Number(quotation.totalTax).toFixed(2)}</p>
               </div>
-              <div className="flex justify-between">
-                <p className="text-muted-foreground">SGST:</p>
-                <p className="text-foreground">₹{quotation.sgst.toFixed(2)}</p>
-              </div>
-              {quotation.igst > 0 && (
-                <div className="flex justify-between">
-                  <p className="text-muted-foreground">IGST:</p>
-                  <p className="text-foreground">₹{quotation.igst.toFixed(2)}</p>
-                </div>
-              )}
               <div className="flex justify-between pt-2 border-t border-border">
-                <p className="text-foreground">Total Amount:</p>
-                <p className="text-foreground">₹{quotation.total.toFixed(2)}</p>
+                <p className="text-foreground font-semibold">Total Amount:</p>
+                <p className="text-foreground font-semibold">₹{Number(quotation.totalAmount).toFixed(2)}</p>
               </div>
             </div>
           </div>

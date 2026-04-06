@@ -1,29 +1,53 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import AccountingDashboard from './AccountingDashboard';
-import ChartOfAccounts from './ChartOfAccounts';
-import JournalEntryForm from './JournalEntryForm';
-import TrialBalance from './TrialBalance';
-import VoucherList from './VoucherList';
-import LedgerView from './LedgerView';
-import ProfitLoss from './ProfitLoss';
-import BalanceSheet from './BalanceSheet';
-import PaymentReceipts from './PaymentReceipts';
+import { useState } from "react";
+import { Routes, Route } from "react-router-dom";
+import { AccountingOverview } from "./AccountingOverview";
+import { TrialBalance } from "./TrialBalance";
+import { ProfitLoss } from "./ProfitLoss";
+import { BalanceSheet } from "./BalanceSheet";
+import { LedgerView } from "./LedgerView";
+import { JournalEntry } from "./JournalEntry";
+import { CostCenterManagement } from "./CostCenterManagement";
+import { toast } from "sonner";
 
-export const AccountingModule = () => {
+export function AccountingModule() {
+    const [activeTab, setActiveTab] = useState<string>("dashboard");
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const handleCreateVoucher = () => {
+        toast.info("Opening journal entry form...");
+    };
+
+    const handleExport = () => {
+        toast.info("Exporting accounting data...");
+    };
+
     return (
-        <Routes>
-            <Route index element={<AccountingDashboard />} />
-            <Route path="chart-of-accounts" element={<ChartOfAccounts />} />
-            <Route path="vouchers" element={<VoucherList />} />
-            <Route path="vouchers/new" element={<JournalEntryForm />} />
-            <Route path="trial-balance" element={<TrialBalance />} />
-            <Route path="ledger/:id" element={<LedgerView />} />
-            <Route path="profit-loss" element={<ProfitLoss />} />
-            <Route path="balance-sheet" element={<BalanceSheet />} />
-            <Route path="receipts" element={<PaymentReceipts />} />
-            <Route path="*" element={<Navigate to="" replace />} />
-        </Routes>
-    );
-};
+        <div className="min-h-full">
+            <Routes>
+                {/* Sub-routes for financial statements */}
+                <Route path="trial-balance" element={<TrialBalance />} />
+                <Route path="profit-loss" element={<ProfitLoss />} />
+                <Route path="balance-sheet" element={<BalanceSheet />} />
+                <Route path="ledger/:id" element={<LedgerView />} />
+                <Route path="journal-entry" element={<JournalEntry />} />
+                <Route path="journal-entry/:id" element={<JournalEntry />} />
+                <Route path="cost-centers" element={<CostCenterManagement />} />
 
+                {/* Default: Overview */}
+                <Route
+                    path="*"
+                    element={
+                        <AccountingOverview
+                            activeTab={activeTab}
+                            setActiveTab={setActiveTab}
+                            searchTerm={searchTerm}
+                            setSearchTerm={setSearchTerm}
+                            onCreateVoucher={handleCreateVoucher}
+                            onExport={handleExport}
+                        />
+                    }
+                />
+            </Routes>
+        </div>
+    );
+}

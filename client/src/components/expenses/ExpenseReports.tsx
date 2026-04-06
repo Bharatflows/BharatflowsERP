@@ -26,6 +26,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { chartColors } from "@/lib/chartColors";
 
 export function ExpenseReports() {
   const [loading, setLoading] = useState(true);
@@ -110,8 +111,8 @@ export function ExpenseReports() {
 
   if (monthlyComparison.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 bg-card rounded-xl border border-border/50 p-8">
-        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+      <div className="flex flex-col items-center justify-center h-64 bg-card rounded-xl border border-border p-8">
+        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
           <BarChart3 className="size-8 text-muted-foreground/50" />
         </div>
         <p className="text-lg font-medium text-foreground mb-1">No expense data yet</p>
@@ -155,13 +156,13 @@ export function ExpenseReports() {
             <div className="flex items-center gap-1 mt-1">
               {monthOverMonthChange > 0 ? (
                 <>
-                  <TrendingUp className="size-3 text-[#ef4444]" />
-                  <span className="text-[#ef4444]">+{monthOverMonthChange.toFixed(1)}%</span>
+                  <TrendingUp className="size-3 text-error" />
+                  <span className="text-error">+{monthOverMonthChange.toFixed(1)}%</span>
                 </>
               ) : (
                 <>
-                  <TrendingDown className="size-3 text-[#10b981]" />
-                  <span className="text-[#10b981]">{monthOverMonthChange.toFixed(1)}%</span>
+                  <TrendingDown className="size-3 text-success" />
+                  <span className="text-success">{monthOverMonthChange.toFixed(1)}%</span>
                 </>
               )}
               <span className="text-muted-foreground">vs last month</span>
@@ -174,7 +175,7 @@ export function ExpenseReports() {
             <CardDescription>Budget Variance</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-[#ef4444]">
+            <p className="text-error">
               +₹{monthlyComparison[monthlyComparison.length - 1].variance.toLocaleString("en-IN")}
             </p>
             <p className="text-muted-foreground mt-1">Over budget (Sep)</p>
@@ -230,8 +231,8 @@ export function ExpenseReports() {
                   formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`}
                 />
                 <Legend />
-                <Bar dataKey="budget" fill="#10b981" name="Budget" />
-                <Bar dataKey="expenses" fill="#2563eb" name="Actual" />
+                <Bar dataKey="budget" fill={chartColors.success} name="Budget" />
+                <Bar dataKey="expenses" fill={chartColors.brand} name="Actual" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -253,7 +254,7 @@ export function ExpenseReports() {
                   labelLine={false}
                   label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={90}
-                  fill="#8884d8"
+                  fill={chartColors.muted}
                   dataKey="value"
                 >
                   {vendorExpenses.map((entry, index) => (
@@ -287,28 +288,28 @@ export function ExpenseReports() {
                 <Line
                   type="monotone"
                   dataKey="rent"
-                  stroke="#2563eb"
+                  stroke={chartColors.brand}
                   strokeWidth={2}
                   name="Rent"
                 />
                 <Line
                   type="monotone"
                   dataKey="salaries"
-                  stroke="#10b981"
+                  stroke={chartColors.success}
                   strokeWidth={2}
                   name="Salaries"
                 />
                 <Line
                   type="monotone"
                   dataKey="utilities"
-                  stroke="#f97316"
+                  stroke={chartColors.orange}
                   strokeWidth={2}
                   name="Utilities"
                 />
                 <Line
                   type="monotone"
                   dataKey="transport"
-                  stroke="#8b5cf6"
+                  stroke={chartColors.purple}
                   strokeWidth={2}
                   name="Transport"
                 />
@@ -345,7 +346,7 @@ export function ExpenseReports() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Variance</p>
-                  <p className={month.variance > 0 ? "text-[#ef4444]" : "text-[#10b981]"}>
+                  <p className={month.variance > 0 ? "text-error" : "text-success"}>
                     {month.variance > 0 ? "+" : ""}₹{month.variance.toLocaleString("en-IN")}
                   </p>
                 </div>
@@ -363,14 +364,14 @@ export function ExpenseReports() {
 
       {/* Quick Reports */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card 
+        <Card
           className="cursor-pointer hover:bg-accent transition-colors"
           onClick={() => handleReportClick("category")}
         >
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              <div className="bg-[#2563eb]/10 p-3 rounded-lg">
-                <FileText className="size-5 text-[#2563eb]" />
+              <div className="bg-primary/10 p-3 rounded-lg">
+                <FileText className="size-5 text-primary" />
               </div>
               <div>
                 <p className="text-foreground mb-1">Category Report</p>
@@ -380,14 +381,14 @@ export function ExpenseReports() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="cursor-pointer hover:bg-accent transition-colors"
           onClick={() => handleReportClick("vendor")}
         >
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              <div className="bg-[#10b981]/10 p-3 rounded-lg">
-                <FileText className="size-5 text-[#10b981]" />
+              <div className="bg-success/10 p-3 rounded-lg">
+                <FileText className="size-5 text-success" />
               </div>
               <div>
                 <p className="text-foreground mb-1">Vendor Report</p>
@@ -397,15 +398,16 @@ export function ExpenseReports() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="cursor-pointer hover:bg-accent transition-colors"
           onClick={() => handleReportClick("tax")}
         >
           <CardContent className="p-6">
             <div className="flex items-start gap-4">
-              <div className="bg-[#f97316]/10 p-3 rounded-lg">
-                <FileText className="size-5 text-[#f97316]" />
-        
+              <div className="bg-warning/10 p-3 rounded-lg">
+                <FileText className="size-5 text-warning" />
+
+              </div>
               <div>
                 <p className="text-foreground mb-1">Tax Report</p>
                 <p className="text-muted-foreground">GST & tax deductions</p>
@@ -414,7 +416,7 @@ export function ExpenseReports() {
           </CardContent>
         </Card>
       </div>
-      </div>
+
 
       <ReportDetailsDialog
         isOpen={isReportOpen}

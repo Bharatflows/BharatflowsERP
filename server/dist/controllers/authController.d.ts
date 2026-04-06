@@ -11,4 +11,7 @@ export declare const verifyEmail: (req: Request, res: Response) => Promise<Respo
 export declare const verifyOTP: (req: Request, res: Response) => Promise<Response>;
 export declare const resendOTP: (req: Request, res: Response) => Promise<Response>;
 export declare const googleLogin: (req: Request, res: Response) => Promise<Response>;
+export declare const refreshToken: (req: Request, res: Response) => Promise<Response>;
+export declare const switchCompany: (req: AuthRequest, res: Response) => Promise<Response>;
+export declare const getUserCompanies: (req: AuthRequest, res: Response) => Promise<Response>;
 //# sourceMappingURL=authController.d.ts.map

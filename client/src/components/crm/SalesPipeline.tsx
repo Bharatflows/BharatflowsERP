@@ -2,9 +2,16 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { RefreshCw, Loader2, GripVertical, DollarSign, User, Calendar, Phone, Mail } from "lucide-react";
 import { crmService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface Lead {
   id: string;
@@ -97,51 +104,51 @@ export function SalesPipeline() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading pipeline...</span>
+      <div className="flex items-center justify-center p-[48px]">
+        <MIcon name="sync" className="text-[32px] animate-spin text-primary" />
+        <span className="ml-[12px] font-medium text-muted-foreground">Loading pipeline...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[24px] animate-fade-in p-[24px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Sales Pipeline</h1>
-          <p className="text-muted-foreground">Drag leads between stages to update status</p>
+          <h1 className="text-3xl font-bold text-foreground">Sales Pipeline</h1>
+          <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">Drag leads between stages to update status</p>
         </div>
-        <Button variant="outline" onClick={fetchLeads}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button variant="outline" onClick={fetchLeads} className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border bg-card">
+          <MIcon name="sync" className="text-[18px]" />
           Refresh
         </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Leads</p>
-            <p className="text-2xl font-bold">{leads.length}</p>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-[16px]">
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Total Leads</p>
+            <p className="text-3xl font-bold text-foreground">{leads.length}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pipeline Value</p>
-            <p className="text-2xl font-bold text-blue-600">₹{activeValue.toLocaleString("en-IN")}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Pipeline Value</p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">₹{activeValue.toLocaleString("en-IN")}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Won Value</p>
-            <p className="text-2xl font-bold text-green-600">₹{wonValue.toLocaleString("en-IN")}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Won Value</p>
+            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">₹{wonValue.toLocaleString("en-IN")}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Win Rate</p>
-            <p className="text-2xl font-bold text-purple-600">
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Win Rate</p>
+            <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
               {leads.length > 0 ? Math.round((getLeadsByStage("WON").length / leads.length) * 100) : 0}%
             </p>
           </CardContent>
@@ -149,7 +156,7 @@ export function SalesPipeline() {
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-[16px] overflow-x-auto pb-[16px]">
         {PIPELINE_STAGES.map(stage => {
           const stageLeads = getLeadsByStage(stage.id);
           const stageValue = getStageValue(stage.id);
@@ -157,28 +164,28 @@ export function SalesPipeline() {
           return (
             <div
               key={stage.id}
-              className="flex-shrink-0 w-72"
+              className="flex-shrink-0 w-[300px]"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, stage.id)}
             >
-              <Card className="h-full min-h-[400px]">
-                <CardHeader className="p-3 pb-2">
+              <div className="h-full min-h-[400px] border border-border shadow-sm rounded-[16px] bg-muted/50 flex flex-col">
+                <div className="p-[16px] pb-[12px] border-b border-border">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${stage.color}`} />
-                      <CardTitle className="text-sm font-medium">{stage.label}</CardTitle>
+                    <div className="flex items-center gap-[8px]">
+                      <div className={`w-[12px] h-[12px] rounded-full ${stage.color}`} />
+                      <h3 className="text-body font-bold text-foreground">{stage.label}</h3>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="font-bold text-[11px] rounded-[4px] py-0">
                       {stageLeads.length}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[12px] font-medium text-muted-foreground mt-[4px]">
                     ₹{stageValue.toLocaleString("en-IN")}
                   </p>
-                </CardHeader>
-                <CardContent className="p-2 space-y-2">
+                </div>
+                <div className="p-[12px] space-y-[12px] flex-1 overflow-y-auto min-h-[100px]">
                   {stageLeads.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
+                    <div className="text-center py-[32px] text-muted-foreground font-medium text-[12px]">
                       No leads in this stage
                     </div>
                   ) : (
@@ -187,25 +194,25 @@ export function SalesPipeline() {
                         key={lead.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, lead)}
-                        className={`p-3 bg-muted/50 rounded-lg border cursor-grab hover:bg-muted transition-colors ${draggedLead?.id === lead.id ? "opacity-50" : ""
+                        className={`p-[16px] bg-background rounded-[12px] border border-border shadow-sm cursor-grab hover:border-border dark:hover:border-slate-700 transition-colors ${draggedLead?.id === lead.id ? "opacity-50 border-primary" : ""
                           }`}
                       >
-                        <div className="flex items-start gap-2">
-                          <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-[8px]">
+                          <MIcon name="drag_indicator" className="text-[18px] text-muted-foreground mt-[2px] cursor-grab shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{lead.name}</p>
+                            <p className="font-bold text-foreground truncate text-body-sm">{lead.name}</p>
                             {lead.company && (
-                              <p className="text-xs text-muted-foreground truncate">{lead.company}</p>
+                              <p className="text-[12px] font-medium text-muted-foreground truncate mt-[2px]">{lead.company}</p>
                             )}
-                            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-[12px] mt-[8px] text-[12px] font-medium text-muted-foreground">
                               {lead.value && (
-                                <span className="flex items-center gap-1">
-                                  <DollarSign className="h-3 w-3" />
+                                <span className="flex items-center gap-[4px]">
+                                  <MIcon name="attach_money" className="text-[14px]" />
                                   ₹{lead.value.toLocaleString("en-IN")}
                                 </span>
                               )}
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
+                              <span className="flex items-center gap-[4px]">
+                                <MIcon name="event" className="text-[14px]" />
                                 {new Date(lead.createdAt).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
                               </span>
                             </div>
@@ -214,8 +221,8 @@ export function SalesPipeline() {
                       </div>
                     ))
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           );
         })}

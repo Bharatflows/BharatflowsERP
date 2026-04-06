@@ -11,11 +11,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteWarehouse = exports.updateWarehouse = exports.getWarehouses = exports.createWarehouse = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
+const logger_1 = __importDefault(require("../../config/logger"));
 // Create Warehouse
 const createWarehouse = async (req, res) => {
     try {
         const { name, code, address, city, state, pincode, isDefault } = req.body;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const warehouse = await prisma_1.default.warehouse.create({
             data: {
@@ -35,7 +35,7 @@ const createWarehouse = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Create warehouse error:', error);
+        logger_1.default.error('Create warehouse error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error creating warehouse'
@@ -46,7 +46,6 @@ exports.createWarehouse = createWarehouse;
 // Get All Warehouses
 const getWarehouses = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const warehouses = await prisma_1.default.warehouse.findMany({
             where: {
@@ -63,7 +62,7 @@ const getWarehouses = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get warehouses error:', error);
+        logger_1.default.error('Get warehouses error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching warehouses'
@@ -75,7 +74,6 @@ exports.getWarehouses = getWarehouses;
 const updateWarehouse = async (req, res) => {
     try {
         const { id } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const warehouse = await prisma_1.default.warehouse.findFirst({
             where: { id, companyId }
@@ -96,7 +94,7 @@ const updateWarehouse = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Update warehouse error:', error);
+        logger_1.default.error('Update warehouse error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error updating warehouse'
@@ -108,7 +106,6 @@ exports.updateWarehouse = updateWarehouse;
 const deleteWarehouse = async (req, res) => {
     try {
         const { id } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const warehouse = await prisma_1.default.warehouse.findFirst({
             where: { id, companyId }
@@ -129,7 +126,7 @@ const deleteWarehouse = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Delete warehouse error:', error);
+        logger_1.default.error('Delete warehouse error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error deleting warehouse'

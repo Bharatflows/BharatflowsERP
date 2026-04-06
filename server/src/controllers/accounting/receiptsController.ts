@@ -4,7 +4,8 @@ import { AuthRequest } from '../../middleware/auth';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 import * as accountingService from '../../services/accountingService';
-import { PostingType } from '@prisma/client';
+import { requireUnlockedPeriod } from '../../services/periodLockService';
+import eventBus, { EventTypes } from '../../services/eventBus';
 
 // @desc    Create a payment receipt (Customer Payment)
 // @route   POST /api/v1/accounting/receipts
@@ -22,6 +23,9 @@ export const createReceipt = async (req: AuthRequest, res: Response): Promise<Re
         } = req.body;
 
         const companyId = req.user.companyId;
+
+        // P0: FY Locking Check
+        await requireUnlockedPeriod(companyId, new Date(date));
 
         if (!partyId || !amount || amount <= 0) {
             return res.status(400).json({
@@ -71,6 +75,7 @@ export const createReceipt = async (req: AuthRequest, res: Response): Promise<Re
 
         const result = await prisma.$transaction(async (tx) => {
             // Create Voucher
+            // Create Voucher (Transactional)
             const voucher = await accountingService.createVoucher({
                 companyId,
                 voucherNumber,
@@ -93,18 +98,37 @@ export const createReceipt = async (req: AuthRequest, res: Response): Promise<Re
                         narration: `Received from Party`
                     }
                 ]
-            });
+            }, tx);
 
             // Update Party Balance
-            // Receipt (Credit to Party) DECREASES balance (if Debit balance)
-            // Party.currentBalance tracks "Net Receivable" usually? 
-            // If currentBalance is positive (Receivable), doing a receipt should decrement it.
             await tx.party.update({
                 where: { id: partyId },
                 data: {
                     currentBalance: { decrement: Number(amount) }
                 }
             });
+
+            // Emit Domain Event for Audit & Sync (Transactional)
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PAYMENT_RECEIVED,
+                aggregateType: 'Payment',
+                aggregateId: voucher.id, // Voucher ID
+                payload: {
+                    paymentId: voucher.id,
+                    voucherNumber: voucher.voucherNumber,
+                    partyId: partyId,
+                    amount: Number(amount),
+                    date: date,
+                    mode: mode,
+                    type: 'RECEIVED',
+                    notes: notes
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
+                }
+            }, tx);
 
             return voucher;
         });

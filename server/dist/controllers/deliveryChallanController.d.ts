@@ -6,4 +6,5 @@ export declare const createDeliveryChallan: (req: AuthRequest, res: Response) =>
 export declare const updateDeliveryChallan: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const deleteDeliveryChallan: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 export declare const searchDeliveryChallans: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
+export declare const convertChallanToInvoice: (req: AuthRequest, res: Response) => Promise<Response<any, Record<string, any>>>;
 //# sourceMappingURL=deliveryChallanController.d.ts.map

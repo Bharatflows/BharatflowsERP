@@ -22,3 +22,14 @@ export const authRateLimiter = rateLimit({
   skipSuccessfulRequests: true, // Don't count successful requests
 });
 
+// Strict rate limit for sensitive operations (GST, Banking, Transfers)
+export const sensitiveOpsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // Limit to 50 sensitive requests per 15 min
+  message: {
+    success: false,
+    message: 'Too many sensitive operations, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

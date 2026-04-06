@@ -4,19 +4,22 @@ import { DocumentLibrary } from "./DocumentLibrary";
 import { DocumentUpload } from "./DocumentUpload";
 import { DocumentCategories } from "./DocumentCategories";
 import { DocumentSharing } from "./DocumentSharing";
+import { ModuleHeader } from "../ui/module-header";
+import { FileText } from "lucide-react";
 
 export function DocumentsModule() {
   const [activeTab, setActiveTab] = useState("library");
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div className="p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-foreground mb-2">Document Management System</h1>
-          <p className="text-muted-foreground">
-            Organize, store, and manage all your business documents
-          </p>
-        </div>
+        <ModuleHeader
+          title="Document Management System"
+          description="Organize, store, and manage all your business documents"
+          showBackButton={true}
+          backTo="/dashboard"
+          icon={<FileText className="size-5 text-primary" />}
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto pb-2">

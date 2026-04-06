@@ -117,7 +117,7 @@ export function GSTPayments() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
@@ -145,7 +145,7 @@ export function GSTPayments() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-emerald-50 p-2.5 rounded-lg">
@@ -158,7 +158,7 @@ export function GSTPayments() {
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -171,7 +171,7 @@ export function GSTPayments() {
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-violet-50 p-2.5 rounded-lg">
@@ -184,7 +184,7 @@ export function GSTPayments() {
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-amber-50 p-2.5 rounded-lg">
@@ -197,7 +197,7 @@ export function GSTPayments() {
       </div>
 
       {/* Search */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -216,7 +216,7 @@ export function GSTPayments() {
       </div>
 
       {/* Payments Table */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/30 border-b border-border/50">
@@ -315,7 +315,7 @@ export function GSTPayments() {
       </div>
 
       {/* Payment Instructions */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">How to Make GST Payment</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl relative overflow-hidden">

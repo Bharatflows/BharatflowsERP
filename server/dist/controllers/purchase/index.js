@@ -9,7 +9,7 @@
  * - grnController.ts
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteGRN = exports.updateGRN = exports.createGRN = exports.getGRN = exports.getGRNs = exports.deletePurchaseBill = exports.updatePurchaseBill = exports.createPurchaseBill = exports.getPurchaseBill = exports.getPurchaseBills = exports.updatePurchaseOrderStatus = exports.deletePurchaseOrder = exports.updatePurchaseOrder = exports.createPurchaseOrder = exports.getPurchaseOrder = exports.getPurchaseOrders = void 0;
+exports.deleteGRN = exports.updateGRN = exports.createGRN = exports.getGRN = exports.getGRNs = exports.deletePurchaseBill = exports.updatePurchaseBill = exports.createPurchaseBill = exports.getPurchaseBill = exports.getPurchaseBills = exports.convertPOToBill = exports.convertPOToGRN = exports.updatePurchaseOrderStatus = exports.deletePurchaseOrder = exports.updatePurchaseOrder = exports.createPurchaseOrder = exports.getPurchaseOrder = exports.getPurchaseOrders = void 0;
 // Purchase Orders
 var purchaseOrderController_1 = require("./purchaseOrderController");
 Object.defineProperty(exports, "getPurchaseOrders", { enumerable: true, get: function () { return purchaseOrderController_1.getPurchaseOrders; } });
@@ -18,6 +18,8 @@ Object.defineProperty(exports, "createPurchaseOrder", { enumerable: true, get: f
 Object.defineProperty(exports, "updatePurchaseOrder", { enumerable: true, get: function () { return purchaseOrderController_1.updatePurchaseOrder; } });
 Object.defineProperty(exports, "deletePurchaseOrder", { enumerable: true, get: function () { return purchaseOrderController_1.deletePurchaseOrder; } });
 Object.defineProperty(exports, "updatePurchaseOrderStatus", { enumerable: true, get: function () { return purchaseOrderController_1.updatePurchaseOrderStatus; } });
+Object.defineProperty(exports, "convertPOToGRN", { enumerable: true, get: function () { return purchaseOrderController_1.convertPOToGRN; } });
+Object.defineProperty(exports, "convertPOToBill", { enumerable: true, get: function () { return purchaseOrderController_1.convertPOToBill; } });
 // Purchase Bills
 var purchaseBillController_1 = require("./purchaseBillController");
 Object.defineProperty(exports, "getPurchaseBills", { enumerable: true, get: function () { return purchaseBillController_1.getPurchaseBills; } });

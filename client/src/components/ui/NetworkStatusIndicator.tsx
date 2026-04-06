@@ -47,45 +47,45 @@ export function NetworkStatusIndicator() {
     const statusConfig = {
         offline: {
             icon: WifiOff,
-            color: 'bg-red-500',
-            textColor: 'text-red-600',
-            bgColor: 'bg-red-50 dark:bg-red-900/20',
+            color: 'bg-error',
+            textColor: 'text-error',
+            bgColor: 'bg-error-50',
             borderColor: 'border-red-200 dark:border-red-800',
             label: 'Offline',
             description: `${pendingChanges} changes will sync when back online`
         },
         syncing: {
             icon: RefreshCw,
-            color: 'bg-yellow-500',
-            textColor: 'text-yellow-600',
-            bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+            color: 'bg-warning',
+            textColor: 'text-warning',
+            bgColor: 'bg-warning-50',
             borderColor: 'border-yellow-200 dark:border-yellow-800',
             label: 'Syncing...',
             description: 'Synchronizing your changes'
         },
         error: {
             icon: AlertCircle,
-            color: 'bg-red-500',
-            textColor: 'text-red-600',
-            bgColor: 'bg-red-50 dark:bg-red-900/20',
+            color: 'bg-error',
+            textColor: 'text-error',
+            bgColor: 'bg-error-50',
             borderColor: 'border-red-200 dark:border-red-800',
             label: 'Sync Error',
             description: syncError || 'Failed to sync. Tap to retry.'
         },
         pending: {
             icon: Cloud,
-            color: 'bg-blue-500',
-            textColor: 'text-blue-600',
-            bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+            color: 'bg-info',
+            textColor: 'text-info',
+            bgColor: 'bg-info-50',
             borderColor: 'border-blue-200 dark:border-blue-800',
             label: 'Changes Pending',
             description: `${pendingChanges} changes waiting to sync`
         },
         synced: {
             icon: CheckCircle2,
-            color: 'bg-green-500',
-            textColor: 'text-green-600',
-            bgColor: 'bg-green-50 dark:bg-green-900/20',
+            color: 'bg-success',
+            textColor: 'text-success',
+            bgColor: 'bg-success-50',
             borderColor: 'border-green-200 dark:border-green-800',
             label: 'All Synced',
             description: lastSyncedAt
@@ -104,7 +104,7 @@ export function NetworkStatusIndicator() {
             <button
                 onClick={() => setIsExpanded(true)}
                 className={cn(
-                    "fixed bottom-4 right-4 z-50",
+                    "fixed bottom-4 right-4 z-toast",
                     "flex items-center gap-2 px-3 py-2",
                     "bg-white dark:bg-gray-800",
                     "border border-gray-200 dark:border-gray-700",
@@ -114,7 +114,7 @@ export function NetworkStatusIndicator() {
                 )}
             >
                 <div className={cn("w-2 h-2 rounded-full", config.color)} />
-                <Wifi className="w-4 h-4 text-green-500" />
+                <Wifi className="w-4 h-4 text-success" />
                 <span className="text-xs text-gray-500 dark:text-gray-400 hidden group-hover:inline">
                     Online
                 </span>
@@ -125,7 +125,7 @@ export function NetworkStatusIndicator() {
     return (
         <div
             className={cn(
-                "fixed bottom-4 right-4 z-50",
+                "fixed bottom-4 right-4 z-toast",
                 "min-w-[280px] max-w-[320px]",
                 "rounded-xl shadow-2xl",
                 "border",
@@ -214,7 +214,7 @@ export function NetworkStatusIndicator() {
                             <span className="text-gray-500">Connection</span>
                             <span className={cn(
                                 "flex items-center gap-1",
-                                isOnline ? "text-green-600" : "text-red-600"
+                                isOnline ? "text-success" : "text-error"
                             )}>
                                 {isOnline ? <Wifi className="w-3 h-3" /> : <CloudOff className="w-3 h-3" />}
                                 {isOnline ? 'Online' : 'Offline'}
@@ -225,7 +225,7 @@ export function NetworkStatusIndicator() {
                         {pendingChanges > 0 && (
                             <div className="flex items-center justify-between text-xs">
                                 <span className="text-gray-500">Pending changes</span>
-                                <span className="text-blue-600 font-medium">{pendingChanges}</span>
+                                <span className="text-info font-medium">{pendingChanges}</span>
                             </div>
                         )}
 

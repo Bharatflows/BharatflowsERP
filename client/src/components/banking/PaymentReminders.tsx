@@ -128,7 +128,7 @@ export function PaymentReminders() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
@@ -158,7 +158,7 @@ export function PaymentReminders() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-center justify-between">
             <div>
@@ -172,7 +172,7 @@ export function PaymentReminders() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-rose-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-center justify-between">
             <div>
@@ -186,7 +186,7 @@ export function PaymentReminders() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-center justify-between">
             <div>
@@ -202,7 +202,7 @@ export function PaymentReminders() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="p-4 border-b border-border/50 bg-muted/20">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="flex justify-between items-center">

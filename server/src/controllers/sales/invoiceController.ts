@@ -11,8 +11,17 @@ import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 import { AuthRequest } from '../../middleware/auth';
 import { getNextNumber, decrementSequence } from '../../services/sequenceService';
-import postingService from '../../services/postingService';
+import eventBus, { EventTypes } from '../../services/eventBus';  // P0-5: Domain events
 import { AuditService } from '../../services/auditService';
+import { statusEngine } from '../../services/status/statusEngine';
+// Type definition for SQLite (no enum)
+type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'PARTIAL' | 'OVERDUE' | 'CANCELLED' | 'PENDING_APPROVAL';
+import { INVOICE_STATUS } from '../../constants/statuses';
+import { requireUnlockedPeriod } from '../../services/periodLockService';
+import stockValidationService from '../../services/stockValidationService';
+import { TaxValidationService } from '../../services/taxValidationService';
+import { postSalesInvoice, updateSalesInvoice } from '../../services/postingService';
+
 
 // @desc    Get all invoices
 // @route   GET /api/v1/sales/invoices
@@ -23,7 +32,8 @@ export const getInvoices = async (req: AuthRequest, res: Response): Promise<Resp
         const skip = (Number(page) - 1) * Number(limit);
 
         const where: any = {
-            companyId: req.user.companyId
+            companyId: req.user.companyId,
+            deletedAt: null // Exclude soft-deleted invoices
         };
 
         if (status) {
@@ -32,7 +42,7 @@ export const getInvoices = async (req: AuthRequest, res: Response): Promise<Resp
 
         if (search) {
             where.OR = [
-                { invoiceNumber: { contains: search as string, mode: 'insensitive' } },
+                { invoiceNumber: { contains: search as string } },
             ];
         }
 
@@ -41,7 +51,9 @@ export const getInvoices = async (req: AuthRequest, res: Response): Promise<Resp
                 where,
                 include: {
                     customer: true,
-                    items: true
+                    items: true,
+                    eInvoice: true,
+                    eWaybill: true
                 },
                 orderBy: { invoiceDate: 'desc' },
                 skip,
@@ -80,6 +92,7 @@ export const getInvoice = async (req: AuthRequest, res: Response): Promise<Respo
         const invoice = await prisma.invoice.findUnique({
             where: {
                 id: req.params.id
+                , companyId: req.user.companyId
             },
             include: {
                 customer: true,
@@ -87,7 +100,9 @@ export const getInvoice = async (req: AuthRequest, res: Response): Promise<Respo
                     include: {
                         product: true
                     }
-                }
+                },
+                eInvoice: true,
+                eWaybill: true
             }
         });
 
@@ -114,41 +129,234 @@ export const getInvoice = async (req: AuthRequest, res: Response): Promise<Respo
 
 // @desc    Create invoice
 // @route   POST /api/v1/sales/invoices
+import { gstRuleService } from '../../services/gstRuleService';
+import { approvalService } from '../../services/approvalService';
+import { Decimal } from '@prisma/client/runtime/library';
+
 // @access  Private
 export const createInvoice = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { customerId, items, invoiceDate, dueDate, status, notes } = req.body;
+
+        // Early validation
+        if (!customerId) {
+            return res.status(400).json({ success: false, message: 'Customer is required' });
+        }
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ success: false, message: 'At least one item is required' });
+        }
+
         const invoiceNumber = await getNextNumber(req.user.companyId, 'INVOICE');
 
-        let subtotal = 0;
-        let totalTax = 0;
+        // Fetch Company and Customer details for Tax Calculation
+        const [company, customer] = await Promise.all([
+            prisma.company.findUnique({
+                where: { id: req.user.companyId },
+                select: { state: true }
+            }),
+            prisma.party.findFirst({
+                where: { id: customerId, companyId: req.user.companyId },
+                select: { creditPeriod: true, billingAddress: true, gstin: true }
+            })
+        ]);
 
-        const invoiceItems = items.map((item: any) => {
-            const total = Number(item.quantity) * Number(item.rate);
-            const tax = total * (Number(item.taxRate) / 100);
+        const supplierState = company?.state || '';
+        const placeOfSupply = (customer?.billingAddress as any)?.state || ''; // Fallback needs handling
 
-            subtotal += total;
-            totalTax += tax;
+        if (!supplierState) {
+            logger.warn('Company state not found for tax calculation');
+        }
 
-            return {
-                productId: item.productId,
+        // Calculate Taxes using Rule Engine
+        const invoiceItems: any[] = [];
+        let subtotal = new Decimal(0);
+        let totalCGST = new Decimal(0);
+        let totalSGST = new Decimal(0);
+        let totalIGST = new Decimal(0);
+        let totalCess = new Decimal(0);
+        let totalTax = new Decimal(0);
+
+        for (const item of items) {
+            const quantity = new Decimal(item.quantity || 0);
+            const rate = new Decimal(item.rate || 0);
+            const taxRate = new Decimal(item.taxRate || 0);
+            const cessRate = new Decimal(item.cessRate || 0);
+            const taxableValue = quantity.mul(rate);
+
+            const taxResult = gstRuleService.calculateLineItem({
+                taxableValue: taxableValue,
+                gstRate: taxRate,
+                placeOfSupplyState: placeOfSupply,
+                companyState: supplierState,
+                cessRate: cessRate
+            });
+
+            subtotal = subtotal.add(taxResult.taxableValue);
+            totalCGST = totalCGST.add(taxResult.cgst);
+            totalSGST = totalSGST.add(taxResult.sgst);
+            totalIGST = totalIGST.add(taxResult.igst);
+            totalCess = totalCess.add(taxResult.cess);
+            totalTax = totalTax.add(taxResult.taxAmount);
+
+            invoiceItems.push({
+                productId: item.productId || null,
                 productName: item.productName || 'Unknown Product',
-                quantity: Number(item.quantity),
-                rate: Number(item.rate),
-                taxRate: Number(item.taxRate),
-                taxAmount: tax,
-                total: total + tax
-            };
-        });
-
+                quantity: Number(quantity),
+                rate: Number(rate),
+                taxRate: Number(taxRate),
+                taxAmount: taxResult.taxAmount,
+                cgst: taxResult.cgst,
+                sgst: taxResult.sgst,
+                igst: taxResult.igst,
+                total: taxResult.totalAmount,
+                batchId: item.batchId || null,
+            });
+        }
 
 
         // Calculate Total with Discount and Round Off
-        const discount = Number(req.body.discountAmount || 0);
-        const round = Number(req.body.roundOff || 0);
-        const totalAmount = subtotal + totalTax - discount + round;
+        const discount = new Decimal(req.body.discountAmount || 0);
+        const round = new Decimal(req.body.roundOff || 0);
+        // subtotal + totalTax - discount + round
+        const totalAmount = subtotal.add(totalTax).sub(discount).add(round);
+
+        // Auto-calculate Due Date based on Credit Terms (MSME Requirement)
+        let derivedDueDate = dueDate ? new Date(dueDate) : null;
+        if (!derivedDueDate && customer && customer.creditPeriod > 0) {
+            derivedDueDate = new Date(invoiceDate);
+            derivedDueDate.setDate(derivedDueDate.getDate() + customer.creditPeriod);
+        }
+
+        // Derive Status via Engine
+        let derivedStatus = statusEngine.deriveStatus('SALES', {
+            status: status || INVOICE_STATUS.DRAFT,
+            totalAmount,
+            amountPaid: 0,
+            balanceAmount: totalAmount,
+            dueDate: derivedDueDate
+        });
+
+        // APPROVAL WORKFLOW (P1): Dynamic check
+        const { workflowService } = require('../../services/workflowService');
+        const requiresApproval = await workflowService.checkApprovalRequired(req.user.companyId, 'Invoice', totalAmount.toNumber());
+
+        if (requiresApproval && derivedStatus !== INVOICE_STATUS.DRAFT) {
+            derivedStatus = 'PENDING_APPROVAL'; // Override status
+        }
+
+        // Phase 8: Check period lock before creating invoice
+        await requireUnlockedPeriod(
+            req.user.companyId,
+            new Date(invoiceDate),
+            'invoice creation'
+        );
+
+        // Phase 9: Validate stock availability before proceeding (skip for drafts)
+        const derivedStatusLower = (derivedStatus || '').toLowerCase();
+        if (derivedStatusLower !== 'draft' && derivedStatusLower !== 'pending_approval') {
+            const stockItems = items
+                .filter((item: any) => item.productId)
+                .map((item: any) => ({
+                    productId: item.productId,
+                    quantity: Number(item.quantity),
+                    warehouseId: item.warehouseId
+                }));
+
+            if (stockItems.length > 0) {
+                const stockValidation = await stockValidationService.validateMultipleItems(
+                    stockItems,
+                    req.user.companyId
+                );
+
+                if (!stockValidation.isValid) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Insufficient stock for one or more items',
+                        errors: stockValidation.errors,
+                        code: 'INSUFFICIENT_STOCK'
+                    });
+                }
+            }
+        }
+
+        // Phase 9.3: Batch Tracking Validation
+        const productIds = items.filter((i: any) => i.productId).map((i: any) => i.productId);
+        if (productIds.length > 0) {
+            const batchTrackedProducts = await prisma.product.findMany({
+                where: {
+                    id: { in: productIds },
+                    companyId: req.user.companyId,
+                    isBatchTracked: true
+                },
+                select: { id: true, name: true }
+            });
+
+            const batchErrors: string[] = [];
+            for (const product of batchTrackedProducts) {
+                const item = items.find((i: any) => i.productId === product.id);
+                if (item && !item.batchId) {
+                    batchErrors.push(`Batch selection required for ${product.name}`);
+                }
+            }
+
+            if (batchErrors.length > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Batch selection required for batch-tracked products',
+                    errors: batchErrors,
+                    code: 'BATCH_REQUIRED'
+                });
+            }
+        }
+
+        // Phase 10: Tax Validation Gates
+        if (customerId) {
+            // Already fetched company and customer above
+            if (company?.state && customer) {
+                const customerState = (customer.billingAddress as any)?.state;
+
+                // 10.1.1 Validate GSTIN if present
+                if (customer.gstin) {
+                    const gstinValidation = TaxValidationService.validateGSTIN(customer.gstin, customerState);
+                    if (!gstinValidation.isValid) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Invalid GSTIN details',
+                            errors: gstinValidation.errors,
+                            code: 'INVALID_TAX_DETAILS'
+                        });
+                    }
+                }
+
+                // 10.1.2 Validate Tax Type (IGST mismatch)
+                if (customerState && items.length > 0) {
+                    const taxValidation = TaxValidationService.validateInvoiceTax(
+                        company.state,
+                        customerState,
+                        items.map((i: any) => ({
+                            taxRate: Number(i.taxRate || 0),
+                            taxAmount: Number(i.totalTax || 0),
+                            cgst: Number(i.cgst || 0),
+                            sgst: Number(i.sgst || 0),
+                            igst: Number(i.igst || 0),
+                            total: Number(i.totalAmount || 0),
+                        }))
+                    );
+
+                    if (!taxValidation.isValid) {
+                        return res.status(400).json({
+                            success: false,
+                            message: 'Tax type Mismatch (Inter/Intra State)',
+                            errors: taxValidation.errors,
+                            code: 'TAX_MISMATCH'
+                        });
+                    }
+                }
+            }
+        }
 
         const result = await prisma.$transaction(async (tx) => {
+            // Step 1: Create the invoice without items
             const invoice = await tx.invoice.create({
                 data: {
                     companyId: req.user.companyId,
@@ -156,8 +364,8 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<Re
                     customerId,
                     invoiceNumber,
                     invoiceDate: new Date(invoiceDate),
-                    dueDate: dueDate ? new Date(dueDate) : null,
-                    status: status || 'DRAFT',
+                    dueDate: derivedDueDate,
+                    status: derivedStatus as InvoiceStatus,
                     notes,
                     subtotal,
                     totalTax,
@@ -166,98 +374,155 @@ export const createInvoice = async (req: AuthRequest, res: Response): Promise<Re
                     balanceAmount: totalAmount,
                     discountAmount: discount,
                     roundOff: round,
-                    items: {
-                        create: invoiceItems
-                    }
-                },
+
+                    // GST Compliance Fields
+                    placeOfSupply: placeOfSupply,
+                    isInterState: supplierState !== placeOfSupply,
+                    // Tax Breakdown
+                    cgst: new Decimal(totalCGST),
+                    sgst: new Decimal(totalSGST),
+                    igst: new Decimal(totalIGST),
+                }
+            });
+
+            // Step 2: Create items separately using createMany (avoids nested relation connect which triggers tenant isolation)
+            if (invoiceItems.length > 0) {
+                await tx.invoiceItem.createMany({
+                    data: invoiceItems.map((item: any) => ({
+                        ...item,
+                        invoiceId: invoice.id,
+                    }))
+                });
+            }
+
+            // Step 3: Re-fetch invoice with includes
+            const fullInvoice = await tx.invoice.findUnique({
+                where: { id: invoice.id, companyId: req.user.companyId },
                 include: {
                     items: true,
                     customer: true
                 }
             });
 
-            // Deduct stock for each product
+            // C2 FIX: Atomic stock deduction within same transaction
+            // This ensures inventory is updated atomically with invoice creation
             for (const item of items) {
-                if (item.productId) {
-                    const product = await tx.product.findUnique({
-                        where: { id: item.productId },
-                        select: { currentStock: true, trackInventory: true }
+                if (!item.productId) continue;
+
+                const product = await tx.product.findFirst({
+                    where: { id: item.productId, companyId: req.user.companyId },
+                    select: { id: true, name: true, currentStock: true, trackInventory: true }
+                });
+
+                if (product && product.trackInventory) {
+                    const previousStock = product.currentStock;
+                    const newStock = previousStock - Number(item.quantity);
+
+                    // Update product stock
+                    await tx.product.update({
+                        where: { id: item.productId, companyId: req.user.companyId },
+                        data: { currentStock: newStock }
                     });
 
-                    if (product && product.trackInventory) {
-                        const previousStock = product.currentStock;
-                        const quantity = Number(item.quantity);
-                        const newStock = previousStock - quantity;
-
-                        await tx.product.update({
-                            where: { id: item.productId },
-                            data: { currentStock: newStock }
-                        });
-
-                        await tx.stockMovement.create({
-                            data: {
-                                companyId: req.user.companyId,
-                                productId: item.productId,
-                                type: 'SALE',
-                                quantity: -quantity,
-                                previousStock,
-                                newStock,
-                                reference: invoiceNumber,
-                                reason: `Sold via Invoice ${invoiceNumber}`,
-                                createdBy: req.user.id
-                            }
+                    // Update batch stock if applicable
+                    if (item.batchId) {
+                        await tx.stockBatch.update({
+                            where: { id: item.batchId, companyId: req.user.companyId },
+                            data: { quantity: { decrement: Number(item.quantity) } }
                         });
                     }
+
+                    // Log stock movement
+                    await tx.stockMovement.create({
+                        data: {
+                            companyId: req.user.companyId,
+                            productId: item.productId,
+                            type: 'SALE',
+                            quantity: -Number(item.quantity),
+                            previousStock,
+                            newStock,
+                            reference: invoiceNumber,
+                            reason: `Invoice Created: ${invoiceNumber}`,
+                            createdBy: req.user.id,
+                            batchId: item.batchId
+                        }
+                    });
+
+                    logger.info(`[C2] Atomic stock deduction: ${item.quantity} from ${product.name} (New: ${newStock})`);
                 }
             }
 
-            // Update customer balance
-            await tx.party.update({
-                where: { id: customerId },
-                data: {
-                    currentBalance: {
-                        increment: totalAmount
+            // C3 FIX: Atomic Ledger Posting
+            // Enforce 1.2 "Atomic stock + ledger + document write"
+            // APPROVAL CHECK: Only post if NOT pending approval
+            if (!requiresApproval) {
+                await postSalesInvoice({
+                    id: invoice.id,
+                    invoiceNumber: invoiceNumber,
+                    invoiceDate: new Date(invoiceDate),
+                    customerId: customerId,
+                    subtotal: subtotal.toNumber(),
+                    totalTax: totalTax.toNumber(),
+                    totalAmount: totalAmount.toNumber(),
+                    discountAmount: discount.toNumber(),
+                    roundOff: round.toNumber(),
+                    companyId: req.user.companyId,
+                    items: items.map((item: any) => ({
+                        productId: item.productId,
+                        quantity: Number(item.quantity),
+                        rate: Number(item.rate)
+                    }))
+                }, tx); // Pass tx to ensure atomicity
+            } else {
+                // Creates Approval Request inside the transaction
+                await tx.approvalRequest.create({
+                    data: {
+                        companyId: req.user.companyId,
+                        entityType: 'INVOICE',
+                        entityId: invoice.id,
+                        requestedById: req.user.id,
+                        amount: new Decimal(totalAmount),
+                        status: 'PENDING',
+                        approverRole: 'ADMIN' // Default for now
                     }
+                });
+
+                logger.info(`Invoice ${invoiceNumber} held for approval (Amount: ${totalAmount} > 50000)`);
+            }
+
+            // P0-5: Emit domain event for event-driven processing (Transactional)
+            await eventBus.emit({
+                companyId: req.user.companyId,
+                eventType: EventTypes.INVOICE_CREATED,
+                aggregateType: 'Invoice',
+                aggregateId: invoice.id,
+                payload: {
+                    invoiceId: invoice.id,
+                    invoiceNumber: invoice.invoiceNumber,
+                    customerId: invoice.customerId,
+                    invoiceDate: invoice.invoiceDate,
+                    subtotal: Number(invoice.subtotal),
+                    totalTax: Number(invoice.totalTax),
+                    discountAmount: Number(invoice.discountAmount),
+                    roundOff: Number(invoice.roundOff),
+                    totalAmount: Number(invoice.totalAmount),
+                    items: items.map((item: any) => ({
+                        productId: item.productId,
+                        quantity: Number(item.quantity),
+                        rate: Number(item.rate),
+                        batchId: item.batchId
+                    }))
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
                 }
-            });
+            }, tx);
 
-            return invoice;
-        });
+            return fullInvoice;
+        }, { timeout: 30000 });
 
-        // Create ledger postings for double-entry accounting
-        try {
-            await postingService.postSalesInvoice({
-                id: result.id,
-                invoiceNumber: result.invoiceNumber,
-                invoiceDate: result.invoiceDate,
-                customerId: result.customerId,
-                subtotal: Number(result.subtotal),
-                totalTax: Number(result.totalTax),
-                totalAmount: Number(result.totalAmount),
-                discountAmount: Number(result.discountAmount),
-                roundOff: Number(result.roundOff),
-                companyId: req.user.companyId
-            });
-        } catch (postingError) {
-            // Log but don't fail the invoice creation
-            logger.warn(`Failed to create ledger postings for invoice ${result.invoiceNumber}:`, postingError);
-        }
-
-        // Audit Log
-        await AuditService.logChange(
-            req.user.companyId,
-            req.user.id,
-            'INVOICE',
-            result.id,
-            'CREATE',
-            null,
-            result,
-            req.ip,
-            req.headers['user-agent'] || 'UNKNOWN',
-            'SALES'
-        );
-
-        logger.info(`Invoice created: ${result.invoiceNumber} by ${req.user.email}`);
+        logger.info(`Invoice created: ${result!.invoiceNumber} by ${req.user.email}`);
 
         return res.status(201).json({
             success: true,
@@ -283,7 +548,7 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
         const { status, notes, items, invoiceDate, dueDate } = req.body;
 
         const existingInvoice = await prisma.invoice.findUnique({
-            where: { id },
+            where: { id, companyId: req.user.companyId },
             include: { items: true, customer: true }
         });
 
@@ -291,6 +556,25 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
             return res.status(404).json({
                 success: false,
                 message: 'Invoice not found'
+            });
+        }
+
+        // FIX #2: Block updates on invoices with payments
+        const hasPayments = Number(existingInvoice.amountPaid || 0) > 0;
+        if (hasPayments) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot modify invoice with recorded payments. Create a Credit Note instead.',
+                code: 'INVOICE_HAS_PAYMENTS'
+            });
+        }
+
+        // C1 FIX: Block updates on finalized invoices (status-based locking)
+        if (statusEngine.isLocked('SALES', existingInvoice)) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot edit invoice with status: ${existingInvoice.status}. The invoice is locked.`,
+                code: 'INVOICE_STATUS_LOCKED'
             });
         }
 
@@ -305,52 +589,13 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
 
             let subtotal = Number(existingInvoice.subtotal);
             let totalTax = Number(existingInvoice.totalTax);
-            let newItems;
-
-            // B. Revert CUSTOMER BALANCE (subtract old total) - Always do this to ensure clean state
-            await tx.party.update({
-                where: { id: existingInvoice.customerId },
-                data: { currentBalance: { decrement: existingInvoice.totalAmount } }
-            });
 
             if (items) {
-                // A. Revert STOCK for ALL existing items (add back to stock)
-                for (const item of existingInvoice.items) {
-                    if (item.productId) {
-                        const product = await tx.product.findUnique({
-                            where: { id: item.productId },
-                            select: { currentStock: true, trackInventory: true }
-                        });
-
-                        if (product && product.trackInventory) {
-                            await tx.product.update({
-                                where: { id: item.productId },
-                                data: { currentStock: { increment: item.quantity } }
-                            });
-
-                            // Log stock return
-                            await tx.stockMovement.create({
-                                data: {
-                                    companyId: req.user.companyId,
-                                    productId: item.productId,
-                                    type: 'Why', // This seems like a placeholder in original code? Keeping it or fixing? 'ADJUSTMENT' or 'RETURN' is better but keeping original to minimize change noise
-                                    quantity: item.quantity,
-                                    previousStock: product.currentStock,
-                                    newStock: product.currentStock + item.quantity,
-                                    reference: existingInvoice.invoiceNumber,
-                                    reason: `Invoice Update (Restock): ${existingInvoice.invoiceNumber}`,
-                                    createdBy: req.user.id
-                                }
-                            });
-                        }
-                    }
-                }
-
-                // C. Calculate NEW totals and prepare new items
+                // RESTORED: Calculate NEW totals and prepare new items
                 subtotal = 0;
                 totalTax = 0;
 
-                newItems = items.map((item: any) => {
+                const newItemsData = items.map((item: any) => {
                     const total = Number(item.quantity) * Number(item.rate);
                     const tax = total * (Number(item.taxRate) / 100);
 
@@ -368,10 +613,14 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
                         batchId: item.batchId
                     };
                 });
+
+                updateData.items = {
+                    deleteMany: {},
+                    create: newItemsData
+                };
             }
 
             // Calculate Totals with Discount/RoundOff
-            // Check if discount/roundOff are in body, otherwise use existing
             const discount = req.body.discountAmount !== undefined ? Number(req.body.discountAmount) : Number(existingInvoice.discountAmount);
             const round = req.body.roundOff !== undefined ? Number(req.body.roundOff) : Number(existingInvoice.roundOff);
 
@@ -381,65 +630,31 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
                 ...updateData,
                 subtotal,
                 totalTax,
-
                 totalAmount,
                 discountAmount: discount,
                 roundOff: round,
             };
 
-            // Adjust balanceAmount logic
-            // Assuming balanceAmount tracks unpaid amount. 
-            // If we just want to update it to new total - paid:
-            const amountPaid = Number(existingInvoice.amountPaid || 0);
-            updateData.balanceAmount = totalAmount - amountPaid;
+            // Re-Derive Status based on new totals
+            const newDerivedStatus = statusEngine.deriveStatus('SALES', {
+                status: existingInvoice.status, // Keep existing status logic base
+                totalAmount,
+                amountPaid: Number(existingInvoice.amountPaid), // Amount paid doesn't change here
+                balanceAmount: totalAmount - Number(existingInvoice.amountPaid),
+                dueDate: updateData.dueDate || existingInvoice.dueDate
+            });
 
-            if (newItems) {
-                updateData.items = {
-                    deleteMany: {},
-                    create: newItems
-                };
-            }
+            const finalStatus = status ? status : newDerivedStatus;
 
-            // D. Deduct STOCK for NEW items (if items changed)
-            if (items && newItems) {
-                for (const item of items) {
-                    if (item.productId) {
-                        const product = await tx.product.findUnique({
-                            where: { id: item.productId },
-                            select: { currentStock: true, trackInventory: true }
-                        });
-
-                        if (product && product.trackInventory) {
-                            const qty = Number(item.quantity);
-                            await tx.product.update({
-                                where: { id: item.productId },
-                                data: { currentStock: { decrement: qty } }
-                            });
-
-                            // Log stock deduction
-                            await tx.stockMovement.create({
-                                data: {
-                                    companyId: req.user.companyId,
-                                    productId: item.productId,
-                                    type: 'SALE',
-                                    quantity: -qty,
-                                    previousStock: product.currentStock,
-                                    newStock: product.currentStock - qty,
-                                    reference: existingInvoice.invoiceNumber,
-                                    reason: `Invoice Update (Sale): ${existingInvoice.invoiceNumber}`,
-                                    createdBy: req.user.id
-                                }
-                            });
-                        }
-                    }
+            // Validate Transition if status is changing
+            if (finalStatus !== existingInvoice.status) {
+                const validation = statusEngine.validateTransition('SALES', existingInvoice, finalStatus);
+                if (!validation.allowed) {
+                    throw new Error(validation.reason || 'Status transition not allowed');
                 }
             }
 
-            // E. Update CUSTOMER BALANCE (add new total) - Always do this
-            await tx.party.update({
-                where: { id: existingInvoice.customerId },
-                data: { currentBalance: { increment: totalAmount } }
-            });
+            updateData.status = finalStatus;
 
             // Update the invoice
             const updatedInvoice = await tx.invoice.update({
@@ -451,52 +666,29 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
                 }
             });
 
+            // Atomic Ledger Update
+            await updateSalesInvoice({
+                id: updatedInvoice.id,
+                invoiceNumber: updatedInvoice.invoiceNumber,
+                invoiceDate: updatedInvoice.invoiceDate,
+                customerId: updatedInvoice.customerId,
+                subtotal: Number(updatedInvoice.subtotal),
+                totalTax: Number(updatedInvoice.totalTax),
+                discountAmount: Number(updatedInvoice.discountAmount),
+                roundOff: Number(updatedInvoice.roundOff),
+                totalAmount: Number(updatedInvoice.totalAmount),
+                companyId: req.user.companyId,
+                items: updatedInvoice.items.map((i: any) => ({
+                    productId: i.productId,
+                    quantity: Number(i.quantity),
+                    rate: Number(i.rate)
+                }))
+            }, tx);
+
             return updatedInvoice;
         });
 
-        // 2. Handle Ledger Postings (Outside transaction or inside? Ideally inside but service uses separate calls)
-        // Since we changed financial impact, we must Reverse OLD posting and Create NEW posting
-
-        // This is tricky without a dedicated "Reverse Voucher" function, but we can do it manually or add logic.
-        // For P0 fix, we will just log the new posting. 
-        // ideally: Void old voucher -> Create new voucher.
-        // But we don't have the old voucher ID easily accessible on the invoice (no relation stored on Invoice model).
-        // The Voucher has referenceId = invoice.id.
-
-        // Find old voucher
-        const oldVoucher = await prisma.voucher.findFirst({
-            where: {
-                companyId: req.user.companyId,
-                referenceId: id,
-                referenceType: 'INVOICE'
-            }
-        });
-
-        if (oldVoucher) {
-            // "Void" it by creating a REVERSAL voucher or deleting it?
-            // Deleting is cleaner for "Draft" updates, but Reversal is better for audit.
-            // Let's delete it for now to keep ledger clean as this is an edit, not a cancellation.
-            // NOTE: Deleting vouchers deletes postings via cascade.
-            await prisma.voucher.delete({ where: { id: oldVoucher.id } });
-        }
-
-        // Post NEW ledger entry
-        try {
-            await postingService.postSalesInvoice({
-                id: result.id,
-                invoiceNumber: result.invoiceNumber,
-                invoiceDate: result.invoiceDate,
-                customerId: result.customerId,
-                subtotal: Number(result.subtotal),
-                totalTax: Number(result.totalTax),
-                totalAmount: Number(result.totalAmount),
-                discountAmount: Number(result.discountAmount),
-                roundOff: Number(result.roundOff),
-                companyId: req.user.companyId
-            });
-        } catch (postingError) {
-            logger.warn(`Failed to repost ledger for invoice ${result.invoiceNumber}:`, postingError);
-        }
+        // Ledger posting moved to Accounting Domain listener
 
         // Audit Log
         await AuditService.logChange(
@@ -513,6 +705,20 @@ export const updateInvoice = async (req: AuthRequest, res: Response): Promise<Re
         );
 
         logger.info(`Invoice updated: ${result.invoiceNumber} by ${req.user.email}`);
+
+        // Emit INVOICE_UPDATED
+        eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.INVOICE_UPDATED,
+            aggregateType: 'Invoice',
+            aggregateId: result.id,
+            payload: {
+                ...result,
+                oldItems: existingInvoice.items,
+                oldTotalAmount: Number(existingInvoice.totalAmount)
+            },
+            metadata: { userId: req.user.id, source: 'api' }
+        });
 
         return res.status(200).json({
             success: true,
@@ -537,7 +743,7 @@ export const deleteInvoice = async (req: AuthRequest, res: Response): Promise<Re
         const { id } = req.params;
 
         const existingInvoice = await prisma.invoice.findUnique({
-            where: { id },
+            where: { id, companyId: req.user.companyId },
             include: { items: true }
         });
 
@@ -548,55 +754,29 @@ export const deleteInvoice = async (req: AuthRequest, res: Response): Promise<Re
             });
         }
 
-        await prisma.$transaction(async (tx) => {
-            // Restore stock for each product
-            for (const item of existingInvoice.items) {
-                if (item.productId) {
-                    const product = await tx.product.findUnique({
-                        where: { id: item.productId },
-                        select: { currentStock: true, trackInventory: true }
-                    });
+        // B1 FIX: Prevent deletion of invoices that have received payments or are not in DRAFT status
+        const hasPayments = Number(existingInvoice.amountPaid || 0) > 0;
+        const isNotDraft = existingInvoice.status !== INVOICE_STATUS.DRAFT;
 
-                    if (product && product.trackInventory) {
-                        const previousStock = product.currentStock;
-                        const quantity = item.quantity;
-                        const newStock = previousStock + quantity;
-
-                        await tx.product.update({
-                            where: { id: item.productId },
-                            data: { currentStock: newStock }
-                        });
-
-                        await tx.stockMovement.create({
-                            data: {
-                                companyId: req.user.companyId,
-                                productId: item.productId,
-                                type: 'ADJUSTMENT',
-                                quantity: quantity,
-                                previousStock,
-                                newStock,
-                                reference: existingInvoice.invoiceNumber,
-                                reason: `Stock restored - Invoice ${existingInvoice.invoiceNumber} deleted`,
-                                createdBy: req.user.id
-                            }
-                        });
-                    }
-                }
-            }
-
-            // Reduce customer balance
-            await tx.party.update({
-                where: { id: existingInvoice.customerId },
-                data: {
-                    currentBalance: {
-                        decrement: Number(existingInvoice.totalAmount)
-                    }
-                }
+        if (hasPayments) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete invoice with recorded payments. Create a Credit Note instead.'
             });
+        }
 
-            await tx.invoice.delete({
-                where: { id }
+        if (isNotDraft && existingInvoice.status !== INVOICE_STATUS.CANCELLED) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete invoice with status '${existingInvoice.status}'. Only DRAFT or CANCELLED invoices can be deleted.`
             });
+        }
+
+        // Cross-domain logic removed. 
+        // Stock restoration and Party balance reduction handles by Event Handlers.
+
+        await prisma.invoice.delete({
+            where: { id, companyId: req.user.companyId }
         });
 
         // Decrement the sequence number to reuse the freed number
@@ -617,6 +797,19 @@ export const deleteInvoice = async (req: AuthRequest, res: Response): Promise<Re
         );
 
         logger.info(`Invoice deleted: ${existingInvoice.invoiceNumber} by ${req.user.email}`);
+
+        // Emit INVOICE_CANCELLED (treated as Delete)
+        eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.INVOICE_CANCELLED,
+            aggregateType: 'Invoice',
+            aggregateId: existingInvoice.id,
+            payload: {
+                ...existingInvoice,
+                items: existingInvoice.items
+            },
+            metadata: { userId: req.user.id, source: 'api' }
+        });
 
         return res.status(200).json({
             success: true,
@@ -650,7 +843,7 @@ export const searchInvoices = async (req: AuthRequest, res: Response): Promise<R
             where: {
                 companyId: req.user.companyId,
                 OR: [
-                    { invoiceNumber: { contains: q as string, mode: 'insensitive' } },
+                    { invoiceNumber: { contains: q as string } },
                 ]
             },
             take: 10,

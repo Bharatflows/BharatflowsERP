@@ -14,4 +14,7 @@ export declare const createPaymentReminder: (req: AuthRequest, res: Response) =>
 export declare const updatePaymentReminder: (req: AuthRequest, res: Response) => Promise<void>;
 export declare const deletePaymentReminder: (req: AuthRequest, res: Response) => Promise<void>;
 export declare const sendReminder: (req: AuthRequest, res: Response) => Promise<void>;
+export declare const getCashFlowTrends: (req: AuthRequest, res: Response) => Promise<void>;
+export declare const getCashFlowForecast: (req: AuthRequest, res: Response) => Promise<void>;
+export declare const syncBankAccount: (req: AuthRequest, res: Response) => Promise<void>;
 //# sourceMappingURL=bankingController.d.ts.map

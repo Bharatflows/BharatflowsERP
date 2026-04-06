@@ -11,10 +11,13 @@ import {
     ArrowLeft,
     CheckCircle,
     AlertCircle,
+    TrendingUp,
 } from "lucide-react";
 import { accountingService } from "@/services/modules.service";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { ModuleHeader } from "../ui/module-header";
+import { ACCOUNT_TYPES } from "@/constants";
 
 interface TrialBalanceEntry {
     ledgerId: string;
@@ -130,40 +133,34 @@ export function TrialBalance() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Link to="/accounting">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-5 w-5" />
+            <ModuleHeader
+                title="Trial Balance"
+                description="Summary of all ledger account balances"
+                showBackButton={true}
+                backTo="/accounting"
+                icon={<TrendingUp className="size-5 text-primary" />}
+                actions={
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 bg-muted p-1.5 rounded-lg border">
+                            <Calendar className="h-4 w-4 text-muted-foreground ml-1" />
+                            <Input
+                                type="date"
+                                value={asOfDate}
+                                onChange={(e) => setAsOfDate(e.target.value)}
+                                className="w-32 h-7 p-0 border-0 bg-transparent text-sm"
+                            />
+                        </div>
+                        <Button variant="outline" size="sm" onClick={fetchData}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Refresh
                         </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">Trial Balance</h1>
-                        <p className="text-muted-foreground">
-                            Summary of all ledger account balances
-                        </p>
+                        <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Export CSV
+                        </Button>
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="date"
-                            value={asOfDate}
-                            onChange={(e) => setAsOfDate(e.target.value)}
-                            className="w-40 border-0 bg-transparent"
-                        />
-                    </div>
-                    <Button variant="outline" onClick={fetchData}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
-                    </Button>
-                    <Button variant="outline" onClick={handleExportCSV}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export CSV
-                    </Button>
-                </div>
-            </div>
+                }
+            />
 
             {/* Balance Status */}
             <Card className={isBalanced ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
@@ -205,7 +202,7 @@ export function TrialBalance() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b-2 bg-muted/50">
+                                    <tr className="border-b-2 bg-muted">
                                         <th className="text-left py-3 px-4 font-semibold">Code</th>
                                         <th className="text-left py-3 px-4 font-semibold">Ledger Account</th>
                                         <th className="text-left py-3 px-4 font-semibold">Group</th>
@@ -215,7 +212,7 @@ export function TrialBalance() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {["ASSET", "LIABILITY", "EQUITY", "INCOME", "EXPENSE"].map((type) => {
+                                    {ACCOUNT_TYPES.map((type) => {
                                         const entries = groupedEntries[type] || [];
                                         if (entries.length === 0) return null;
 

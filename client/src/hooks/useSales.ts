@@ -1,7 +1,5 @@
-// TanStack Query hooks for Sales module
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { salesService, estimatesService, salesOrdersService, deliveryChallansService } from '../services/modules.service';
-import { salesService as quotationSalesService } from '../services/sales.service';
+import { salesService, estimatesService, salesOrdersService, deliveryChallansService, quotationsService, creditNotesService } from '../services/modules.service';
 import { toast } from 'sonner';
 import type { Invoice, Estimate, SalesOrder, Quotation, QueryParams } from '../types';
 
@@ -18,6 +16,8 @@ export const salesKeys = {
     order: (id: string) => [...salesKeys.orders(), id] as const,
     challans: () => [...salesKeys.all, 'challans'] as const,
     challan: (id: string) => [...salesKeys.challans(), id] as const,
+    creditNotes: () => [...salesKeys.all, 'credit-notes'] as const,
+    creditNote: (id: string) => [...salesKeys.creditNotes(), id] as const,
 };
 
 // ============ INVOICES ============
@@ -175,6 +175,23 @@ export function useCreateSalesOrder() {
     });
 }
 
+export function useUpdateSalesOrder() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: Partial<SalesOrder> }) =>
+            salesOrdersService.update(id, data),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.order(id) });
+            queryClient.invalidateQueries({ queryKey: salesKeys.orders() });
+            toast.success('Sales order updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to update sales order');
+        },
+    });
+}
+
 export function useDeleteSalesOrder() {
     const queryClient = useQueryClient();
 
@@ -215,6 +232,23 @@ export function useCreateDeliveryChallan() {
     });
 }
 
+export function useUpdateDeliveryChallan() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: any }) =>
+            deliveryChallansService.update(id, data),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.challan(id) });
+            queryClient.invalidateQueries({ queryKey: salesKeys.challans() });
+            toast.success('Delivery challan updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to update delivery challan');
+        },
+    });
+}
+
 export function useDeleteDeliveryChallan() {
     const queryClient = useQueryClient();
 
@@ -235,7 +269,11 @@ export function useDeleteDeliveryChallan() {
 export function useQuotations(params?: QueryParams) {
     return useQuery({
         queryKey: [...salesKeys.quotations(), params],
-        queryFn: () => quotationSalesService.getQuotations(params),
+        queryFn: () => quotationsService.getAll(params),
+        select: (response) => {
+            // Unpack paginated or standard response data safely
+            return Array.isArray(response) ? response : (response as any).data || (response as any).docs || [];
+        },
         staleTime: 5 * 60 * 1000,
     });
 }
@@ -243,7 +281,7 @@ export function useQuotations(params?: QueryParams) {
 export function useQuotation(id: string) {
     return useQuery({
         queryKey: salesKeys.quotation(id),
-        queryFn: () => quotationSalesService.getQuotation(id),
+        queryFn: () => quotationsService.getById(id),
         enabled: !!id,
     });
 }
@@ -252,7 +290,7 @@ export function useCreateQuotation() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: Partial<Quotation>) => quotationSalesService.createQuotation(data),
+        mutationFn: (data: Partial<Quotation>) => quotationsService.create(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: salesKeys.quotations() });
             toast.success('Quotation created successfully');
@@ -263,17 +301,114 @@ export function useCreateQuotation() {
     });
 }
 
+export function useUpdateQuotation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: Partial<Quotation> }) =>
+            quotationsService.update(id, data),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.quotation(id) });
+            queryClient.invalidateQueries({ queryKey: salesKeys.quotations() });
+            toast.success('Quotation updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to update quotation');
+        },
+    });
+}
+
 export function useDeleteQuotation() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id: string) => quotationSalesService.deleteQuotation(id),
+        mutationFn: (id: string) => quotationsService.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: salesKeys.quotations() });
             toast.success('Quotation deleted successfully');
         },
         onError: (error: any) => {
             toast.error(error.message || 'Failed to delete quotation');
+        },
+    });
+}
+
+export function useConvertQuotation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => quotationsService.convert(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.quotations() });
+            queryClient.invalidateQueries({ queryKey: salesKeys.orders() });
+            toast.success('Quotation converted to Sales Order');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to convert quotation');
+        },
+    });
+}
+
+// ============ CREDIT NOTES ============
+
+export function useCreditNotes(params?: QueryParams) {
+    return useQuery({
+        queryKey: [...salesKeys.creditNotes(), params],
+        queryFn: () => creditNotesService.getAll(params),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function useCreditNote(id: string) {
+    return useQuery({
+        queryKey: salesKeys.creditNote(id),
+        queryFn: () => creditNotesService.getById(id),
+        enabled: !!id,
+    });
+}
+
+export function useCreateCreditNote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: any) => creditNotesService.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.creditNotes() });
+            toast.success('Credit note created successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to create credit note');
+        },
+    });
+}
+
+export function useDeleteCreditNote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => creditNotesService.delete(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.creditNotes() });
+            toast.success('Credit note deleted successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to delete credit note');
+        },
+    });
+}
+
+export function useUpdateCreditNote() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: string; data: any }) => creditNotesService.update(id, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({ queryKey: salesKeys.creditNotes() });
+            queryClient.invalidateQueries({ queryKey: salesKeys.creditNote(variables.id) });
+            toast.success('Credit note updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to update credit note');
         },
     });
 }

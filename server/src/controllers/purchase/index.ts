@@ -15,7 +15,9 @@ export {
     createPurchaseOrder,
     updatePurchaseOrder,
     deletePurchaseOrder,
-    updatePurchaseOrderStatus
+    updatePurchaseOrderStatus,
+    convertPOToGRN,
+    convertPOToBill
 } from './purchaseOrderController';
 
 // Purchase Bills

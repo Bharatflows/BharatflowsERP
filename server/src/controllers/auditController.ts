@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { AuditService } from '../services/auditService';
+import logger from '../config/logger';
 
 /**
  * Get Audit Logs for a specific entity
@@ -29,7 +30,7 @@ export const getEntityLogs = async (req: AuthRequest, res: Response) => {
             data: logs
         });
     } catch (error: any) {
-        console.error('Get entity logs error:', error);
+        logger.error('Get entity logs error:', error);
         return res.status(500).json({
             success: false,
             message: 'Error fetching audit logs'
@@ -84,7 +85,7 @@ export const getGlobalLogs = async (req: AuthRequest, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get global logs error:', error);
+        logger.error('Get global logs error:', error);
         return res.status(500).json({
             success: false,
             message: 'Error fetching global logs'
@@ -117,7 +118,7 @@ export const verifyIntegrity = async (req: AuthRequest, res: Response) => {
             });
         }
     } catch (error: any) {
-        console.error('Verify integrity error:', error);
+        logger.error('Verify integrity error:', error);
         return res.status(500).json({
             success: false,
             message: 'Error verifying integrity'

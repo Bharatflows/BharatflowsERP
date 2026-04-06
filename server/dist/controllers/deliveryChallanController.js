@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchDeliveryChallans = exports.deleteDeliveryChallan = exports.updateDeliveryChallan = exports.createDeliveryChallan = exports.getDeliveryChallan = exports.getDeliveryChallans = void 0;
+exports.convertChallanToInvoice = exports.searchDeliveryChallans = exports.deleteDeliveryChallan = exports.updateDeliveryChallan = exports.createDeliveryChallan = exports.getDeliveryChallan = exports.getDeliveryChallans = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const logger_1 = __importDefault(require("../config/logger"));
 const sequenceService_1 = require("../services/sequenceService");
+const eventBus_1 = require("../services/eventBus");
 // @desc    Get all delivery challans
 // @route   GET /api/v1/sales/challans
 // @access  Private
@@ -22,7 +23,7 @@ const getDeliveryChallans = async (req, res) => {
         }
         if (search) {
             where.OR = [
-                { challanNumber: { contains: search, mode: 'insensitive' } },
+                { challanNumber: { contains: search } },
             ];
         }
         const [challans, total] = await Promise.all([
@@ -148,6 +149,15 @@ const createDeliveryChallan = async (req, res) => {
                 items: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.DELIVERY_CHALLAN_CREATED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: challan.id,
+            payload: challan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         logger_1.default.info(`Delivery challan created: ${challan.challanNumber} by user ${req.user.id}`);
         return res.status(201).json({
             success: true,
@@ -223,6 +233,15 @@ const updateDeliveryChallan = async (req, res) => {
                 items: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.DELIVERY_CHALLAN_UPDATED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: challan.id,
+            payload: challan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         logger_1.default.info(`Delivery challan updated: ${challan.challanNumber} by user ${req.user.id}`);
         return res.status(200).json({
             success: true,
@@ -257,6 +276,17 @@ const deleteDeliveryChallan = async (req, res) => {
         await prisma_1.default.deliveryChallan.delete({
             where: { id: req.params.id }
         });
+        // Decrement the sequence number to reuse the freed number
+        await (0, sequenceService_1.decrementSequence)(req.user.companyId, 'DELIVERY_CHALLAN');
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.DELIVERY_CHALLAN_DELETED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: challan.id,
+            payload: challan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         logger_1.default.info(`Delivery challan deleted: ${challan.challanNumber} by user ${req.user.id}`);
         return res.status(200).json({
             success: true,
@@ -289,8 +319,8 @@ const searchDeliveryChallans = async (req, res) => {
             where: {
                 companyId: req.user.companyId,
                 OR: [
-                    { challanNumber: { contains: q, mode: 'insensitive' } },
-                    { referenceNumber: { contains: q, mode: 'insensitive' } },
+                    { challanNumber: { contains: q } },
+                    { referenceNumber: { contains: q } },
                 ]
             },
             include: {
@@ -315,4 +345,127 @@ const searchDeliveryChallans = async (req, res) => {
     }
 };
 exports.searchDeliveryChallans = searchDeliveryChallans;
+// @desc    Convert challan to invoice
+// @route   POST /api/v1/sales/challans/:id/convert
+// @access  Private
+const convertChallanToInvoice = async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Get the challan with all items
+        const challan = await prisma_1.default.deliveryChallan.findUnique({
+            where: { id },
+            include: {
+                items: true
+            }
+        });
+        if (!challan || challan.companyId !== req.user.companyId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Delivery challan not found'
+            });
+        }
+        // Check if already converted
+        if (challan.status === 'CONVERTED') {
+            return res.status(400).json({
+                success: false,
+                message: 'Delivery challan has already been converted to invoice'
+            });
+        }
+        // Generate invoice number
+        const invoiceNumber = await (0, sequenceService_1.getNextNumber)(req.user.companyId, 'INVOICE');
+        // Prepare invoice items from challan items
+        const invoiceItems = challan.items.map(item => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            rate: item.rate,
+            taxRate: 18, // Default tax rate if not stored in DC
+            taxAmount: 0, // Will be calculated dynamically if needed, or 0
+            total: item.total
+        }));
+        // Recalculate tax for invoice items as DC might not have tax info
+        const itemsWithTax = invoiceItems.map(item => {
+            // Assuming rate is base. 
+            const sub = Number(item.quantity) * Number(item.rate);
+            const tax = sub * 0.18; // Default 18% GST assumption for now
+            const tot = sub + tax;
+            return {
+                ...item,
+                taxAmount: tax,
+                total: tot
+            };
+        });
+        let subtotal = 0;
+        let totalTax = 0;
+        itemsWithTax.forEach(item => {
+            subtotal += (Number(item.quantity) * Number(item.rate));
+            totalTax += item.taxAmount;
+        });
+        const totalAmount = subtotal + totalTax;
+        // Create invoice in a transaction
+        const [invoice, updatedChallan] = await prisma_1.default.$transaction([
+            // Create the invoice
+            prisma_1.default.invoice.create({
+                data: {
+                    companyId: req.user.companyId,
+                    userId: req.user.id,
+                    customerId: challan.customerId,
+                    invoiceNumber,
+                    invoiceDate: new Date(),
+                    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                    status: 'DRAFT',
+                    notes: `Converted from Delivery Challan: ${challan.challanNumber}\n${challan.notes || ''}`,
+                    subtotal,
+                    totalTax,
+                    totalAmount,
+                    balanceAmount: totalAmount,
+                    items: {
+                        create: itemsWithTax
+                    }
+                },
+                include: {
+                    items: true,
+                    customer: true
+                }
+            }),
+            // Update challan status
+            prisma_1.default.deliveryChallan.update({
+                where: { id },
+                data: { status: 'CONVERTED' }
+            })
+        ]);
+        // Emit events
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.INVOICE_CREATED,
+            aggregateType: 'Invoice',
+            aggregateId: invoice.id,
+            payload: invoice,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.DELIVERY_CHALLAN_UPDATED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: updatedChallan.id,
+            payload: updatedChallan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        logger_1.default.info(`Challan ${challan.challanNumber} converted to Invoice ${invoice.invoiceNumber} by ${req.user.email}`);
+        return res.status(201).json({
+            success: true,
+            message: 'Delivery challan converted to invoice successfully',
+            data: { invoice }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Convert challan to invoice error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error converting delivery challan to invoice',
+            error: error.message
+        });
+    }
+};
+exports.convertChallanToInvoice = convertChallanToInvoice;
 //# sourceMappingURL=deliveryChallanController.js.map

@@ -27,44 +27,8 @@ interface SerialNumber {
     createdAt: string;
 }
 
-// Mock data for demonstration
-const mockSerials: SerialNumber[] = [
-    {
-        id: "1",
-        serialNumber: "SN-PHONE-001-2024",
-        productName: "Samsung Galaxy A54",
-        productCode: "PROD-001",
-        status: "IN_STOCK",
-        purchaseBillNumber: "PB-2024-100",
-        warrantyExpiry: "2025-12-01",
-        createdAt: "2024-11-01",
-    },
-    {
-        id: "2",
-        serialNumber: "SN-PHONE-002-2024",
-        productName: "Samsung Galaxy A54",
-        productCode: "PROD-001",
-        status: "SOLD",
-        purchaseBillNumber: "PB-2024-100",
-        invoiceNumber: "INV-2024-0150",
-        warrantyExpiry: "2025-12-01",
-        createdAt: "2024-11-01",
-    },
-    {
-        id: "3",
-        serialNumber: "SN-LAPTOP-001-2024",
-        productName: "Dell Inspiron 15",
-        productCode: "PROD-005",
-        status: "RETURNED",
-        purchaseBillNumber: "PB-2024-095",
-        invoiceNumber: "INV-2024-0125",
-        warrantyExpiry: "2026-06-15",
-        createdAt: "2024-10-15",
-    },
-];
-
 export function SerialNumberTracking() {
-    const [serials, setSerials] = useState<SerialNumber[]>(mockSerials);
+    const [serials, setSerials] = useState<SerialNumber[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("ALL");
     const [showAddModal, setShowAddModal] = useState(false);
@@ -231,7 +195,7 @@ export function SerialNumberTracking() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50">
+                                <tr className="border-b bg-muted">
                                     <th className="text-left py-3 px-4 font-medium">Serial Number</th>
                                     <th className="text-left py-3 px-4 font-medium">Product</th>
                                     <th className="text-center py-3 px-4 font-medium">Status</th>

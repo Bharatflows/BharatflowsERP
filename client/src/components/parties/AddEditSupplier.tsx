@@ -1,7 +1,7 @@
 import { useCreateParty, useUpdateParty } from "../../hooks/useParties";
-import { partiesService } from "../../services/modules.service";
+import { partiesService, settingsService } from "../../services/modules.service";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, CreditCard, FileText, CheckCircle2, Truck } from "lucide-react";
+import { Loader2, ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, CreditCard, FileText, CheckCircle2, Truck, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -48,6 +48,8 @@ export function AddEditSupplier({ supplierId, onSave, onCancel }: AddEditSupplie
     status: "active",
   });
 
+  const [fetchingGst, setFetchingGst] = useState(false);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -90,6 +92,51 @@ export function AddEditSupplier({ supplierId, onSave, onCancel }: AddEditSupplie
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleFetchGSTIN = async () => {
+    if (!formData.gstin) {
+      toast.error("Please enter a GSTIN first");
+      return;
+    }
+
+    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!gstinRegex.test(formData.gstin)) {
+      toast.error("Invalid GSTIN format");
+      return;
+    }
+
+    setFetchingGst(true);
+    try {
+      const response = await settingsService.getGSTINDetails(formData.gstin);
+      if (response.success && response.data) {
+        const data = response.data;
+
+        // Construct address
+        const addressParts = [];
+        if (data.address?.building) addressParts.push(data.address.building);
+        if (data.address?.street) addressParts.push(data.address.street);
+        const fullAddress = addressParts.join(', ');
+
+        setFormData(prev => ({
+          ...prev,
+          businessName: data.tradeName || data.legalName || prev.businessName,
+          // If name is empty, use legal name as contact person for now
+          name: !prev.name ? (data.legalName || "") : prev.name,
+          address: fullAddress || prev.address,
+          city: data.address?.city || prev.city,
+          state: data.stateName || prev.state,
+          pincode: data.address?.pincode || prev.pincode
+        }));
+
+        toast.success("Supplier details fetched successfully");
+      }
+    } catch (error: any) {
+      console.error("GST fetch error:", error);
+      toast.error("Failed to fetch GST details");
+    } finally {
+      setFetchingGst(false);
     }
   };
 
@@ -175,7 +222,7 @@ export function AddEditSupplier({ supplierId, onSave, onCancel }: AddEditSupplie
           <ArrowLeft className="size-4" />
           Back to Suppliers
         </Button>
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-6 rounded-2xl shadow-lg shadow-blue-500/20">
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-8 py-6 rounded-2xl shadow-lg shadow-primary/20">
           <div className="flex items-center gap-3">
             <Truck className="size-8" />
             <div>
@@ -208,7 +255,7 @@ export function AddEditSupplier({ supplierId, onSave, onCancel }: AddEditSupplie
                     ? "bg-emerald-500 text-white"
                     : currentStep === step.id
                       ? "bg-blue-600 text-white ring-4 ring-blue-100"
-                      : "bg-white text-slate-400 border-2 border-slate-200"
+                      : "bg-white text-muted-foreground border-2 border-slate-200"
                 )}
               >
                 {currentStep > step.id ? (
@@ -310,16 +357,33 @@ export function AddEditSupplier({ supplierId, onSave, onCancel }: AddEditSupplie
 
               <div className="space-y-2">
                 <Label htmlFor="gstin" className="text-foreground font-medium">GSTIN</Label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    id="gstin"
-                    value={formData.gstin}
-                    onChange={(e) => handleChange("gstin", e.target.value.toUpperCase())}
-                    placeholder="27AABCU9603R1ZM"
-                    maxLength={15}
-                    className={cn("h-11 rounded-xl pl-10 uppercase", errors.gstin && "border-rose-500")}
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <Input
+                      id="gstin"
+                      value={formData.gstin}
+                      onChange={(e) => handleChange("gstin", e.target.value.toUpperCase())}
+                      placeholder="27AABCU9603R1ZM"
+                      maxLength={15}
+                      className={cn("h-11 rounded-xl pl-10 uppercase", errors.gstin && "border-rose-500")}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleFetchGSTIN}
+                    disabled={fetchingGst || !formData.gstin}
+                    className="h-11 w-11 shrink-0 rounded-xl border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                    title="Fetch details from GSTIN"
+                    type="button"
+                  >
+                    {fetchingGst ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </Button>
                 </div>
                 {errors.gstin && <p className="text-sm text-rose-500">{errors.gstin}</p>}
                 <p className="text-xs text-muted-foreground">15-character GSTIN number</p>

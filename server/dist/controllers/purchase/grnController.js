@@ -5,6 +5,39 @@
  * Handles all GRN-related operations.
  * Split from purchaseController.ts for better maintainability.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,6 +45,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteGRN = exports.updateGRN = exports.createGRN = exports.getGRN = exports.getGRNs = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
 const sequenceService_1 = require("../../services/sequenceService");
+const eventBus_1 = __importStar(require("../../services/eventBus")); // P0-5: Domain events
+const logger_1 = __importDefault(require("../../config/logger"));
 // @desc    Get all GRNs
 // @route   GET /api/v1/purchases/grn
 // @access  Private
@@ -33,7 +68,7 @@ const getGRNs = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching GRNs:', error);
+        logger_1.default.error('Error fetching GRNs:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -73,7 +108,7 @@ const getGRN = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error fetching GRN:', error);
+        logger_1.default.error('Error fetching GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -109,7 +144,9 @@ const createGRN = async (req, res) => {
                             productName: item.productName || 'Unknown Product',
                             quantity: Number(item.quantity) || 0,
                             rate: Number(item.rate) || 0,
-                            total: Number(item.total || 0)
+                            total: Number(item.total || 0),
+                            batchNumber: item.batchNumber || null,
+                            expiryDate: item.expiryDate ? new Date(item.expiryDate) : null
                         }))
                     }
                 },
@@ -117,59 +154,45 @@ const createGRN = async (req, res) => {
                     items: true
                 }
             });
-            // 2. Increase stock for each product and log stock movements
-            for (const item of items) {
-                if (item.productId) {
-                    // Get current stock
-                    const product = await tx.product.findUnique({
-                        where: { id: item.productId },
-                        select: { currentStock: true, trackInventory: true }
-                    });
-                    if (product && product.trackInventory) {
-                        const previousStock = product.currentStock;
-                        const quantity = Number(item.quantity);
-                        const newStock = previousStock + quantity;
-                        // Update product stock (INCREASE)
-                        await tx.product.update({
-                            where: { id: item.productId },
-                            data: { currentStock: newStock }
-                        });
-                        // Log stock movement for audit trail
-                        await tx.stockMovement.create({
-                            data: {
-                                companyId: companyId,
-                                productId: item.productId,
-                                type: 'PURCHASE',
-                                quantity: quantity,
-                                previousStock,
-                                newStock,
-                                reference: createdGRN.grnNumber,
-                                reason: `Received via GRN ${createdGRN.grnNumber}`,
-                                createdBy: userId
-                            }
-                        });
-                    }
-                }
-            }
-            // 3. Update supplier balance (increase payable)
-            await tx.party.update({
-                where: { id: supplierId },
-                data: {
-                    currentBalance: {
-                        increment: Number(totalAmount || 0)
-                    }
-                }
-            });
             return createdGRN;
         });
-        console.log(`GRN created: ${grn.grnNumber} - Stock updated, Supplier balance updated`);
+        logger_1.default.info(`GRN created: ${grn.grnNumber}`);
+        // P0-5: Emit domain event for event-driven processing
+        try {
+            await eventBus_1.default.emit({
+                companyId: companyId,
+                eventType: eventBus_1.EventTypes.GOODS_RECEIVED,
+                aggregateType: 'GoodsReceivedNote',
+                aggregateId: grn.id,
+                payload: {
+                    grnId: grn.id,
+                    grnNumber: grn.grnNumber,
+                    supplierId: supplierId,
+                    totalAmount: Number(totalAmount || 0),
+                    items: items.map((item) => ({
+                        productId: item.productId,
+                        quantity: Number(item.quantity),
+                        batchNumber: item.batchNumber,
+                        expiryDate: item.expiryDate
+                    }))
+                },
+                metadata: {
+                    userId: userId,
+                    source: 'api'
+                }
+            });
+            logger_1.default.info(`[GRN] Emitted GOODS_RECEIVED event for ${grn.grnNumber}`);
+        }
+        catch (eventError) {
+            logger_1.default.warn(`Failed to emit GOODS_RECEIVED event: ${eventError}`);
+        }
         res.status(201).json({
             success: true,
             data: grn
         });
     }
     catch (error) {
-        console.error('Error creating GRN:', error);
+        logger_1.default.error('Error creating GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -228,7 +251,7 @@ const updateGRN = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Error updating GRN:', error);
+        logger_1.default.error('Error updating GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -257,13 +280,24 @@ const deleteGRN = async (req, res) => {
         await prisma_1.default.goodsReceivedNote.delete({
             where: { id: req.params.id }
         });
+        // Emit domain event
+        await eventBus_1.default.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.GRN_DELETED,
+            aggregateType: 'GoodsReceivedNote',
+            aggregateId: grn.id,
+            payload: grn,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        // Decrement the sequence number to reuse the freed number
+        await (0, sequenceService_1.decrementSequence)(req.user.companyId, 'GRN');
         res.json({
             success: true,
             data: {}
         });
     }
     catch (error) {
-        console.error('Error deleting GRN:', error);
+        logger_1.default.error('Error deleting GRN:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'

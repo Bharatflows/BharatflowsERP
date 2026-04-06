@@ -31,7 +31,7 @@ interface Activity {
   id: string;
   leadId: string;
   type: string;
-  title: string;
+  subject: string;
   description?: string;
   date: string;
   createdAt: string;
@@ -107,9 +107,10 @@ export function ActivityTracking() {
     }
 
     try {
-      await crmService.addActivity(formData.leadId, {
+      await crmService.addActivity({
+        leadId: formData.leadId,
         type: formData.type,
-        title: formData.title,
+        subject: formData.title,
         description: formData.description,
         date: formData.date,
       });
@@ -268,10 +269,10 @@ export function ActivityTracking() {
                           <div className="absolute -left-[25px] w-4 h-4 rounded-full bg-background border-2 border-muted flex items-center justify-center">
                             <Icon className={`h-2.5 w-2.5 ${color}`} />
                           </div>
-                          <div className="p-3 bg-muted/50 rounded-lg">
+                          <div className="p-3 bg-muted rounded-lg">
                             <div className="flex items-start justify-between">
                               <div>
-                                <p className="font-medium">{activity.title}</p>
+                                <p className="font-medium">{activity.subject}</p>
                                 {activity.lead && (
                                   <p className="text-sm text-muted-foreground">
                                     {activity.lead.name}

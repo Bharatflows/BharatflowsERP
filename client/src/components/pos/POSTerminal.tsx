@@ -1,21 +1,20 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PageLayout } from '../system/PageLayout';
 import { posService } from '../../services/modules.service';
 import { useProducts } from '../../hooks/useInventory';
-import { Search, Loader2, Package, Minus, Plus, Trash2, Keyboard, X } from 'lucide-react';
 import { ThermalReceipt } from './ThermalReceipt';
 import { toast } from 'sonner';
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
 import syncService from '../../services/syncService';
 import { generateOfflineId } from '../../lib/db';
+
+// Subcomponents
+import { POSHeader, ProductGrid, CartSection, HeldOrdersDialog } from './terminal';
 
 interface CartItem {
     id: string;
@@ -76,7 +75,7 @@ const POSTerminal = () => {
                 quantity: qty
             }];
         });
-        toast.success(`Added ${product.name}`);
+        toast.success(`added ${product.name}`);
         // Play beep sound logic here if needed
     };
 
@@ -89,7 +88,6 @@ const POSTerminal = () => {
         }).filter(item => item.quantity > 0));
     };
 
-    const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.id !== id));
     const clearCart = () => { setCart([]); toast.info("Cart cleared"); };
 
     const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -126,10 +124,10 @@ const POSTerminal = () => {
         const heldOrders = JSON.parse(localStorage.getItem('pos_held_orders') || '[]');
         const newHeld = heldOrders.filter((o: any) => o.id !== id);
         localStorage.setItem('pos_held_orders', JSON.stringify(newHeld));
-        // Force re-render of dialog content by refetching in the dialog component or state
-        // For simplicity, we trigger a state update
+        // Force re-render happens naturally via dialog reopening or external state if lifted
+        // For now, we close it to simplify
         setShowRecallDialog(false);
-        setTimeout(() => setShowRecallDialog(true), 0);
+        setTimeout(() => setShowRecallDialog(true), 100);
     };
 
     // --- Barcode Scanner Logic ---
@@ -249,112 +247,65 @@ const POSTerminal = () => {
     };
 
     return (
-        <div className="flex h-screen p-4 gap-4 bg-background">
-            {/* ... Left Side (Unchanged Logic, just simplified JSX structure for brevity) ... */}
-            <div className="flex-1 flex flex-col gap-4">
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input ref={searchInputRef} placeholder="Search products... (F2)" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
-                    </div>
-                    <Button variant="outline" size="icon" onClick={() => setShowShortcuts(true)}><Keyboard className="h-4 w-4" /></Button>
+        <PageLayout
+            title="POS Terminal"
+            description="Quick billing & checkout"
+            className="h-[calc(100dvh-4rem)] p-0" // Remove standard padding for full-screen POS
+        >
+            <div className="flex h-full gap-4 pb-4">
+                {/* Left Side: Product Search & Grid */}
+                <div className="flex-1 flex flex-col gap-4 min-w-0">
+                    <POSHeader
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        onShowShortcuts={() => setShowShortcuts(true)}
+                        searchInputRef={searchInputRef}
+                    />
+
+                    <ProductGrid
+                        loading={loading}
+                        products={filteredProducts}
+                        onProductClick={(p) => addToCart(p)}
+                    />
                 </div>
 
-                <div className="flex-1 overflow-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
-                    {loading ? <Loader2 className="animate-spin" /> : filteredProducts.map((p: any) => (
-                        <Card key={p.id} className="cursor-pointer hover:border-primary h-fit" onClick={() => addToCart(p)}>
-                            <CardHeader className="p-3 pb-1"><CardTitle className="text-sm line-clamp-2">{p.name}</CardTitle></CardHeader>
-                            <CardContent className="p-3 pt-1">
-                                <div className="font-bold text-primary">₹{Number(p.sellingPrice).toLocaleString()}</div>
-                                <div className="text-xs text-muted-foreground">Stk: {p.currentStock}</div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
-            </div>
+                {/* Right Side: Cart & Checkout */}
+                <CartSection
+                    cart={cart}
+                    onUpdateQuantity={updateQuantity}
+                    onClearCart={clearCart}
+                    onHoldOrder={holdOrder}
+                    onRecallClick={() => setShowRecallDialog(true)}
+                    onCheckout={handleCheckout}
+                    totalAmount={totalAmount}
+                />
 
-            {/* Right Side: Cart */}
-            <Card className="w-1/3 min-w-[300px] flex flex-col">
-                <CardHeader className="border-b py-3">
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Order</CardTitle>
-                        <div className="flex gap-1">
-                            <Button variant="outline" size="sm" onClick={holdOrder} title="Hold Order (F6)">Hold</Button>
-                            <Button variant="outline" size="sm" onClick={() => setShowRecallDialog(true)} title="Recall Order (F7)">Recall</Button>
-                            <Button variant="ghost" size="sm" onClick={clearCart} title="Clear (F3)"><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-auto p-0">
-                    {cart.map(item => (
-                        <div key={item.id} className="flex justify-between p-3 border-b hover:bg-muted/50">
-                            <div className="flex-1">
-                                <div className="font-medium">{item.name}</div>
-                                <div className="text-sm text-muted-foreground">₹{item.price} x {item.quantity}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.id, -1)}><Minus className="h-3 w-3" /></Button>
-                                <span className="w-4 text-center">{item.quantity}</span>
-                                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.id, 1)}><Plus className="h-3 w-3" /></Button>
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-                <div className="p-4 border-t bg-muted/20 space-y-3">
-                    <div className="flex justify-between text-2xl font-bold">
-                        <span>Total</span>
-                        <span>₹{totalAmount.toLocaleString()}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button size="lg" onClick={() => handleCheckout('CASH')}>CASH (F1)</Button>
-                        <Button size="lg" variant="outline" onClick={() => handleCheckout('UPI')}>UPI (F4)</Button>
-                    </div>
-                </div>
-            </Card>
-
-            {/* Shortcuts Dialog */}
-            <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Keyboard Shortcuts</DialogTitle></DialogHeader>
-                    <div className="grid gap-2">
-                        {KEYBOARD_SHORTCUTS.map(s => (
-                            <div key={s.key} className="flex justify-between border-b py-2">
-                                <span>{s.action}</span>
-                                <kbd className="bg-muted px-2 rounded">{s.key}</kbd>
-                            </div>
-                        ))}
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Recall Dialog */}
-            <Dialog open={showRecallDialog} onOpenChange={setShowRecallDialog}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Held Orders</DialogTitle></DialogHeader>
-                    <div className="space-y-2 max-h-[60vh] overflow-auto">
-                        {JSON.parse(localStorage.getItem('pos_held_orders') || '[]').length === 0 ? (
-                            <p className="text-center text-muted-foreground py-4">No held orders</p>
-                        ) : (
-                            JSON.parse(localStorage.getItem('pos_held_orders') || '[]').map((o: any) => (
-                                <div key={o.id} className="flex justify-between items-center p-3 border rounded hover:bg-muted/50">
-                                    <div>
-                                        <div className="font-medium">{o.reference}</div>
-                                        <div className="text-xs text-muted-foreground">{new Date(o.date).toLocaleTimeString()} • {o.items.length} items</div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="font-bold mr-2">₹{o.total}</div>
-                                        <Button size="sm" variant="default" onClick={() => recallOrder(o)}>Resume</Button>
-                                        <Button size="sm" variant="ghost" onClick={() => deleteHeldOrder(o.id)}><X className="h-4 w-4" /></Button>
-                                    </div>
+                {/* Dialogs */}
+                <Dialog open={showShortcuts} onOpenChange={setShowShortcuts}>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Keyboard Shortcuts</DialogTitle></DialogHeader>
+                        <div className="grid gap-2">
+                            {KEYBOARD_SHORTCUTS.map(s => (
+                                <div key={s.key} className="flex justify-between border-b py-2">
+                                    <span>{s.action}</span>
+                                    <kbd className="bg-muted px-2 rounded font-mono text-sm">{s.key}</kbd>
                                 </div>
-                            ))
-                        )}
-                    </div>
-                </DialogContent>
-            </Dialog>
+                            ))}
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
-            <ThermalReceipt data={receiptData} />
-        </div>
+                <HeldOrdersDialog
+                    open={showRecallDialog}
+                    onOpenChange={setShowRecallDialog}
+                    heldOrders={JSON.parse(localStorage.getItem('pos_held_orders') || '[]')}
+                    onRecall={recallOrder}
+                    onDelete={deleteHeldOrder}
+                />
+
+                <ThermalReceipt data={receiptData} />
+            </div>
+        </PageLayout>
     );
 };
 

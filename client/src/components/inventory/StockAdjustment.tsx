@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { cn } from "../../lib/utils";
+import { ResponsiveGrid } from "../layout/ResponsiveGrid";
 import { useProduct, useAdjustStock } from "../../hooks/useInventory";
 
 interface StockAdjustmentProps {
@@ -154,21 +155,21 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="mb-6">
         <Button variant="ghost" onClick={onCancel} className="gap-2 mb-4">
           <ArrowLeft className="size-4" />
           Back to Products
         </Button>
-        <div className="bg-primary text-white px-6 py-4 rounded-xl">
+        <div className="bg-primary text-primary-foreground px-6 py-4 rounded-xl">
           <h2>Stock Adjustment</h2>
           <p className="opacity-90">Adjust stock levels for your product</p>
         </div>
       </div>
 
       {/* Product Info */}
-      <div className="bg-white rounded-xl border border-border p-6 mb-6">
+      <div className="card-base p-6 mb-6">
         <div className="flex items-center gap-4">
           <div className="bg-primary p-4 rounded-xl">
             <Package className="size-8 text-white" />
@@ -189,23 +190,23 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
       {/* Adjustment Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Adjustment Type */}
-        <div className="bg-white rounded-xl border border-border p-6">
+        <div className="card-base p-6">
           <Label className="mb-3 block">Adjustment Type</Label>
-          <div className="grid grid-cols-3 gap-3">
+          <ResponsiveGrid columns="grid-cols-1 sm:grid-cols-3">
             <button
               type="button"
               onClick={() => setAdjustmentType("add")}
               className={cn(
                 "p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2",
                 adjustmentType === "add"
-                  ? "border-[#10b981] bg-[#d1fae5]"
-                  : "border-border hover:border-[#10b981]/50"
+                  ? "border-success bg-success-light"
+                  : "border-border hover:border-success/50"
               )}
             >
               <div
                 className={cn(
                   "p-3 rounded-lg",
-                  adjustmentType === "add" ? "bg-[#10b981]" : "bg-[#f8fafc]"
+                  adjustmentType === "add" ? "bg-success" : "bg-background"
                 )}
               >
                 <Plus
@@ -215,7 +216,7 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
                   )}
                 />
               </div>
-              <span className={cn(adjustmentType === "add" ? "text-[#065f46]" : "text-muted-foreground")}>
+              <span className={cn(adjustmentType === "add" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>
                 Add Stock
               </span>
             </button>
@@ -226,14 +227,14 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
               className={cn(
                 "p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2",
                 adjustmentType === "remove"
-                  ? "border-[#ef4444] bg-[#fee2e2]"
-                  : "border-border hover:border-[#ef4444]/50"
+                  ? "border-error bg-error-light"
+                  : "border-border hover:border-error/50"
               )}
             >
               <div
                 className={cn(
                   "p-3 rounded-lg",
-                  adjustmentType === "remove" ? "bg-[#ef4444]" : "bg-[#f8fafc]"
+                  adjustmentType === "remove" ? "bg-error" : "bg-background"
                 )}
               >
                 <Minus
@@ -243,7 +244,7 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
                   )}
                 />
               </div>
-              <span className={cn(adjustmentType === "remove" ? "text-[#991b1b]" : "text-muted-foreground")}>
+              <span className={cn(adjustmentType === "remove" ? "text-destructive" : "text-muted-foreground")}>
                 Remove Stock
               </span>
             </button>
@@ -254,14 +255,14 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
               className={cn(
                 "p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2",
                 adjustmentType === "set"
-                  ? "border-[#2563eb] bg-[#dbeafe]"
-                  : "border-border hover:border-[#2563eb]/50"
+                  ? "border-primary bg-info-light"
+                  : "border-border hover:border-primary/50"
               )}
             >
               <div
                 className={cn(
                   "p-3 rounded-lg",
-                  adjustmentType === "set" ? "bg-[#2563eb]" : "bg-[#f8fafc]"
+                  adjustmentType === "set" ? "bg-primary" : "bg-background"
                 )}
               >
                 <Package
@@ -271,16 +272,16 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
                   )}
                 />
               </div>
-              <span className={cn(adjustmentType === "set" ? "text-[#1e40af]" : "text-muted-foreground")}>
+              <span className={cn(adjustmentType === "set" ? "text-blue-700 dark:text-blue-400" : "text-muted-foreground")}>
                 Set Stock
               </span>
             </button>
-          </div>
+          </ResponsiveGrid>
         </div>
 
         {/* Quantity and Reason */}
-        <div className="bg-white rounded-xl border border-border p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card-base p-6">
+          <ResponsiveGrid columns="grid-cols-1 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quantity">
                 Quantity <span className="text-destructive">*</span>
@@ -328,13 +329,13 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
                 rows={3}
               />
             </div>
-          </div>
+          </ResponsiveGrid>
         </div>
 
         {/* Summary */}
-        <div className="bg-primary text-white rounded-xl p-6">
+        <div className="bg-primary text-white rounded-xl p-6" >
           <h3 className="mb-4">Adjustment Summary</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <ResponsiveGrid columns="grid-cols-1 sm:grid-cols-3">
             <div>
               <p className="opacity-80 mb-1">Current Stock</p>
               <p className="text-2xl">
@@ -356,11 +357,11 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
                 {getNewStock()} {unit}
               </p>
             </div>
-          </div>
+          </ResponsiveGrid>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 justify-end">
+        <div className="flex items-center gap-3 justify-end" >
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
@@ -376,8 +377,8 @@ export function StockAdjustment({ productId, onComplete, onCancel }: StockAdjust
             )}
             Confirm Adjustment
           </Button>
-        </div>
-      </form>
-    </div>
+        </div >
+      </form >
+    </div >
   );
 }

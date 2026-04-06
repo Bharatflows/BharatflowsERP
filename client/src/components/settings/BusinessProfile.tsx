@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { settingsService } from "../../services/modules.service";
 import { useAuth } from "../../contexts/AuthContext";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -23,6 +25,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
+import { INDIAN_STATES } from "../../constants";
+
 
 export function BusinessProfile() {
   const { user } = useAuth();
@@ -70,6 +74,7 @@ export function BusinessProfile() {
     bankName: "HDFC Bank",
     branch: "MG Road, Bangalore",
     accountType: "Current Account",
+    confirmAccountNumber: "",
   });
 
   const [brandingData, setBrandingData] = useState({
@@ -83,20 +88,150 @@ export function BusinessProfile() {
     includeTerms: true,
   });
 
+  const [fetchingGst, setFetchingGst] = useState(false);
+  const [gstVerified, setGstVerified] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+
+  // Helper to save updates with validation error handling
+  const saveUpdates = async (updates: any, successMessage: string) => {
+    setSaving(true);
+    try {
+      const response = await settingsService.updateCompanyDetails(updates);
+      if (response.success) {
+        toast.success(successMessage);
+      }
+    } catch (error: any) {
+      // Handle field-level validation errors
+      if (error?.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        Object.entries(errors).forEach(([field, message]) => {
+          toast.error(`${field}: ${message}`);
+        });
+      } else {
+        toast.error(error?.response?.data?.message || error.message || "Failed to save changes");
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFetchGSTIN = async () => {
+    if (!businessData.gstNumber) {
+      toast.error("Please enter a GSTIN number first");
+      return;
+    }
+
+    // Basic format check
+    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!gstinRegex.test(businessData.gstNumber)) {
+      toast.error("Invalid GSTIN format");
+      return;
+    }
+
+    setFetchingGst(true);
+    setGstVerified(false);
+
+    try {
+      const response = await settingsService.getGSTINDetails(businessData.gstNumber);
+
+      if (response.success && response.data) {
+        const data = response.data;
+
+        setBusinessData(prev => ({
+          ...prev,
+          legalName: data.legalName || prev.legalName,
+          // businessName might be same as legal name or trade name
+          businessName: data.tradeName || data.legalName || prev.businessName,
+          addressLine1: data.address?.building ? `${data.address.building}, ${data.address.street}` : data.address?.street || prev.addressLine1,
+          city: data.address?.city || prev.city,
+          state: data.stateName || prev.state,
+          pincode: data.address?.pincode || prev.pincode,
+          // Auto-fill PAN from GSTIN if missing
+          panNumber: !prev.panNumber && businessData.gstNumber.length >= 12 ? businessData.gstNumber.substring(2, 12) : prev.panNumber
+        }));
+
+        setGstVerified(true);
+        toast.success("Business details fetched successfully!");
+      } else {
+        toast.error("Could not fetch details for this GSTIN");
+      }
+    } catch (error: any) {
+      console.error("GST fetch error:", error);
+      toast.error(error.message || "Failed to fetch GSTIN details");
+    } finally {
+      setFetchingGst(false);
+    }
+  };
+
   const handleSaveBasicInfo = () => {
-    toast.success("Business information saved successfully");
+    // Client-side GSTIN validation
+    if (businessData.gstNumber) {
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!gstinRegex.test(businessData.gstNumber)) {
+        toast.error("Invalid GSTIN format (e.g., 27AAPFU0939F1ZV)");
+        return;
+      }
+    }
+
+    // Client-side PAN validation
+    if (businessData.panNumber) {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(businessData.panNumber)) {
+        toast.error("Invalid PAN format (e.g., ABCDE1234F)");
+        return;
+      }
+    }
+
+    saveUpdates({
+      businessName: businessData.businessName,
+      legalName: businessData.legalName,
+      gstin: businessData.gstNumber,
+      pan: businessData.panNumber,
+      email: businessData.email,
+      phone: businessData.phone,
+      website: businessData.website,
+      address: {
+        line1: businessData.addressLine1,
+        line2: businessData.addressLine2,
+        city: businessData.city,
+        state: businessData.state,
+        pincode: businessData.pincode,
+        country: businessData.country
+      }
+    }, "Business information saved successfully");
   };
 
   const handleSaveBankInfo = () => {
-    toast.success("Bank details saved successfully");
+    // Validate account number match if confirm field exists
+    if (bankData.confirmAccountNumber && bankData.accountNumber !== bankData.confirmAccountNumber) {
+      toast.error("Account numbers do not match");
+      return;
+    }
+
+    // Validate IFSC format
+    if (bankData.ifscCode) {
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (!ifscRegex.test(bankData.ifscCode)) {
+        toast.error("Invalid IFSC code format (e.g., HDFC0001234)");
+        return;
+      }
+    }
+
+    saveUpdates({
+      bankDetails: bankData
+    }, "Bank details saved successfully");
   };
 
   const handleSaveBranding = () => {
-    toast.success("Branding settings saved successfully");
+    saveUpdates({
+      branding: brandingData
+    }, "Branding settings saved successfully");
   };
 
   return (
     <div className="p-6">
+
       <Tabs defaultValue="basic" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2 bg-muted/20 p-1 rounded-xl">
           <TabsTrigger
@@ -127,11 +262,11 @@ export function BusinessProfile() {
 
         {/* Basic Information Tab */}
         <TabsContent value="basic" className="space-y-6 mt-0">
-          <Card className="border border-border/50 shadow-sm bg-card">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="border-b border-border/50 pb-4">
               <div className="flex items-center gap-3">
-                <div className="bg-indigo-50 p-3 rounded-lg">
-                  <Building2 className="h-6 w-6 text-indigo-600" />
+                <div className="bg-primary/10 p-3 rounded-lg">
+                  <Building2 className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <CardTitle className="text-lg font-semibold">Business Information</CardTitle>
@@ -144,7 +279,7 @@ export function BusinessProfile() {
               <div>
                 <Label className="text-sm font-medium">Business Logo</Label>
                 <div className="mt-2 flex items-center gap-4">
-                  <div className="h-24 w-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div className="h-24 w-24 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/30 hover:bg-muted transition-colors">
                     <Building2 className="h-10 w-10 text-muted-foreground" />
                   </div>
                   <div className="space-y-2">
@@ -183,14 +318,39 @@ export function BusinessProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="gstNumber">GST Number *</Label>
-                  <div className="relative">
-                    <Input
-                      id="gstNumber"
-                      value={businessData.gstNumber}
-                      onChange={(e) => setBusinessData({ ...businessData, gstNumber: e.target.value })}
-                      className="bg-background"
-                    />
-                    <Badge className="absolute right-2 top-2 bg-emerald-500 hover:bg-emerald-600 text-white border-0">Verified</Badge>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="gstNumber"
+                        value={businessData.gstNumber}
+                        onChange={(e) => {
+                          setBusinessData({ ...businessData, gstNumber: e.target.value.toUpperCase() });
+                          setGstVerified(false);
+                        }}
+                        className="bg-background pr-20"
+                        placeholder="27AABCU9603R1ZM"
+                        maxLength={15}
+                      />
+                      {gstVerified && (
+                        <Badge className="absolute right-2 top-2 bg-emerald-500 hover:bg-emerald-600 text-white border-0 pointer-events-none">
+                          Verified
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleFetchGSTIN}
+                      disabled={fetchingGst || !businessData.gstNumber}
+                      title="Fetch Details from GSTIN"
+                      className="shrink-0"
+                    >
+                      {fetchingGst ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -316,14 +476,12 @@ export function BusinessProfile() {
                       <Label htmlFor="state">State *</Label>
                       <Select value={businessData.state} onValueChange={(value) => setBusinessData({ ...businessData, state: value })}>
                         <SelectTrigger className="bg-background">
-                          <SelectValue />
+                          <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Karnataka">Karnataka</SelectItem>
-                          <SelectItem value="Maharashtra">Maharashtra</SelectItem>
-                          <SelectItem value="Tamil Nadu">Tamil Nadu</SelectItem>
-                          <SelectItem value="Delhi">Delhi</SelectItem>
-                          <SelectItem value="Gujarat">Gujarat</SelectItem>
+                          {INDIAN_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -338,7 +496,7 @@ export function BusinessProfile() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="country">Country *</Label>
-                      <Input id="country" value={businessData.country} disabled className="bg-muted/50" />
+                      <Input id="country" value={businessData.country} disabled className="bg-muted" />
                     </div>
                   </div>
                 </div>
@@ -356,7 +514,7 @@ export function BusinessProfile() {
 
         {/* Bank Details Tab */}
         <TabsContent value="bank" className="space-y-6 mt-0">
-          <Card className="border border-border/50 shadow-sm bg-card">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="border-b border-border/50 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-emerald-50 p-3 rounded-lg">
@@ -448,7 +606,7 @@ export function BusinessProfile() {
 
         {/* Branding Tab */}
         <TabsContent value="branding" className="space-y-6 mt-0">
-          <Card className="border border-border/50 shadow-sm bg-card">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="border-b border-border/50 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-amber-50 p-3 rounded-lg">
@@ -475,7 +633,7 @@ export function BusinessProfile() {
                         onChange={(e) => setBrandingData({ ...brandingData, primaryColor: e.target.value })}
                         className="w-20 h-10 p-1 bg-background"
                       />
-                      <Input value={brandingData.primaryColor} readOnly className="bg-muted/50" />
+                      <Input value={brandingData.primaryColor} readOnly className="bg-muted" />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -488,7 +646,7 @@ export function BusinessProfile() {
                         onChange={(e) => setBrandingData({ ...brandingData, secondaryColor: e.target.value })}
                         className="w-20 h-10 p-1 bg-background"
                       />
-                      <Input value={brandingData.secondaryColor} readOnly className="bg-muted/50" />
+                      <Input value={brandingData.secondaryColor} readOnly className="bg-muted" />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -501,7 +659,7 @@ export function BusinessProfile() {
                         onChange={(e) => setBrandingData({ ...brandingData, accentColor: e.target.value })}
                         className="w-20 h-10 p-1 bg-background"
                       />
-                      <Input value={brandingData.accentColor} readOnly className="bg-muted/50" />
+                      <Input value={brandingData.accentColor} readOnly className="bg-muted" />
                     </div>
                   </div>
                 </div>
@@ -590,7 +748,7 @@ export function BusinessProfile() {
 
         {/* Documents Tab */}
         <TabsContent value="documents" className="space-y-6 mt-0">
-          <Card className="border border-border/50 shadow-sm bg-card">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="border-b border-border/50 pb-4">
               <div className="flex items-center gap-3">
                 <div className="bg-cyan-50 p-3 rounded-lg">
@@ -610,7 +768,7 @@ export function BusinessProfile() {
                 { name: "Bank Cancelled Cheque", uploaded: true, filename: "cancelled_cheque.pdf" },
                 { name: "Partnership Deed / MOA", uploaded: false, filename: "" },
               ].map((doc, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border border-border/50 rounded-lg hover:bg-muted/30 transition-colors">
+                <div key={index} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors">
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-muted-foreground" />
                     <div>

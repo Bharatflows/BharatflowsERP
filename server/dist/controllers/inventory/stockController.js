@@ -1,69 +1,35 @@
 "use strict";
-/**
- * Stock Controller
- *
- * Handles stock-related operations: adjustments, transfers, movements, valuation.
- * Split from inventoryController.ts for better maintainability.
- */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getInventoryValuation = exports.getStockMovements = exports.getStockHistory = exports.transferStock = exports.getLowStock = exports.adjustStock = void 0;
+exports.getInventoryValuation = exports.getStockMovements = exports.getBatches = exports.createBatch = exports.getStockHistory = exports.transferStock = exports.getLowStock = exports.adjustStock = void 0;
+const stockService_1 = require("../../services/stockService");
 const prisma_1 = __importDefault(require("../../config/prisma"));
+const logger_1 = __importDefault(require("../../config/logger"));
 // Stock Adjustment
 const adjustStock = async (req, res) => {
     try {
         const { productId, quantity, type, reason, notes, warehouseId } = req.body;
-        // @ts-ignore
         const companyId = req.user.companyId;
-        // @ts-ignore
         const userId = req.user.id;
-        const product = await prisma_1.default.product.findFirst({
-            where: { id: productId, companyId }
-        });
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-        const previousStock = product.currentStock;
-        const newStock = previousStock + quantity;
-        if (newStock < 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Insufficient stock'
-            });
-        }
-        const updatedProduct = await prisma_1.default.product.update({
-            where: { id: productId },
-            data: { currentStock: newStock }
-        });
-        const stockMovement = await prisma_1.default.stockMovement.create({
-            data: {
-                productId,
-                type: type || 'ADJUSTMENT',
-                quantity,
-                previousStock,
-                newStock,
-                reason,
-                notes,
-                warehouseId,
-                createdBy: userId,
-                companyId
-            }
+        const result = await stockService_1.stockService.adjustStock({
+            productId,
+            quantity,
+            type,
+            reason,
+            notes,
+            warehouseId,
+            companyId,
+            userId
         });
         return res.json({
             success: true,
-            data: {
-                product: updatedProduct,
-                movement: stockMovement
-            }
+            data: result
         });
     }
     catch (error) {
-        console.error('Stock adjustment error:', error);
+        logger_1.default.error('Stock adjustment error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error adjusting stock'
@@ -71,10 +37,9 @@ const adjustStock = async (req, res) => {
     }
 };
 exports.adjustStock = adjustStock;
-// Get Low Stock Products
+// Get Low Stock Products (Logic remains in controller as it's a read operation)
 const getLowStock = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const lowStockProducts = await prisma_1.default.product.findMany({
             where: {
@@ -98,7 +63,7 @@ const getLowStock = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get low stock error:', error);
+        logger_1.default.error('Get low stock error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching low stock products'
@@ -110,73 +75,24 @@ exports.getLowStock = getLowStock;
 const transferStock = async (req, res) => {
     try {
         const { productId, fromWarehouseId, toWarehouseId, quantity, notes } = req.body;
-        // @ts-ignore
         const companyId = req.user.companyId;
-        // @ts-ignore
         const userId = req.user.id;
-        if (quantity <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Quantity must be greater than 0'
-            });
-        }
-        const product = await prisma_1.default.product.findFirst({
-            where: { id: productId, companyId }
-        });
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-        const previousStock = product.currentStock;
-        const [fromWarehouse, toWarehouse] = await Promise.all([
-            prisma_1.default.warehouse.findFirst({ where: { id: fromWarehouseId, companyId } }),
-            prisma_1.default.warehouse.findFirst({ where: { id: toWarehouseId, companyId } })
-        ]);
-        if (!fromWarehouse || !toWarehouse) {
-            return res.status(404).json({
-                success: false,
-                message: 'Warehouse not found'
-            });
-        }
-        const transferOut = await prisma_1.default.stockMovement.create({
-            data: {
-                productId,
-                type: 'TRANSFER_OUT',
-                quantity: -quantity,
-                previousStock,
-                newStock: previousStock,
-                warehouseId: fromWarehouseId,
-                notes,
-                createdBy: userId,
-                companyId
-            }
-        });
-        const transferIn = await prisma_1.default.stockMovement.create({
-            data: {
-                productId,
-                type: 'TRANSFER_IN',
-                quantity,
-                previousStock,
-                newStock: previousStock,
-                warehouseId: toWarehouseId,
-                reference: transferOut.id,
-                notes,
-                createdBy: userId,
-                companyId
-            }
+        const result = await stockService_1.stockService.transferStock({
+            productId,
+            fromWarehouseId,
+            toWarehouseId,
+            quantity,
+            notes,
+            companyId,
+            userId
         });
         return res.json({
             success: true,
-            data: {
-                transferOut,
-                transferIn
-            }
+            data: result
         });
     }
     catch (error) {
-        console.error('Stock transfer error:', error);
+        logger_1.default.error('Stock transfer error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error transferring stock'
@@ -188,7 +104,6 @@ exports.transferStock = transferStock;
 const getStockHistory = async (req, res) => {
     try {
         const { productId } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const movements = await prisma_1.default.stockMovement.findMany({
             where: {
@@ -197,7 +112,8 @@ const getStockHistory = async (req, res) => {
             },
             include: {
                 product: true,
-                warehouse: true
+                warehouse: true,
+                batch: true
             },
             orderBy: {
                 createdAt: 'desc'
@@ -209,7 +125,7 @@ const getStockHistory = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get stock history error:', error);
+        logger_1.default.error('Get stock history error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching stock history'
@@ -217,10 +133,101 @@ const getStockHistory = async (req, res) => {
     }
 };
 exports.getStockHistory = getStockHistory;
+// Create a new batch
+const createBatch = async (req, res) => {
+    try {
+        const { productId, batchNumber, quantity, mfgDate, expiryDate, mrp, costPrice, sellingPrice } = req.body;
+        const companyId = req.user.companyId;
+        const userId = req.user.id;
+        const product = await prisma_1.default.product.findFirst({
+            where: { id: productId, companyId }
+        });
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found'
+            });
+        }
+        const batch = await prisma_1.default.stockBatch.create({
+            data: {
+                productId,
+                batchNumber,
+                quantity: parseInt(quantity) || 0,
+                mfgDate: mfgDate ? new Date(mfgDate) : null,
+                expiryDate: expiryDate ? new Date(expiryDate) : null,
+                mrp: mrp ? parseFloat(mrp) : null,
+                costPrice: costPrice ? parseFloat(costPrice) : null,
+                sellingPrice: sellingPrice ? parseFloat(sellingPrice) : null,
+                companyId
+            }
+        });
+        // Also update total product stock if initial quantity > 0
+        if (parseInt(quantity) > 0) {
+            await prisma_1.default.product.update({
+                where: { id: productId },
+                data: { currentStock: { increment: parseInt(quantity) } }
+            });
+            // Log movement
+            await prisma_1.default.stockMovement.create({
+                data: {
+                    productId,
+                    type: 'BATCH_OPENING',
+                    quantity: parseInt(quantity),
+                    previousStock: product.currentStock,
+                    newStock: product.currentStock + parseInt(quantity),
+                    batchId: batch.id,
+                    createdBy: userId,
+                    companyId
+                }
+            });
+        }
+        return res.status(201).json({
+            success: true,
+            data: batch
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Create batch error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Error creating batch'
+        });
+    }
+};
+exports.createBatch = createBatch;
+// Get batches for a product
+const getBatches = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const companyId = req.user.companyId;
+        const batches = await prisma_1.default.stockBatch.findMany({
+            where: {
+                productId,
+                companyId,
+                isActive: true,
+                quantity: { gt: 0 } // Only fetch non-empty batches by default
+            },
+            orderBy: {
+                expiryDate: 'asc' // First expiring first
+            }
+        });
+        res.json({
+            success: true,
+            data: batches
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Get batches error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error fetching batches'
+        });
+    }
+};
+exports.getBatches = getBatches;
 // Get All Stock Movements
 const getStockMovements = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const { type, startDate, endDate, limit = '50' } = req.query;
         const where = { companyId };
@@ -251,7 +258,7 @@ const getStockMovements = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get stock movements error:', error);
+        logger_1.default.error('Get stock movements error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching stock movements'
@@ -262,7 +269,6 @@ exports.getStockMovements = getStockMovements;
 // Inventory Valuation
 const getInventoryValuation = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const products = await prisma_1.default.product.findMany({
             where: {
@@ -294,7 +300,7 @@ const getInventoryValuation = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get inventory valuation error:', error);
+        logger_1.default.error('Get inventory valuation error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error calculating inventory valuation'

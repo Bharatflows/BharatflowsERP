@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Download, FileText, ChevronRight, Check, Calendar, TrendingUp, Receipt, FileCheck, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
 import { Label } from "../ui/label";
 import {
@@ -13,6 +12,13 @@ import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { gstService } from "../../services/modules.service";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface GSTR1Section {
   invoices?: number;
@@ -153,34 +159,34 @@ export function GSTR1() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="size-8 animate-spin text-primary" />
+        <MIcon name="sync" className="text-[32px] animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[24px] animate-fade-in">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="bg-primary/10 p-3 rounded-xl">
-              <FileText className="size-6 text-primary" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm p-[24px]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-[16px]">
+          <div className="flex items-start gap-[16px]">
+            <div className="bg-primary/10 p-[12px] rounded-[12px]">
+              <MIcon name="description" className="text-[24px] text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-foreground mb-1">GSTR-1 Return</h2>
-              <p className="text-muted-foreground text-sm">
+              <h2 className="text-2xl font-bold text-foreground mb-[4px]">GSTR-1 Return</h2>
+              <p className="text-body-sm font-medium text-muted-foreground">
                 Statement of outward supplies of goods or services
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchGSTR1Data} className="gap-2 h-10">
-              <RefreshCw className="size-4" />
+          <div className="flex gap-[8px]">
+            <Button variant="outline" onClick={fetchGSTR1Data} className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+              <MIcon name="refresh" className="text-[18px]" />
               Refresh
             </Button>
-            <Button variant="outline" className="gap-2 h-10">
-              <Download className="size-4" />
+            <Button variant="outline" className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+              <MIcon name="download" className="text-[18px]" />
               Download JSON
             </Button>
           </div>
@@ -188,12 +194,12 @@ export function GSTR1() {
       </div>
 
       {/* Period Selection */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-end gap-4">
-          <div className="space-y-2">
-            <Label>Return Period</Label>
+      <div className="bg-card rounded-[16px] border border-border shadow-sm p-[24px]">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-[16px]">
+          <div className="space-y-[8px]">
+            <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Return Period</Label>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="w-[200px] h-10">
+              <SelectTrigger className="w-[200px] h-[40px] rounded-[8px] border-slate-200">
                 <SelectValue placeholder="Select month" />
               </SelectTrigger>
               <SelectContent>
@@ -212,12 +218,12 @@ export function GSTR1() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <Calendar className="size-4" />
+          <div className="flex items-center gap-[16px] text-body-sm font-medium text-muted-foreground">
+            <div className="flex items-center gap-[8px]">
+              <MIcon name="event" className="text-[18px]" />
               <span>Due Date: 11th of next month</span>
             </div>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+            <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 rounded-[6px] font-bold">
               Pending
             </Badge>
           </div>
@@ -225,86 +231,86 @@ export function GSTR1() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-blue-50 p-2.5 rounded-lg">
-              <Receipt className="size-5 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
+        <div className="bg-blue-50 dark:bg-blue-950/20 rounded-[16px] border border-blue-200 dark:border-blue-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-blue-100 dark:bg-blue-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="receipt" className="text-[24px] text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Total Taxable Value</p>
-          <h3 className="text-2xl font-bold text-foreground">₹{totals.totalTaxable.toLocaleString("en-IN")}</h3>
+          <p className="text-[12px] font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-wider mb-[4px]">Total Taxable Value</p>
+          <h3 className="text-3xl font-bold text-blue-700 dark:text-blue-300">₹{totals.totalTaxable.toLocaleString("en-IN")}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-emerald-50 p-2.5 rounded-lg">
-              <TrendingUp className="size-5 text-emerald-600" />
+        <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-[16px] border border-emerald-200 dark:border-emerald-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-emerald-100 dark:bg-emerald-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="trending_up" className="text-[24px] text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Total Tax Liability</p>
-          <h3 className="text-2xl font-bold text-emerald-600">₹{totals.totalTax.toLocaleString("en-IN")}</h3>
+          <p className="text-[12px] font-bold text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider mb-[4px]">Total Tax Liability</p>
+          <h3 className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">₹{totals.totalTax.toLocaleString("en-IN")}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-violet-50 p-2.5 rounded-lg">
-              <FileCheck className="size-5 text-violet-600" />
+        <div className="bg-violet-50 dark:bg-violet-950/20 rounded-[16px] border border-violet-200 dark:border-violet-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-violet-100 dark:bg-violet-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="fact_check" className="text-[24px] text-violet-600 dark:text-violet-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Total Documents</p>
-          <h3 className="text-2xl font-bold text-foreground">
+          <p className="text-[12px] font-bold text-violet-600/80 dark:text-violet-400/80 uppercase tracking-wider mb-[4px]">Total Documents</p>
+          <h3 className="text-3xl font-bold text-violet-700 dark:text-violet-300">
             {sections.reduce((sum, s) => sum + ((s.data as any).invoices || (s.data as any).notes || 0), 0)}
           </h3>
         </div>
       </div>
 
       {/* GSTR-1 Sections */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-border/50">
-          <h3 className="text-lg font-semibold text-foreground">Return Sections</h3>
-          <p className="text-sm text-muted-foreground mt-1">Click on a section to view and edit details</p>
+      <div className="bg-card rounded-[16px] border border-border shadow-sm overflow-hidden">
+        <div className="p-[20px] pb-[16px] border-b border-slate-100 dark:border-slate-800">
+          <h3 className="text-2xl font-bold text-foreground">Return Sections</h3>
+          <p className="text-[12px] font-medium text-muted-foreground mt-[4px]">Click on a section to view and edit details</p>
         </div>
-        <div className="divide-y divide-border/50">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {sections.map((section) => (
             <div
               key={section.code}
-              className="p-5 hover:bg-muted/20 transition-colors cursor-pointer"
+              className="p-[20px] hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors cursor-pointer"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/10 p-2 rounded-lg">
-                    <span className="text-sm font-bold text-primary">{section.code}</span>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-[16px]">
+                <div className="flex items-center gap-[16px]">
+                  <div className="bg-primary/10 p-[12px] rounded-[12px]">
+                    <span className="text-body-sm font-bold text-primary">{section.code}</span>
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{section.name}</span>
+                    <div className="flex items-center gap-[8px]">
+                      <span className="font-bold text-foreground">{section.name}</span>
                       {section.mandatory && (
-                        <Badge variant="outline" className="text-xs bg-rose-50 text-rose-700 border-rose-200">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold bg-rose-50 text-rose-700 border-rose-200 rounded-[4px]">
                           Mandatory
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{section.description}</p>
+                    <p className="text-body-sm font-medium text-muted-foreground mt-[2px]">{section.description}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex flex-row items-center gap-[24px] md:justify-end">
                   <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Taxable Value</div>
-                    <div className="font-medium text-foreground">
+                    <div className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[2px]">Taxable Value</div>
+                    <div className="font-mono text-body-sm font-bold text-foreground">
                       ₹{section.data.taxableValue.toLocaleString("en-IN")}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Total Tax</div>
-                    <div className="font-medium text-emerald-600">
+                    <div className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[2px]">Total Tax</div>
+                    <div className="font-mono text-body-sm font-bold text-emerald-600">
                       ₹{section.data.totalTax.toLocaleString("en-IN")}
                     </div>
                   </div>
-                  <ChevronRight className="size-5 text-muted-foreground" />
+                  <MIcon name="chevron_right" className="text-[24px] text-muted-foreground" />
                 </div>
               </div>
             </div>
@@ -313,13 +319,13 @@ export function GSTR1() {
       </div>
 
       {/* Info and Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
-          <div className="flex gap-3">
-            <AlertCircle className="size-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-[16px] p-[24px]">
+          <div className="flex gap-[16px]">
+            <MIcon name="info" className="text-[24px] text-blue-600 dark:text-blue-400 flex-shrink-0 mt-[2px]" />
             <div>
-              <h4 className="text-blue-900 font-medium mb-2">Filing Instructions</h4>
-              <ul className="space-y-1 text-blue-700 text-sm list-disc list-inside">
+              <h4 className="text-body font-bold text-blue-900 dark:text-blue-100 mb-[8px]">Filing Instructions</h4>
+              <ul className="space-y-[4px] text-body-sm font-medium text-blue-700 dark:text-blue-300 list-disc list-inside">
                 <li>Ensure all B2B invoices are uploaded</li>
                 <li>Verify HSN summary is complete</li>
                 <li>Validate all credit/debit notes</li>
@@ -329,18 +335,18 @@ export function GSTR1() {
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5">
-          <h4 className="font-medium text-foreground mb-4">Filing Actions</h4>
-          <div className="space-y-3">
-            <Button variant="outline" className="w-full justify-start gap-2 h-10">
-              <Check className="size-4" />
+        <div className="bg-card rounded-[16px] border border-border shadow-sm p-[24px]">
+          <h4 className="text-body font-bold text-foreground mb-[16px]">Filing Actions</h4>
+          <div className="space-y-[12px]">
+            <Button variant="outline" className="w-full justify-start gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+              <MIcon name="check" className="text-[18px]" />
               Validate Return Data
             </Button>
             <Button
-              className="w-full justify-start gap-2 h-10"
+              className="w-full justify-start gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold"
               onClick={handleFileReturn}
             >
-              <FileCheck className="size-4" />
+              <MIcon name="fact_check" className="text-[18px]" />
               File GSTR-1 Return
             </Button>
           </div>

@@ -36,7 +36,7 @@ export function ProductLookup() {
               <div key={idx} className="p-4 border rounded-lg space-y-2">
                 <div className="flex items-center justify-between">
                   <p className="text-foreground">{product.name}</p>
-                  <Badge className={product.stock > 20 ? "bg-[#10b981] text-white" : "bg-[#f97316] text-white"}>
+                  <Badge className={product.stock > 20 ? "bg-success text-white" : "bg-warning text-white"}>
                     {product.stock} in stock
                   </Badge>
                 </div>

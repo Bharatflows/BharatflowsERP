@@ -34,12 +34,14 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { cn } from "../../lib/utils";
+import { chartColors } from "@/lib/chartColors";
 
 interface ExpensesDashboardProps {
   onViewExpenses: () => void;
+  hideStats?: boolean;
 }
 
-export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
+export function ExpensesDashboard({ onViewExpenses, hideStats = false }: ExpensesDashboardProps) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,86 +86,88 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-blue-50 p-2.5 rounded-lg">
-              <Wallet className="size-5 text-blue-600" />
+      {!hideStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-blue-500/10 p-2.5 rounded-lg">
+                <Wallet className="size-5 text-blue-500" />
+              </div>
             </div>
+            <p className="text-muted-foreground text-sm font-medium mb-1">Total Expenses (MTD)</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-2xl font-bold text-foreground">₹{kpi.currentMonthTotal.toLocaleString("en-IN")}</h3>
+              <span className={cn(
+                "flex items-center gap-1 text-xs font-medium mb-1",
+                kpi.percentChange > 0 ? "text-rose-600" : "text-emerald-600"
+              )}>
+                {kpi.percentChange > 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                {Math.abs(kpi.percentChange)}%
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">vs last month</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Total Expenses (MTD)</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-2xl font-bold text-foreground">₹{kpi.currentMonthTotal.toLocaleString("en-IN")}</h3>
-            <span className={cn(
-              "flex items-center gap-1 text-xs font-medium mb-1",
-              kpi.percentChange > 0 ? "text-rose-600" : "text-emerald-600"
-            )}>
-              {kpi.percentChange > 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-              {Math.abs(kpi.percentChange)}%
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">vs last month</p>
-        </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-amber-50 p-2.5 rounded-lg">
-              <BarChartIcon className="size-5 text-amber-600" />
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-amber-500/10 p-2.5 rounded-lg">
+                <BarChartIcon className="size-5 text-amber-500" />
+              </div>
             </div>
+            <p className="text-muted-foreground text-sm font-medium mb-1">Budget Utilization</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-2xl font-bold text-foreground">{kpi.budgetUtilization.toFixed(0)}%</h3>
+              {kpi.budgetUtilization > 100 && <span className="text-rose-600 text-xs font-medium mb-1">Over Budget</span>}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              ₹50,000 limit
+            </p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Budget Utilization</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-2xl font-bold text-foreground">{kpi.budgetUtilization.toFixed(0)}%</h3>
-            {kpi.budgetUtilization > 100 && <span className="text-rose-600 text-xs font-medium mb-1">Over Budget</span>}
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            ₹50,000 limit
-          </p>
-        </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-emerald-50 p-2.5 rounded-lg">
-              <AlertCircle className="size-5 text-emerald-600" />
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-emerald-500/10 p-2.5 rounded-lg">
+                <AlertCircle className="size-5 text-emerald-500" />
+              </div>
             </div>
+            <p className="text-muted-foreground text-sm font-medium mb-1">Pending Payments</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-2xl font-bold text-foreground">₹{kpi.pendingAmount.toLocaleString("en-IN")}</h3>
+              <span className="text-muted-foreground text-xs font-medium mb-1">
+                {kpi.pendingCount} items
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Require action</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Pending Payments</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-2xl font-bold text-foreground">₹{kpi.pendingAmount.toLocaleString("en-IN")}</h3>
-            <span className="text-muted-foreground text-xs font-medium mb-1">
-              {kpi.pendingCount} items
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">Require action</p>
-        </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-violet-50 p-2.5 rounded-lg">
-              <Calendar className="size-5 text-violet-600" />
+          <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
+            <div className="flex items-start justify-between mb-3">
+              <div className="bg-violet-500/10 p-2.5 rounded-lg">
+                <Calendar className="size-5 text-violet-500" />
+              </div>
             </div>
+            <p className="text-muted-foreground text-sm font-medium mb-1">Avg Daily Expense</p>
+            <div className="flex items-end gap-2">
+              <h3 className="text-2xl font-bold text-foreground">
+                ₹{(kpi.currentMonthTotal / 30).toFixed(0)}
+              </h3>
+              <span className="text-muted-foreground text-xs font-medium mb-1">
+                approx
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Based on 30 days</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Avg Daily Expense</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-2xl font-bold text-foreground">
-              ₹{(kpi.currentMonthTotal / 30).toFixed(0)}
-            </h3>
-            <span className="text-muted-foreground text-xs font-medium mb-1">
-              approx
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">Based on 30 days</p>
         </div>
-      </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Monthly Trend */}
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6 lg:col-span-2">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6 lg:col-span-2">
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-foreground">Monthly Expense Trend</h3>
             <p className="text-sm text-muted-foreground">Actual vs Budget comparison</p>
@@ -173,12 +177,12 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
               <AreaChart data={monthlyData}>
                 <defs>
                   <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                    <stop offset="5%" stopColor={chartColors.brand} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={chartColors.brand} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={chartColors.success} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -209,7 +213,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
                   type="monotone"
                   dataKey="budget"
                   stackId="1"
-                  stroke="#10b981"
+                  stroke={chartColors.success}
                   strokeWidth={2}
                   fill="url(#colorBudget)"
                   name="Budget"
@@ -218,7 +222,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
                   type="monotone"
                   dataKey="amount"
                   stackId="2"
-                  stroke="#2563eb"
+                  stroke={chartColors.brand}
                   strokeWidth={2}
                   fill="url(#colorAmount)"
                   name="Actual"
@@ -229,7 +233,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
         </div>
 
         {/* Category Breakdown */}
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-foreground">Expense by Category</h3>
             <p className="text-sm text-muted-foreground">Current month breakdown</p>
@@ -281,7 +285,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
       {/* Recent Expenses & Pending Payments */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Expenses */}
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-foreground">Recent Expenses</h3>
@@ -297,18 +301,18 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
               recentExpenses.map((expense: any) => (
                 <div
                   key={expense.id}
-                  className="flex items-start justify-between p-4 border border-border/50 rounded-lg hover:bg-muted/20 transition-colors bg-background/50"
+                  className="flex items-start justify-between p-4 border border-border rounded-lg hover:bg-muted/20 transition-colors bg-background/50"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-foreground">{expense.description}</p>
                       {expense.status === "APPROVED" || expense.status === "PAID" ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0 h-5 gap-1">
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-2xs px-1.5 py-0 h-5 gap-1">
                           <CheckCircle className="size-2.5" />
                           {expense.status}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0 h-5 gap-1">
+                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-2xs px-1.5 py-0 h-5 gap-1">
                           <Clock className="size-2.5" />
                           {expense.status}
                         </Badge>
@@ -336,7 +340,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
         </div>
 
         {/* Pending Payments */}
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-foreground">Pending Payments</h3>
             <p className="text-sm text-muted-foreground">Upcoming payment obligations</p>
@@ -346,7 +350,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
               pendingPayments.map((payment: any) => (
                 <div
                   key={payment.id}
-                  className="flex items-center justify-between p-4 border border-amber-200 rounded-lg bg-amber-50/50"
+                  className="flex items-center justify-between p-4 border border-amber-500/20 rounded-lg bg-amber-500/5"
                 >
                   <div>
                     <p className="font-medium text-foreground">{payment.vendor}</p>
@@ -359,7 +363,7 @@ export function ExpensesDashboard({ onViewExpenses }: ExpensesDashboardProps) {
                     <p className="font-bold text-foreground">
                       ₹{payment.amount.toLocaleString("en-IN")}
                     </p>
-                    <Button size="sm" className="mt-2 h-7 text-xs bg-amber-600 hover:bg-amber-700 border-amber-700">
+                    <Button size="sm" className="mt-2 h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white">
                       Pay Now
                     </Button>
                   </div>

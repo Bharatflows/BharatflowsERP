@@ -12,4 +12,6 @@ export declare const createPurchaseOrder: (req: AuthRequest, res: Response) => P
 export declare const updatePurchaseOrder: (req: AuthRequest, res: Response) => Promise<void>;
 export declare const deletePurchaseOrder: (req: AuthRequest, res: Response) => Promise<void>;
 export declare const updatePurchaseOrderStatus: (req: AuthRequest, res: Response) => Promise<void>;
+export declare const convertPOToGRN: (req: AuthRequest, res: Response) => Promise<void>;
+export declare const convertPOToBill: (req: AuthRequest, res: Response) => Promise<void>;
 //# sourceMappingURL=purchaseOrderController.d.ts.map

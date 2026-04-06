@@ -241,7 +241,7 @@ export function EWaybillTracking() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
@@ -350,7 +350,7 @@ export function EWaybillTracking() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -361,7 +361,7 @@ export function EWaybillTracking() {
           <h3 className="text-2xl font-bold text-foreground">{stats.total}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-emerald-50 p-2.5 rounded-lg">
@@ -372,7 +372,7 @@ export function EWaybillTracking() {
           <h3 className="text-2xl font-bold text-emerald-600">{stats.active}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -383,7 +383,7 @@ export function EWaybillTracking() {
           <h3 className="text-2xl font-bold text-blue-600">{stats.completed}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-amber-50 p-2.5 rounded-lg">
@@ -396,7 +396,7 @@ export function EWaybillTracking() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6 space-y-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-6">
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
           <div className="flex items-start gap-3">
@@ -455,7 +455,7 @@ export function EWaybillTracking() {
         </div>
 
         {/* E-Waybills Table */}
-        <div className="border border-border/50 rounded-lg overflow-hidden">
+        <div className="border border-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-muted/30 border-b border-border/50">
@@ -601,7 +601,7 @@ export function EWaybillTracking() {
           {selectedEWB && (
             <div className="space-y-6">
               {/* Route Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg border border-border">
                 <div>
                   <Label className="text-muted-foreground text-xs uppercase tracking-wider">From</Label>
                   <div className="font-medium mt-1">{selectedEWB.fromPlace}</div>
@@ -636,7 +636,7 @@ export function EWaybillTracking() {
               </div>
 
               {/* No tracking updates available */}
-              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-border/50 border-dashed">
+              <div className="text-center py-8 text-muted-foreground bg-muted/20 rounded-lg border border-border border-dashed">
                 <Truck className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>Tracking details will be available once the e-waybill is generated on the NIC portal</p>
               </div>

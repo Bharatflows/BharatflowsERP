@@ -3,7 +3,9 @@ import { AuthRequest } from '../../middleware/auth';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 import * as sequenceService from '../../services/sequenceService';
-import * as postingService from '../../services/postingService';
+import { requireUnlockedPeriod } from '../../services/periodLockService';
+// P0: postingService removed - ledger posting handled by Accounting domain via event subscription
+import { eventBus, EventTypes } from '../../services/eventBus';
 
 // @desc    Get all Debit Notes
 // @route   GET /api/v1/purchase/debit-notes
@@ -19,8 +21,8 @@ export const getDebitNotes = async (req: AuthRequest, res: Response): Promise<Re
 
         if (search) {
             where.OR = [
-                { debitNoteNumber: { contains: String(search), mode: 'insensitive' } },
-                { supplier: { name: { contains: String(search), mode: 'insensitive' } } }
+                { debitNoteNumber: { contains: String(search) } },
+                { supplier: { name: { contains: String(search) } } }
             ];
         }
 
@@ -132,6 +134,9 @@ export const createDebitNote = async (req: AuthRequest, res: Response): Promise<
         } = req.body;
 
         const companyId = req.user.companyId;
+
+        // P0: FY Locking Check
+        await requireUnlockedPeriod(companyId, new Date(date));
 
         if (!supplierId || !items || items.length === 0) {
             return res.status(400).json({
@@ -257,20 +262,26 @@ export const createDebitNote = async (req: AuthRequest, res: Response): Promise<
             // 4. Update Sequence - Not needed as getNextNumber uses count
             // await sequenceService.incrementSequence(companyId, 'DEBIT_NOTE');
 
-            return debitNote;
-        });
+            // P0: Emit event for ledger posting (handled by Accounting domain subscriber)
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.DEBIT_NOTE_CREATED,
+                aggregateType: 'DebitNote',
+                aggregateId: debitNote.id,
+                payload: {
+                    debitNoteId: debitNote.id,
+                    debitNoteNumber: debitNote.debitNoteNumber,
+                    date: debitNote.date.toISOString(),
+                    supplierId: debitNote.supplierId,
+                    subtotal: Number(debitNote.subtotal),
+                    taxAmount: Number(debitNote.totalTax),
+                    totalAmount: Number(debitNote.totalAmount),
+                    type: debitNote.type
+                },
+                metadata: { userId: req.user.id, source: 'api' }
+            }, tx);
 
-        // 5. Post Accounting (Async/Separated but called here for immediate consistency)
-        await postingService.postDebitNote({
-            companyId,
-            debitNoteNumber: result.debitNoteNumber,
-            debitNoteId: result.id,
-            date: result.date,
-            supplierId: result.supplierId,
-            subtotal: Number(result.subtotal),
-            taxAmount: Number(result.totalTax),
-            totalAmount: Number(result.totalAmount),
-            type: result.type
+            return debitNote;
         });
 
         return res.status(201).json({
@@ -305,7 +316,18 @@ export const deleteDebitNote = async (req: AuthRequest, res: Response): Promise<
 
             if (!debitNote) throw new Error('Debit Note not found');
 
+            // P0: FY Locking Check
+            await requireUnlockedPeriod(companyId, new Date(debitNote.date), 'delete debit note');
+
+            // C1 FIX: Block deletion of non-DRAFT/ACTIVE debit notes
+            // Allow deletion of DRAFT and ACTIVE, block CANCELLED etc.
+            const DELETABLE_STATUSES = ['DRAFT', 'ACTIVE'];
+            if (!DELETABLE_STATUSES.includes(debitNote.status)) {
+                throw new Error(`Cannot delete debit note with status '${debitNote.status}'. Only DRAFT or ACTIVE debit notes can be deleted.`);
+            }
+
             // 1. Reverse Stock (If RETURN)
+
             // Note was OUT, so now IN (Increase)
             if (debitNote.type === 'RETURN') {
                 for (const item of debitNote.items) {
@@ -360,6 +382,15 @@ export const deleteDebitNote = async (req: AuthRequest, res: Response): Promise<
 
     } catch (error: any) {
         logger.error('Delete debit note error:', error);
+
+        if (error.message && error.message.includes('Cannot delete debit note')) {
+            return res.status(400).json({
+                success: false,
+                message: error.message,
+                code: 'DEBIT_NOTE_STATUS_LOCKED'
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: error.message || 'Error deleting debit note'

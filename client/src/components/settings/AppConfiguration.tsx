@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -24,6 +24,14 @@ import {
   CheckCircle2,
   Monitor,
   Network,
+  CreditCard,
+  Factory,
+  Scan,
+  UserCog,
+  Target,
+  FolderOpen,
+  BookOpen,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,6 +40,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../ui/accordion";
+import { settingsService } from "../../services/modules.service";
 import { ApprovalWorkflow } from "./ApprovalWorkflow";
 import { DeviceManagement } from "./DeviceManagement";
 import { IPWhitelisting } from "./IPWhitelisting";
@@ -64,6 +73,8 @@ interface Workflow {
 }
 
 export function AppConfiguration() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [modules, setModules] = useState<Module[]>([
     {
       id: "sales",
@@ -80,9 +91,23 @@ export function AppConfiguration() {
       ],
     },
     {
+      id: "channel-hub",
+      name: "Channel Hub",
+      description: "E-commerce order aggregation (Amazon, Flipkart, etc.)",
+      icon: ShoppingCart,
+      enabled: true,
+      features: [
+        { id: "amazon-sync", name: "Amazon Sync", enabled: true },
+        { id: "flipkart-sync", name: "Flipkart Sync", enabled: true },
+        { id: "shopify-sync", name: "Shopify Sync", enabled: false },
+        { id: "auto-invoice", name: "Auto Create Invoice", enabled: false },
+      ],
+    },
+    {
       id: "purchase",
       name: "Purchase",
       description: "Purchase Orders and Bills",
+      // Original had: sales: ShoppingCart, purchase: FileText.
       icon: FileText,
       enabled: true,
       features: [
@@ -90,6 +115,14 @@ export function AppConfiguration() {
         { id: "po-approval", name: "PO Approval Workflow", enabled: true },
         { id: "auto-reconcile", name: "Auto Reconciliation", enabled: false },
       ],
+    },
+    {
+      id: "expenses",
+      name: "Expenses",
+      description: "Expense Tracking & Claims",
+      icon: CreditCard,
+      enabled: true,
+      features: [],
     },
     {
       id: "inventory",
@@ -104,6 +137,22 @@ export function AppConfiguration() {
         { id: "barcode", name: "Barcode Scanning", enabled: true },
         { id: "low-stock-alerts", name: "Low Stock Alerts", enabled: true },
       ],
+    },
+    {
+      id: "production",
+      name: "Production",
+      description: "Manufacturing & BOM",
+      icon: Factory,
+      enabled: true,
+      features: [],
+    },
+    {
+      id: "barcode",
+      name: "Barcode",
+      description: "Label Printing & Scanning",
+      icon: Scan,
+      enabled: true,
+      features: [],
     },
     {
       id: "parties",
@@ -143,6 +192,46 @@ export function AppConfiguration() {
       ],
     },
     {
+      id: "hr",
+      name: "HR & Payroll",
+      description: "Employee Management",
+      icon: UserCog,
+      enabled: true,
+      features: [],
+    },
+    {
+      id: "crm",
+      name: "CRM",
+      description: "Leads & Customer Relations",
+      icon: Target,
+      enabled: true,
+      features: [],
+    },
+    {
+      id: "documents",
+      name: "Documents",
+      description: "File Storage & Management",
+      icon: FolderOpen,
+      enabled: true,
+      features: [],
+    },
+    {
+      id: "accounting",
+      name: "Accounting",
+      description: "Double Entry Accounting",
+      icon: BookOpen,
+      enabled: true,
+      features: [],
+    },
+    {
+      id: "analytics",
+      name: "Analytics",
+      description: "Business Insights",
+      icon: TrendingUp,
+      enabled: true,
+      features: [],
+    },
+    {
       id: "messaging",
       name: "Messaging",
       description: "WhatsApp & SMS Notifications",
@@ -167,6 +256,46 @@ export function AppConfiguration() {
       ],
     },
   ]);
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
+
+  const fetchConfig = async () => {
+    try {
+      const res = await settingsService.getCompany();
+      if (res.data && res.data.enabledModules) {
+        const enabledMap = res.data.enabledModules as Record<string, boolean>;
+        setModules(prev => prev.map(m => ({
+          ...m,
+          enabled: enabledMap[m.id] !== undefined ? enabledMap[m.id] : m.enabled
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to load config", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const enabledModules = modules.reduce((acc, m) => ({
+        ...acc,
+        [m.id]: m.enabled
+      }), {});
+
+      await settingsService.updateCompany({ enabledModules });
+      toast.success("Configuration saved successfully");
+      // Optional: Force reload if needed for Sidebar updates
+      window.location.reload();
+    } catch (error) {
+      toast.error("Failed to save configuration");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const [workflows, setWorkflows] = useState<Workflow[]>([
     {
@@ -246,10 +375,18 @@ export function AppConfiguration() {
         <TabsContent value="modules" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Module Management</CardTitle>
-              <CardDescription>
-                Enable or disable modules for your business
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Module Management</CardTitle>
+                  <CardDescription>
+                    Enable or disable modules for your business
+                  </CardDescription>
+                </div>
+                <Button onClick={handleSave} disabled={saving || loading} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -258,7 +395,7 @@ export function AppConfiguration() {
                   return (
                     <Card
                       key={module.id}
-                      className={`${module.enabled ? "border-primary" : "opacity-60"
+                      className={`${module.enabled ? "border-primary" : "border-muted"
                         }`}
                     >
                       <CardHeader>

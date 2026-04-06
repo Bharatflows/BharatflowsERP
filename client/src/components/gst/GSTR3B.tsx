@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Download, FileText, Check, Calendar, AlertCircle, TrendingUp, Wallet, CreditCard, FileCheck, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "../ui/button";
+import { FileCheck, RefreshCw } from "lucide-react";
 import { Label } from "../ui/label";
 import {
   Select,
@@ -11,6 +11,14 @@ import {
 } from "../ui/select";
 import { toast } from "sonner";
 import { gstService } from "../../services/modules.service";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface GSTR3BData {
   outwardSupplies: {
@@ -131,7 +139,7 @@ export function GSTR3B() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="size-8 animate-spin text-primary" />
+        <MIcon name="sync" className="text-[32px] animate-spin text-primary" />
       </div>
     );
   }
@@ -139,7 +147,7 @@ export function GSTR3B() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
@@ -184,95 +192,95 @@ export function GSTR3B() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-blue-50 p-2.5 rounded-lg">
-              <TrendingUp className="size-5 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-[16px]">
+        <div className="bg-blue-50 dark:bg-blue-950/20 rounded-[16px] border border-blue-200 dark:border-blue-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-blue-100 dark:bg-blue-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="trending_up" className="text-[24px] text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Output Tax</p>
-          <h3 className="text-2xl font-bold text-foreground">
+          <p className="text-[12px] font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-wider mb-[4px]">Output Tax</p>
+          <h3 className="text-3xl font-bold text-blue-700 dark:text-blue-300">
             ₹{((gstr3bData.outwardSupplies.centralTax + gstr3bData.outwardSupplies.stateTax + gstr3bData.outwardSupplies.integratedTax)).toLocaleString("en-IN")}
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-emerald-50 p-2.5 rounded-lg">
-              <Wallet className="size-5 text-emerald-600" />
+        <div className="bg-emerald-50 dark:bg-emerald-950/20 rounded-[16px] border border-emerald-200 dark:border-emerald-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-emerald-100 dark:bg-emerald-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="account_balance_wallet" className="text-[24px] text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Input Tax Credit</p>
-          <h3 className="text-2xl font-bold text-foreground">
+          <p className="text-[12px] font-bold text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider mb-[4px]">Input Tax Credit</p>
+          <h3 className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">
             ₹{gstr3bData.itcAvailable.itcAvailed.toLocaleString("en-IN")}
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-amber-50 p-2.5 rounded-lg">
-              <CreditCard className="size-5 text-amber-600" />
+        <div className="bg-rose-50 dark:bg-rose-950/20 rounded-[16px] border border-rose-200 dark:border-rose-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-amber-100 dark:bg-amber-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="credit_card" className="text-[24px] text-amber-600 dark:text-amber-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Tax Payable</p>
-          <h3 className="text-2xl font-bold text-foreground">
+          <p className="text-[12px] font-bold text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wider mb-[4px]">Tax Payable</p>
+          <h3 className="text-3xl font-bold text-amber-700 dark:text-amber-300">
             ₹{totalPayable.toLocaleString("en-IN")}
           </h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
-          <div className="flex items-start justify-between mb-3">
-            <div className="bg-violet-50 p-2.5 rounded-lg">
-              <Calendar className="size-5 text-violet-600" />
+        <div className="bg-violet-50 dark:bg-violet-950/20 rounded-[16px] border border-violet-200 dark:border-violet-900/50 shadow-sm p-[20px] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
+          <div className="flex items-start justify-between mb-[12px]">
+            <div className="bg-violet-100 dark:bg-violet-900/40 p-[12px] rounded-[12px]">
+              <MIcon name="event" className="text-[24px] text-violet-600 dark:text-violet-400" />
             </div>
           </div>
-          <p className="text-muted-foreground text-sm font-medium mb-1">Due Date</p>
-          <h3 className="text-2xl font-bold text-foreground">20th</h3>
-          <p className="text-xs text-muted-foreground mt-1">of next month</p>
+          <p className="text-[12px] font-bold text-violet-600/80 dark:text-violet-400/80 uppercase tracking-wider mb-[4px]">Due Date</p>
+          <h3 className="text-3xl font-bold text-violet-700 dark:text-violet-300">20th</h3>
+          <p className="text-[12px] font-medium text-violet-500 mt-[4px]">of next month</p>
         </div>
       </div>
 
       {/* Table 3.1 - Outward Supplies */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white px-6 py-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <TrendingUp className="size-5" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-[24px] py-[16px]">
+          <h3 className="text-body font-bold flex items-center gap-[8px]">
+            <MIcon name="trending_up" className="text-[20px]" />
             Table 3.1 - Tax on Outward Supplies
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/30 border-b border-border/50">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-muted dark:bg-slate-950 border-b border-border">
               <tr>
-                <th className="text-left px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Nature of Supplies</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Taxable Value</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Integrated Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Central Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">State/UT Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cess</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider border-r border-border">Nature of Supplies</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Taxable Value</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Integrated Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Central Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">State/UT Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Cess</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">Outward taxable supplies</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">Outward taxable supplies</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.outwardSupplies.taxableValue.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.outwardSupplies.integratedTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.outwardSupplies.centralTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.outwardSupplies.stateTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground">
                   ₹{gstr3bData.outwardSupplies.cess.toLocaleString("en-IN")}
                 </td>
               </tr>
@@ -282,59 +290,59 @@ export function GSTR3B() {
       </div>
 
       {/* Table 4 - ITC Available */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-6 py-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Wallet className="size-5" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white px-[24px] py-[16px]">
+          <h3 className="text-body font-bold flex items-center gap-[8px]">
+            <MIcon name="account_balance_wallet" className="text-[20px]" />
             Table 4 - Eligible ITC
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/30 border-b border-border/50">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-muted dark:bg-slate-950 border-b border-border">
               <tr>
-                <th className="text-left px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Details</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Integrated Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Central Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">State/UT Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cess</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider border-r border-border">Details</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Integrated Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Central Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">State/UT Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Cess</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">(A) ITC Available (on purchases)</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">₹0</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">(A) ITC Available (on purchases)</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">₹0</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{(gstr3bData.itcAvailable.inwardSupplies / 2).toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{(gstr3bData.itcAvailable.inwardSupplies / 2).toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">₹0</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground">₹0</td>
               </tr>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">(B) ITC Reversed</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">(B) ITC Reversed</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.itcAvailable.reversals.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.itcAvailable.reversals.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.itcAvailable.reversals.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">₹0</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground">₹0</td>
               </tr>
-              <tr className="bg-emerald-50/50">
-                <td className="px-6 py-4 text-sm font-semibold text-foreground">(C) Net ITC Available (A - B)</td>
-                <td className="px-6 py-4 text-right text-sm font-semibold text-emerald-600">₹0</td>
-                <td className="px-6 py-4 text-right text-sm font-semibold text-emerald-600">
+              <tr className="bg-emerald-50/50 dark:bg-emerald-900/20">
+                <td className="px-[24px] py-[16px] text-body-sm font-bold text-foreground border-r border-emerald-200 dark:border-emerald-800">(C) Net ITC Available (A - B)</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-emerald-600 dark:text-emerald-400 border-r border-emerald-200 dark:border-emerald-800">₹0</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-emerald-600 dark:text-emerald-400 border-r border-emerald-200 dark:border-emerald-800">
                   ₹{(gstr3bData.itcAvailable.itcAvailed / 2).toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-semibold text-emerald-600">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-emerald-600 dark:text-emerald-400 border-r border-emerald-200 dark:border-emerald-800">
                   ₹{(gstr3bData.itcAvailable.itcAvailed / 2).toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-semibold text-emerald-600">₹0</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-emerald-600 dark:text-emerald-400">₹0</td>
               </tr>
             </tbody>
           </table>
@@ -342,55 +350,55 @@ export function GSTR3B() {
       </div>
 
       {/* Table 6.1 - Tax Payable and Paid */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-white px-6 py-4">
-          <h3 className="font-semibold flex items-center gap-2">
-            <CreditCard className="size-5" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-400 text-white px-[24px] py-[16px]">
+          <h3 className="text-body font-bold flex items-center gap-[8px]">
+            <MIcon name="credit_card" className="text-[20px]" />
             Table 6.1 - Payment of Tax
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/30 border-b border-border/50">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-muted dark:bg-slate-950 border-b border-border">
               <tr>
-                <th className="text-left px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Integrated Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Central Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">State/UT Tax</th>
-                <th className="text-right px-6 py-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cess</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider border-r border-border">Description</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Integrated Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">Central Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right border-r border-border">State/UT Tax</th>
+                <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Cess</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">Tax Payable</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">Tax Payable</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.taxPayable.integratedTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.taxPayable.centralTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground border-r border-border">
                   ₹{gstr3bData.taxPayable.stateTax.toLocaleString("en-IN")}
                 </td>
-                <td className="px-6 py-4 text-right text-sm text-foreground">
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground">
                   ₹{gstr3bData.taxPayable.cess.toLocaleString("en-IN")}
                 </td>
               </tr>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">Interest</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground" colSpan={4}>
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">Interest</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground" colSpan={4}>
                   ₹{gstr3bData.taxPayable.interest.toLocaleString("en-IN")}
                 </td>
               </tr>
-              <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-6 py-4 text-sm font-medium text-foreground">Late Fee</td>
-                <td className="px-6 py-4 text-right text-sm text-foreground" colSpan={4}>
+              <tr className="border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors">
+                <td className="px-[24px] py-[16px] text-body-sm font-medium text-foreground border-r border-border">Late Fee</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm text-foreground dark:text-muted-foreground" colSpan={4}>
                   ₹{gstr3bData.taxPayable.lateFee.toLocaleString("en-IN")}
                 </td>
               </tr>
-              <tr className="bg-amber-50/50">
-                <td className="px-6 py-4 text-sm font-semibold text-foreground">Total Amount Payable</td>
-                <td className="px-6 py-4 text-right text-sm font-bold text-amber-600" colSpan={4}>
+              <tr className="bg-amber-50/50 dark:bg-amber-900/20">
+                <td className="px-[24px] py-[16px] text-body-sm font-bold text-foreground border-r border-amber-200 dark:border-amber-800">Total Amount Payable</td>
+                <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-amber-600 dark:text-amber-400" colSpan={4}>
                   ₹{totalPayable.toLocaleString("en-IN")}
                 </td>
               </tr>
@@ -400,15 +408,15 @@ export function GSTR3B() {
       </div>
 
       {/* Summary Section */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-xl p-6 shadow-lg">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <FileCheck className="size-5" />
+      <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-[16px] p-[24px] shadow-sm">
+        <h3 className="text-2xl font-bold mb-[16px] flex items-center gap-[8px]">
+          <MIcon name="fact_check" className="text-[20px]" />
           GSTR-3B Summary for {getMonthName(selectedMonth)}
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <p className="text-sm opacity-90 mb-1">Total Output Tax</p>
-            <h3 className="text-2xl font-bold">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-[24px]">
+          <div className="bg-white/10 backdrop-blur-sm rounded-[12px] p-[16px]">
+            <p className="text-body-sm font-medium opacity-90 mb-[4px]">Total Output Tax</p>
+            <h3 className="text-3xl font-bold">
               ₹
               {(
                 gstr3bData.outwardSupplies.integratedTax +
@@ -417,40 +425,40 @@ export function GSTR3B() {
               ).toLocaleString("en-IN")}
             </h3>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <p className="text-sm opacity-90 mb-1">Total ITC Claimed</p>
-            <h3 className="text-2xl font-bold">
+          <div className="bg-white/10 backdrop-blur-sm rounded-[12px] p-[16px]">
+            <p className="text-body-sm font-medium opacity-90 mb-[4px]">Total ITC Claimed</p>
+            <h3 className="text-3xl font-bold">
               ₹{gstr3bData.itcAvailable.itcAvailed.toLocaleString("en-IN")}
             </h3>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <p className="text-sm opacity-90 mb-1">Net Tax Payable</p>
-            <h3 className="text-2xl font-bold">₹{totalPayable.toLocaleString("en-IN")}</h3>
+          <div className="bg-white/10 backdrop-blur-sm rounded-[12px] p-[16px]">
+            <p className="text-body-sm font-medium opacity-90 mb-[4px]">Net Tax Payable</p>
+            <h3 className="text-3xl font-bold">₹{totalPayable.toLocaleString("en-IN")}</h3>
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Actions</h3>
-        <div className="flex flex-wrap gap-3 mb-4">
-          <Button onClick={handleDownload} variant="outline" className="gap-2 h-10">
-            <Download className="size-4" />
+      <div className="bg-card rounded-[16px] border border-border shadow-sm p-[24px]">
+        <h3 className="text-2xl font-bold text-foreground mb-[16px]">Actions</h3>
+        <div className="flex flex-wrap gap-[12px] mb-[16px]">
+          <Button onClick={handleDownload} variant="outline" className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+            <MIcon name="download" className="text-[18px]" />
             Download JSON
           </Button>
-          <Button onClick={handleFile} className="gap-2 h-10">
-            <Check className="size-4" />
+          <Button onClick={handleFile} className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold">
+            <MIcon name="check" className="text-[18px]" />
             File GSTR-3B
           </Button>
         </div>
 
-        <div className="space-y-3">
-          <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
-            <div className="flex gap-3">
-              <Calendar className="size-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div className="space-y-[12px]">
+          <div className="p-[16px] bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[12px]">
+            <div className="flex gap-[12px]">
+              <MIcon name="event" className="text-[20px] text-amber-600 dark:text-amber-400 flex-shrink-0 mt-[2px]" />
               <div>
-                <p className="text-amber-900 font-medium mb-1">Filing Deadline</p>
-                <p className="text-amber-700 text-sm">
+                <p className="text-body font-bold text-amber-900 dark:text-amber-100 mb-[4px]">Filing Deadline</p>
+                <p className="text-body-sm font-medium text-amber-700 dark:text-amber-300">
                   GSTR-3B for {getMonthName(selectedMonth)} must be filed by 20th of next month.
                   Late filing attracts penalty and interest.
                 </p>
@@ -458,12 +466,12 @@ export function GSTR3B() {
             </div>
           </div>
 
-          <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
-            <div className="flex gap-3">
-              <AlertCircle className="size-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="p-[16px] bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-[12px]">
+            <div className="flex gap-[12px]">
+              <MIcon name="info" className="text-[20px] text-blue-600 dark:text-blue-400 flex-shrink-0 mt-[2px]" />
               <div>
-                <p className="text-blue-900 font-medium mb-1">Important Note</p>
-                <p className="text-blue-700 text-sm">
+                <p className="text-body font-bold text-blue-900 dark:text-blue-100 mb-[4px]">Important Note</p>
+                <p className="text-body-sm font-medium text-blue-700 dark:text-blue-300">
                   Please reconcile ITC with GSTR-2B before filing. Ensure all purchase bills are
                   recorded correctly. Payment must be made before filing the return.
                 </p>

@@ -3,7 +3,7 @@ import { Zap } from "lucide-react";
 
 export function SplashScreen() {
   return (
-    <div className="min-h-screen bg-primary flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-primary flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -18,7 +18,7 @@ export function SplashScreen() {
           className="flex items-center justify-center gap-3 mb-6"
         >
           <div className="bg-white p-4 rounded-3xl shadow-lg">
-            <Zap className="size-12 text-[#2563eb]" />
+            <Zap className="size-12 text-primary" />
           </div>
         </motion.div>
 

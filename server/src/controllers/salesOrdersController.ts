@@ -3,6 +3,7 @@ import prisma from '../config/prisma';
 import logger from '../config/logger';
 import { AuthRequest } from '../middleware/auth';
 import { getNextNumber, decrementSequence } from '../services/sequenceService';
+import { eventBus, EventTypes } from '../services/eventBus';
 
 // @desc    Get all sales orders
 // @route   GET /api/v1/sales/orders
@@ -22,7 +23,7 @@ export const getSalesOrders = async (req: AuthRequest, res: Response) => {
 
         if (search) {
             where.OR = [
-                { orderNumber: { contains: search as string, mode: 'insensitive' } },
+                { orderNumber: { contains: search as string } },
             ];
         }
 
@@ -70,7 +71,7 @@ export const getSalesOrder = async (req: AuthRequest, res: Response) => {
         const order = await prisma.salesOrder.findUnique({
             where: {
                 id: req.params.id
-            },
+            , companyId: req.user.companyId },
             include: {
                 customer: true,
                 items: {
@@ -158,6 +159,38 @@ export const createSalesOrder = async (req: AuthRequest, res: Response) => {
             }
         });
 
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.SALES_ORDER_CREATED,
+            aggregateType: 'SalesOrder',
+            aggregateId: order.id,
+            payload: order,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
+        // Auto-create a delivery task if expected date is provided
+        if (expectedDate && order.status !== 'CANCELLED') {
+            try {
+                await prisma.activity.create({
+                    data: {
+                        companyId: req.user.companyId,
+                        type: 'TASK',
+                        subject: `Delivery: ${orderNumber}`,
+                        description: `Scheduled delivery for order ${orderNumber} to ${order.customer?.name}`,
+                        date: new Date(expectedDate),
+                        priority: 'HIGH',
+                        isCompleted: false,
+                        partyId: customerId,
+                        createdBy: req.user.id
+                    }
+                });
+            } catch (activityError) {
+                logger.error('Failed to auto-create delivery task:', activityError);
+                // Don't fail the whole order creation if activity fails
+            }
+        }
+
         return res.status(201).json({
             success: true,
             message: 'Sales order created successfully',
@@ -182,7 +215,7 @@ export const updateSalesOrder = async (req: AuthRequest, res: Response) => {
         const { status, notes, items, orderDate, expectedDate } = req.body;
 
         const existingOrder = await prisma.salesOrder.findUnique({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         if (!existingOrder || existingOrder.companyId !== req.user.companyId) {
@@ -236,12 +269,22 @@ export const updateSalesOrder = async (req: AuthRequest, res: Response) => {
         }
 
         const order = await prisma.salesOrder.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: updateData,
             include: {
                 items: true,
                 customer: true
             }
+        });
+
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.SALES_ORDER_UPDATED,
+            aggregateType: 'SalesOrder',
+            aggregateId: order.id,
+            payload: order,
+            metadata: { userId: req.user.id, source: 'api' }
         });
 
         return res.status(200).json({
@@ -262,12 +305,13 @@ export const updateSalesOrder = async (req: AuthRequest, res: Response) => {
 // @desc    Delete sales order
 // @route   DELETE /api/v1/sales/orders/:id
 // @access  Private
+// H2: STRICT delete blocking - only DRAFT orders can be deleted
 export const deleteSalesOrder = async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
 
         const existingOrder = await prisma.salesOrder.findUnique({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         if (!existingOrder || existingOrder.companyId !== req.user.companyId) {
@@ -277,12 +321,33 @@ export const deleteSalesOrder = async (req: AuthRequest, res: Response) => {
             });
         }
 
+        // H2: Block deletion of non-DRAFT orders
+        if (existingOrder.status !== 'DRAFT') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete ${existingOrder.status} sales order. Only DRAFT orders can be deleted. Use CANCEL flow instead.`,
+                code: 'INVALID_STATUS_FOR_DELETE'
+            });
+        }
+
         await prisma.salesOrder.delete({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         // Decrement the sequence number to reuse the freed number
         await decrementSequence(req.user.companyId, 'SALES_ORDER');
+
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.SALES_ORDER_DELETED,
+            aggregateType: 'SalesOrder',
+            aggregateId: existingOrder.id,
+            payload: existingOrder,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
+        logger.info(`[H2] Sales Order ${existingOrder.orderNumber} deleted (status was DRAFT)`);
 
         return res.status(200).json({
             success: true,
@@ -306,7 +371,7 @@ export const convertSalesOrderToInvoice = async (req: AuthRequest, res: Response
         const { id } = req.params;
 
         const order = await prisma.salesOrder.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: {
                 items: true
             }
@@ -357,9 +422,19 @@ export const convertSalesOrderToInvoice = async (req: AuthRequest, res: Response
             }
         });
 
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.INVOICE_CREATED,
+            aggregateType: 'Invoice',
+            aggregateId: invoice.id,
+            payload: invoice,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
         // Optionally update order status
         await prisma.salesOrder.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: { status: 'CONFIRMED' } // or some other status indicating progress
         });
 
@@ -374,6 +449,89 @@ export const convertSalesOrderToInvoice = async (req: AuthRequest, res: Response
         return res.status(500).json({
             success: false,
             message: 'Error converting sales order',
+            error: error.message
+        });
+    }
+};
+
+// @desc    Convert sales order to Delivery Challan
+// @route   POST /api/v1/sales/orders/:id/challan
+// @access  Private
+export const convertSalesOrderToChallan = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        const order = await prisma.salesOrder.findUnique({
+            where: { id , companyId: req.user.companyId },
+            include: {
+                items: true
+            }
+        });
+
+        if (!order || order.companyId !== req.user.companyId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Sales order not found'
+            });
+        }
+
+        // Generate Challan number
+        const challanNumber = await getNextNumber(req.user.companyId, 'DELIVERY_CHALLAN');
+
+        // Create DC from order data
+        const challan = await prisma.deliveryChallan.create({
+            data: {
+                companyId: req.user.companyId,
+                customerId: order.customerId,
+                challanNumber,
+                challanDate: new Date(),
+                status: 'DRAFT',
+                subtotal: order.subtotal,
+                totalAmount: order.totalAmount, // DC usually doesn't have tax, but we populate for reference
+                notes: `Converted from Sales Order #${order.orderNumber}`,
+                salesOrderId: order.id,
+                items: {
+                    create: order.items.map(item => ({
+                        productId: item.productId,
+                        productName: item.productName || 'Unknown Product',
+                        quantity: item.quantity,
+                        rate: item.rate,
+                        total: item.total
+                    }))
+                }
+            },
+            include: {
+                items: true
+            }
+        });
+
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.DELIVERY_CHALLAN_CREATED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: challan.id,
+            payload: challan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
+        // Update Sales Order relation/status?
+        await prisma.salesOrder.update({
+            where: { id , companyId: req.user.companyId },
+            data: { status: 'CONFIRMED' } // Assuming generating DC confirms the order
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: 'Sales order converted to Delivery Challan successfully',
+            data: { challan }
+        });
+
+    } catch (error: any) {
+        logger.error('Convert sales order to challan error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error converting sales order to challan',
             error: error.message
         });
     }

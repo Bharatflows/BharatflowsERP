@@ -3,6 +3,9 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { ValidationUtils } from '../services/validationService';
 import { AuditService } from '../services/auditService';
+import eventBus, { EventTypes } from '../services/eventBus';  // P0: Domain events
+import logger from '../config/logger';
+// TrustService removed - domains folder deleted
 
 export const createParty = async (req: AuthRequest, res: Response) => {
     try {
@@ -54,8 +57,8 @@ export const createParty = async (req: AuthRequest, res: Response) => {
                 pan: finalPan,
                 email,
                 phone,
-                billingAddress: addressObj,
-                shippingAddress: addressObj,
+                billingAddress: JSON.stringify(addressObj),
+                shippingAddress: JSON.stringify(addressObj),
                 openingBalance: openingBalance || 0,
                 currentBalance: openingBalance || 0,
                 companyId,
@@ -78,12 +81,35 @@ export const createParty = async (req: AuthRequest, res: Response) => {
             'PARTIES'
         );
 
+        // P0: Emit domain event for cross-domain processing
+        try {
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PARTY_CREATED,
+                aggregateType: 'Party',
+                aggregateId: party.id,
+                payload: {
+                    partyId: party.id,
+                    name: party.name,
+                    type: party.type,
+                    gstin: party.gstin,
+                    openingBalance: Number(party.openingBalance)
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
+                }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit PARTY_CREATED event:', eventError);
+        }
+
         return res.status(201).json({
             success: true,
             data: party
         });
     } catch (error: any) {
-        console.error('Create party error:', error);
+        logger.error('Create party error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error creating party'
@@ -112,7 +138,7 @@ export const getParties = async (req: AuthRequest, res: Response) => {
             data: parties
         });
     } catch (error: any) {
-        console.error('Get parties error:', error);
+        logger.error('Get parties error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error fetching parties'
@@ -141,7 +167,7 @@ export const getParty = async (req: AuthRequest, res: Response) => {
             data: party
         });
     } catch (error: any) {
-        console.error('Get party error:', error);
+        logger.error('Get party error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error fetching party'
@@ -197,7 +223,7 @@ export const updateParty = async (req: AuthRequest, res: Response) => {
         };
 
         const updatedParty = await prisma.party.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: {
                 name,
                 type: type ? type.toUpperCase() : undefined,
@@ -205,8 +231,8 @@ export const updateParty = async (req: AuthRequest, res: Response) => {
                 pan,
                 email,
                 phone,
-                billingAddress: addressObj,
-                shippingAddress: addressObj,
+                billingAddress: JSON.stringify(addressObj),
+                shippingAddress: JSON.stringify(addressObj),
                 openingBalance: openingBalance !== undefined ? Number(openingBalance) : undefined,
                 msmeType,
                 udyamNumber
@@ -227,12 +253,35 @@ export const updateParty = async (req: AuthRequest, res: Response) => {
             'PARTIES'
         );
 
+        // P0: Emit domain event for cross-domain processing
+        try {
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PARTY_UPDATED,
+                aggregateType: 'Party',
+                aggregateId: id,
+                payload: {
+                    partyId: id,
+                    name: updatedParty.name,
+                    type: updatedParty.type,
+                    gstin: updatedParty.gstin,
+                    currentBalance: Number(updatedParty.currentBalance)
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
+                }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit PARTY_UPDATED event:', eventError);
+        }
+
         return res.json({
             success: true,
             data: updatedParty
         });
     } catch (error: any) {
-        console.error('Update party error:', error);
+        logger.error('Update party error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error updating party'
@@ -258,7 +307,7 @@ export const deleteParty = async (req: AuthRequest, res: Response) => {
 
         // Soft delete
         const deletedParty = await prisma.party.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: { isActive: false }
         });
 
@@ -281,10 +330,66 @@ export const deleteParty = async (req: AuthRequest, res: Response) => {
             message: 'Party deleted successfully'
         });
     } catch (error: any) {
-        console.error('Delete party error:', error);
+        logger.error('Delete party error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error deleting party'
+        });
+    }
+};
+
+/**
+ * @desc    Get Party Trust Score (Stub)
+ * @route   GET /api/v1/parties/:id/trust-score
+ * @access  Private
+ */
+export const getTrustScore = async (req: AuthRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const companyId = req.user.companyId;
+
+        // Stub implementation - TrustService was in deleted domains folder
+        logger.warn('[TrustScore] Service is a stub. Full implementation pending.');
+
+        return res.json({
+            success: true,
+            data: {
+                partyId: id,
+                score: 0,
+                message: 'Trust score service not yet implemented'
+            }
+        });
+    } catch (error: any) {
+        logger.error('Get trust score error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Error fetching trust score'
+        });
+    }
+};
+
+/**
+ * @desc    Verify Business (Stub)
+ * @route   POST /api/v1/parties/verify-business
+ * @access  Private
+ */
+export const verifyBusiness = async (req: AuthRequest, res: Response) => {
+    try {
+        // Stub implementation
+        logger.warn('[VerifyBusiness] Service is a stub. Full implementation pending.');
+
+        return res.json({
+            success: true,
+            data: {
+                verified: false,
+                message: 'Business verification service not yet implemented'
+            }
+        });
+    } catch (error: any) {
+        logger.error('Verify business error:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || 'Error verifying business'
         });
     }
 };

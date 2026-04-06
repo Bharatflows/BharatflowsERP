@@ -5,17 +5,50 @@
  * Handles Sales, Purchase, Inventory, and Party Statement reports.
  * Split from reportsController.ts for better maintainability.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPartyStatement = exports.getInventoryReport = exports.getPurchaseReport = exports.getSalesReport = void 0;
+exports.analyzeConcentration = exports.getPartyStatement = exports.getInventoryReport = exports.getPurchaseReport = exports.getSalesReport = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
+const logger_1 = __importDefault(require("../../config/logger"));
 // Sales Report
 const getSalesReport = async (req, res) => {
     try {
         const { startDate, endDate, groupBy = 'day' } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
         const end = endDate ? new Date(endDate) : new Date();
@@ -98,7 +131,7 @@ const getSalesReport = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get sales report error:', error);
+        logger_1.default.error('Get sales report error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating sales report'
@@ -110,7 +143,6 @@ exports.getSalesReport = getSalesReport;
 const getPurchaseReport = async (req, res) => {
     try {
         const { startDate, endDate } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
         const end = endDate ? new Date(endDate) : new Date();
@@ -171,7 +203,7 @@ const getPurchaseReport = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get purchase report error:', error);
+        logger_1.default.error('Get purchase report error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating purchase report'
@@ -182,7 +214,6 @@ exports.getPurchaseReport = getPurchaseReport;
 // Inventory Report
 const getInventoryReport = async (req, res) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const products = await prisma_1.default.product.findMany({
             where: {
@@ -241,7 +272,7 @@ const getInventoryReport = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get inventory report error:', error);
+        logger_1.default.error('Get inventory report error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error generating inventory report'
@@ -254,7 +285,6 @@ const getPartyStatement = async (req, res) => {
     try {
         const { partyId } = req.params;
         const { startDate, endDate } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
         const start = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), 0, 1);
         const end = endDate ? new Date(endDate) : new Date();
@@ -346,7 +376,7 @@ const getPartyStatement = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Get party statement error:', error);
+        logger_1.default.error('Get party statement error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error generating party statement'
@@ -354,4 +384,19 @@ const getPartyStatement = async (req, res) => {
     }
 };
 exports.getPartyStatement = getPartyStatement;
+// Supplier Dependency Analysis
+const analyzeConcentration = async (req, res) => {
+    try {
+        const supplierService = (await Promise.resolve().then(() => __importStar(require('../../services/supplierDependencyService')))).default;
+        const companyId = req.user.companyId;
+        const months = parseInt(req.query.months) || 12;
+        const data = await supplierService.analyzeConcentration(companyId, months);
+        res.json({ success: true, data });
+    }
+    catch (error) {
+        logger_1.default.error('Supplier dependency error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+exports.analyzeConcentration = analyzeConcentration;
 //# sourceMappingURL=transactionReportsController.js.map

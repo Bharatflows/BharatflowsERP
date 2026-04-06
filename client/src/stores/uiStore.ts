@@ -1,10 +1,11 @@
 // Zustand UI Store - for global UI state
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 
 interface SidebarState {
     isCollapsed: boolean;
     isMobileOpen: boolean;
+    expandedCategories: string[]; // For Accordion Logic
 }
 
 interface UIState {
@@ -14,6 +15,7 @@ interface UIState {
     collapseSidebar: () => void;
     expandSidebar: () => void;
     setMobileSidebar: (open: boolean) => void;
+    toggleSidebarCategory: (categoryId: string) => void;
 
     // Theme
     theme: 'light' | 'dark' | 'system';
@@ -33,56 +35,80 @@ interface UIState {
 
 export const useUIStore = create<UIState>()(
     devtools(
-        (set) => ({
-            // Sidebar state
-            sidebar: {
-                isCollapsed: false,
-                isMobileOpen: false,
-            },
+        persist(
+            (set) => ({
+                // Sidebar state
+                sidebar: {
+                    isCollapsed: false,
+                    isMobileOpen: false,
+                    expandedCategories: ['finance', 'operations', 'people', 'reports'], // Default expanded
+                },
 
-            toggleSidebar: () =>
-                set((state) => ({
-                    sidebar: {
-                        ...state.sidebar,
-                        isCollapsed: !state.sidebar.isCollapsed,
-                    },
-                })),
+                toggleSidebar: () =>
+                    set((state) => ({
+                        sidebar: {
+                            ...state.sidebar,
+                            isCollapsed: !state.sidebar.isCollapsed,
+                        },
+                    })),
 
-            collapseSidebar: () =>
-                set((state) => ({
-                    sidebar: { ...state.sidebar, isCollapsed: true },
-                })),
+                collapseSidebar: () =>
+                    set((state) => ({
+                        sidebar: { ...state.sidebar, isCollapsed: true },
+                    })),
 
-            expandSidebar: () =>
-                set((state) => ({
-                    sidebar: { ...state.sidebar, isCollapsed: false },
-                })),
+                expandSidebar: () =>
+                    set((state) => ({
+                        sidebar: { ...state.sidebar, isCollapsed: false },
+                    })),
 
-            setMobileSidebar: (open: boolean) =>
-                set((state) => ({
-                    sidebar: { ...state.sidebar, isMobileOpen: open },
-                })),
+                setMobileSidebar: (open: boolean) =>
+                    set((state) => ({
+                        sidebar: { ...state.sidebar, isMobileOpen: open },
+                    })),
 
-            // Theme
-            theme: 'system',
-            setTheme: (theme) => set({ theme }),
+                toggleSidebarCategory: (categoryId: string) =>
+                    set((state) => {
+                        const current = state.sidebar.expandedCategories;
+                        const isExpanded = current.includes(categoryId);
+                        return {
+                            sidebar: {
+                                ...state.sidebar,
+                                expandedCategories: isExpanded
+                                    ? current.filter(id => id !== categoryId)
+                                    : [...current, categoryId]
+                            }
+                        };
+                    }),
 
-            // Global loading
-            isGlobalLoading: false,
-            globalLoadingMessage: null,
-            setGlobalLoading: (loading, message) =>
-                set({
-                    isGlobalLoading: loading,
-                    globalLoadingMessage: message || null,
-                }),
+                // Theme
+                theme: 'system',
+                setTheme: (theme) => set({ theme }),
 
-            // Modal
-            activeModal: null,
-            modalData: null,
-            openModal: (modalId, data) =>
-                set({ activeModal: modalId, modalData: data }),
-            closeModal: () => set({ activeModal: null, modalData: null }),
-        }),
+                // Global loading
+                isGlobalLoading: false,
+                globalLoadingMessage: null,
+                setGlobalLoading: (loading, message) =>
+                    set({
+                        isGlobalLoading: loading,
+                        globalLoadingMessage: message || null,
+                    }),
+
+                // Modal
+                activeModal: null,
+                modalData: null,
+                openModal: (modalId, data) =>
+                    set({ activeModal: modalId, modalData: data }),
+                closeModal: () => set({ activeModal: null, modalData: null }),
+            }),
+            {
+                name: 'ui-storage', // unique name
+                partialize: (state) => ({
+                    sidebar: state.sidebar,
+                    theme: state.theme
+                }), // Only persist sidebar and theme
+            }
+        ),
         { name: 'UIStore' }
     )
 );

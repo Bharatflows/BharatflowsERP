@@ -24,6 +24,7 @@ import {
 } from "../ui/table";
 import { Plus, Edit, Trash2, Folder } from "lucide-react";
 import { toast } from "sonner";
+import { chartColors } from "@/lib/chartColors";
 
 interface Category {
   id: string;
@@ -33,6 +34,7 @@ interface Category {
   spent: number;
   count: number;
   color: string;
+  maxAmount?: number;
 }
 
 export function ExpenseCategories() {
@@ -41,17 +43,19 @@ export function ExpenseCategories() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [newCategory, setNewCategory] = useState({
+  const [newCategory, setNewCategory] = useState<{ name: string, description: string, budget: string, color: string, maxAmount: string }>({
     name: "",
     description: "",
     budget: "",
-    color: "#2563eb",
+    color: chartColors.brand,
+    maxAmount: "",
   });
-  const [editFormData, setEditFormData] = useState({
+  const [editFormData, setEditFormData] = useState<{ name: string, description: string, budget: string, color: string, maxAmount: string }>({
     name: "",
     description: "",
     budget: "",
-    color: "#2563eb",
+    color: chartColors.brand,
+    maxAmount: "",
   });
 
   useEffect(() => {
@@ -85,12 +89,13 @@ export function ExpenseCategories() {
         description: newCategory.description,
         budget: newCategory.budget ? parseFloat(newCategory.budget) : 0,
         color: newCategory.color,
+        maxAmount: newCategory.maxAmount ? parseFloat(newCategory.maxAmount) : undefined,
       });
 
       if (response.success && response.data) {
         setCategories([...categories, response.data]);
         setIsAddOpen(false);
-        setNewCategory({ name: "", description: "", budget: "", color: "#2563eb" });
+        setNewCategory({ name: "", description: "", budget: "", color: chartColors.brand, maxAmount: "" });
         toast.success("Category added successfully");
       }
     } catch (error: any) {
@@ -121,7 +126,8 @@ export function ExpenseCategories() {
       name: category.name,
       description: category.description || "",
       budget: String(category.budget || ""),
-      color: category.color || "#2563eb",
+      color: category.color || chartColors.brand,
+      maxAmount: category.maxAmount ? String(category.maxAmount) : "",
     });
     setIsEditOpen(true);
   };
@@ -137,6 +143,7 @@ export function ExpenseCategories() {
         description: editFormData.description,
         budget: editFormData.budget ? parseFloat(editFormData.budget) : 0,
         color: editFormData.color,
+        maxAmount: editFormData.maxAmount ? parseFloat(editFormData.maxAmount) : undefined,
       });
       if (response.success) {
         setCategories(categories.map(c =>
@@ -255,6 +262,25 @@ export function ExpenseCategories() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="catMaxAmount">Max Amount per Expense</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3 text-muted-foreground">₹</span>
+                      <Input
+                        id="catMaxAmount"
+                        type="number"
+                        placeholder="Leave empty for no limit"
+                        className="pl-7"
+                        value={newCategory.maxAmount}
+                        onChange={(e) =>
+                          setNewCategory({ ...newCategory, maxAmount: e.target.value })
+                        }
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Expenses exceeding this amount will be flagged for review
+                    </p>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="catColor">Color</Label>
                     <Input
                       id="catColor"
@@ -331,10 +357,10 @@ export function ExpenseCategories() {
                           <div className="flex-1 bg-accent rounded-full h-2 overflow-hidden max-w-[100px]">
                             <div
                               className={`h-full ${utilization > 100
-                                ? "bg-[#ef4444]"
+                                ? "bg-error"
                                 : utilization > 80
-                                  ? "bg-[#f97316]"
-                                  : "bg-[#10b981]"
+                                  ? "bg-warning"
+                                  : "bg-success"
                                 }`}
                               style={{ width: `${Math.min(utilization, 100)}%` }}
                             />
@@ -417,10 +443,10 @@ export function ExpenseCategories() {
                     <span
                       className={
                         utilization > 100
-                          ? "text-[#ef4444]"
+                          ? "text-error"
                           : utilization > 80
-                            ? "text-[#f97316]"
-                            : "text-[#10b981]"
+                            ? "text-warning"
+                            : "text-success"
                       }
                     >
                       {utilization.toFixed(0)}%
@@ -429,10 +455,10 @@ export function ExpenseCategories() {
                   <div className="bg-accent rounded-full h-2 overflow-hidden">
                     <div
                       className={`h-full ${utilization > 100
-                        ? "bg-[#ef4444]"
+                        ? "bg-error"
                         : utilization > 80
-                          ? "bg-[#f97316]"
-                          : "bg-[#10b981]"
+                          ? "bg-warning"
+                          : "bg-success"
                         }`}
                       style={{ width: `${Math.min(utilization, 100)}%` }}
                     />
@@ -483,9 +509,26 @@ export function ExpenseCategories() {
               </div>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="editMaxAmount">Max Amount per Expense</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-3 text-muted-foreground">₹</span>
+                <Input
+                  id="editMaxAmount"
+                  type="number"
+                  placeholder="Leave empty for no limit"
+                  className="pl-7"
+                  value={editFormData.maxAmount}
+                  onChange={(e) => setEditFormData({ ...editFormData, maxAmount: e.target.value })}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Expenses exceeding this amount will be flagged
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex gap-2">
-                {["#2563eb", "#10b981", "#f97316", "#8b5cf6", "#ec4899", "#6b7280"].map((color) => (
+                {[chartColors.brand, chartColors.success, chartColors.orange, chartColors.purple, chartColors.pink, chartColors.axis].map((color) => (
                   <button
                     key={color}
                     type="button"

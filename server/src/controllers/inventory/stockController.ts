@@ -1,3 +1,5 @@
+import { stockService } from '../../services/stockService';
+
 /**
  * Stock Controller
  * 
@@ -5,11 +7,13 @@
  * Split from inventoryController.ts for better maintainability.
  */
 
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../../config/prisma';
+import logger from '../../config/logger';
+import { ProtectedRequest } from '../../middleware/auth';
 
 // Stock Adjustment
-export const adjustStock = async (req: Request, res: Response) => {
+export const adjustStock = async (req: ProtectedRequest, res: Response) => {
     try {
         const {
             productId,
@@ -20,61 +24,26 @@ export const adjustStock = async (req: Request, res: Response) => {
             warehouseId
         } = req.body;
 
-        // @ts-ignore
         const companyId = req.user.companyId;
-        // @ts-ignore
         const userId = req.user.id;
 
-        const product = await prisma.product.findFirst({
-            where: { id: productId, companyId }
-        });
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        const previousStock = product.currentStock;
-        const newStock = previousStock + quantity;
-
-        if (newStock < 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Insufficient stock'
-            });
-        }
-
-        const updatedProduct = await prisma.product.update({
-            where: { id: productId },
-            data: { currentStock: newStock }
-        });
-
-        const stockMovement = await prisma.stockMovement.create({
-            data: {
-                productId,
-                type: type || 'ADJUSTMENT',
-                quantity,
-                previousStock,
-                newStock,
-                reason,
-                notes,
-                warehouseId,
-                createdBy: userId,
-                companyId
-            }
+        const result = await stockService.adjustStock({
+            productId,
+            quantity,
+            type,
+            reason,
+            notes,
+            warehouseId,
+            companyId,
+            userId
         });
 
         return res.json({
             success: true,
-            data: {
-                product: updatedProduct,
-                movement: stockMovement
-            }
+            data: result
         });
     } catch (error: any) {
-        console.error('Stock adjustment error:', error);
+        logger.error('Stock adjustment error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error adjusting stock'
@@ -82,10 +51,9 @@ export const adjustStock = async (req: Request, res: Response) => {
     }
 };
 
-// Get Low Stock Products
-export const getLowStock = async (req: Request, res: Response) => {
+// Get Low Stock Products (Logic remains in controller as it's a read operation)
+export const getLowStock = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const lowStockProducts = await prisma.product.findMany({
@@ -110,7 +78,7 @@ export const getLowStock = async (req: Request, res: Response) => {
             data: lowStockProducts
         });
     } catch (error: any) {
-        console.error('Get low stock error:', error);
+        logger.error('Get low stock error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching low stock products'
@@ -119,7 +87,7 @@ export const getLowStock = async (req: Request, res: Response) => {
 };
 
 // Stock Transfer
-export const transferStock = async (req: Request, res: Response) => {
+export const transferStock = async (req: ProtectedRequest, res: Response) => {
     try {
         const {
             productId,
@@ -129,81 +97,25 @@ export const transferStock = async (req: Request, res: Response) => {
             notes
         } = req.body;
 
-        // @ts-ignore
         const companyId = req.user.companyId;
-        // @ts-ignore
         const userId = req.user.id;
 
-        if (quantity <= 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Quantity must be greater than 0'
-            });
-        }
-
-        const product = await prisma.product.findFirst({
-            where: { id: productId, companyId }
-        });
-
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        const previousStock = product.currentStock;
-
-        const [fromWarehouse, toWarehouse] = await Promise.all([
-            prisma.warehouse.findFirst({ where: { id: fromWarehouseId, companyId } }),
-            prisma.warehouse.findFirst({ where: { id: toWarehouseId, companyId } })
-        ]);
-
-        if (!fromWarehouse || !toWarehouse) {
-            return res.status(404).json({
-                success: false,
-                message: 'Warehouse not found'
-            });
-        }
-
-        const transferOut = await prisma.stockMovement.create({
-            data: {
-                productId,
-                type: 'TRANSFER_OUT',
-                quantity: -quantity,
-                previousStock,
-                newStock: previousStock,
-                warehouseId: fromWarehouseId,
-                notes,
-                createdBy: userId,
-                companyId
-            }
-        });
-
-        const transferIn = await prisma.stockMovement.create({
-            data: {
-                productId,
-                type: 'TRANSFER_IN',
-                quantity,
-                previousStock,
-                newStock: previousStock,
-                warehouseId: toWarehouseId,
-                reference: transferOut.id,
-                notes,
-                createdBy: userId,
-                companyId
-            }
+        const result = await stockService.transferStock({
+            productId,
+            fromWarehouseId,
+            toWarehouseId,
+            quantity,
+            notes,
+            companyId,
+            userId
         });
 
         return res.json({
             success: true,
-            data: {
-                transferOut,
-                transferIn
-            }
+            data: result
         });
     } catch (error: any) {
-        console.error('Stock transfer error:', error);
+        logger.error('Stock transfer error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error transferring stock'
@@ -212,10 +124,9 @@ export const transferStock = async (req: Request, res: Response) => {
 };
 
 // Get Stock History for Product
-export const getStockHistory = async (req: Request, res: Response) => {
+export const getStockHistory = async (req: ProtectedRequest, res: Response) => {
     try {
         const { productId } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const movements = await prisma.stockMovement.findMany({
@@ -238,7 +149,7 @@ export const getStockHistory = async (req: Request, res: Response) => {
             data: movements
         });
     } catch (error: any) {
-        console.error('Get stock history error:', error);
+        logger.error('Get stock history error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching stock history'
@@ -247,7 +158,7 @@ export const getStockHistory = async (req: Request, res: Response) => {
 };
 
 // Create a new batch
-export const createBatch = async (req: Request, res: Response) => {
+export const createBatch = async (req: ProtectedRequest, res: Response) => {
     try {
         const {
             productId,
@@ -260,9 +171,7 @@ export const createBatch = async (req: Request, res: Response) => {
             sellingPrice
         } = req.body;
 
-        // @ts-ignore
         const companyId = req.user.companyId;
-        // @ts-ignore
         const userId = req.user.id;
 
         const product = await prisma.product.findFirst({
@@ -293,7 +202,7 @@ export const createBatch = async (req: Request, res: Response) => {
         // Also update total product stock if initial quantity > 0
         if (parseInt(quantity) > 0) {
             await prisma.product.update({
-                where: { id: productId },
+                where: { id: productId , companyId: req.user.companyId },
                 data: { currentStock: { increment: parseInt(quantity) } }
             });
 
@@ -317,7 +226,7 @@ export const createBatch = async (req: Request, res: Response) => {
             data: batch
         });
     } catch (error: any) {
-        console.error('Create batch error:', error);
+        logger.error('Create batch error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error creating batch'
@@ -326,10 +235,9 @@ export const createBatch = async (req: Request, res: Response) => {
 };
 
 // Get batches for a product
-export const getBatches = async (req: Request, res: Response) => {
+export const getBatches = async (req: ProtectedRequest, res: Response) => {
     try {
         const { productId } = req.params;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const batches = await prisma.stockBatch.findMany({
@@ -349,7 +257,7 @@ export const getBatches = async (req: Request, res: Response) => {
             data: batches
         });
     } catch (error: any) {
-        console.error('Get batches error:', error);
+        logger.error('Get batches error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching batches'
@@ -358,9 +266,8 @@ export const getBatches = async (req: Request, res: Response) => {
 };
 
 // Get All Stock Movements
-export const getStockMovements = async (req: Request, res: Response) => {
+export const getStockMovements = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const { type, startDate, endDate, limit = '50' } = req.query;
 
@@ -393,7 +300,7 @@ export const getStockMovements = async (req: Request, res: Response) => {
             data: movements
         });
     } catch (error: any) {
-        console.error('Get stock movements error:', error);
+        logger.error('Get stock movements error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching stock movements'
@@ -402,9 +309,8 @@ export const getStockMovements = async (req: Request, res: Response) => {
 };
 
 // Inventory Valuation
-export const getInventoryValuation = async (req: Request, res: Response) => {
+export const getInventoryValuation = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const products = await prisma.product.findMany({
@@ -441,7 +347,7 @@ export const getInventoryValuation = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get inventory valuation error:', error);
+        logger.error('Get inventory valuation error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error calculating inventory valuation'

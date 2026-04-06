@@ -1,4 +1,5 @@
 // Shared TypeScript types for client and server
+import { Role } from '../constants/roles';
 
 // User & Authentication
 export interface User {
@@ -7,13 +8,17 @@ export interface User {
   name: string;
   role: UserRole;
   phone?: string;
+  avatar?: string;
+  preferences?: any;
   companyId: string;
   company?: Company;
+  companies?: Array<{ id: string; businessName: string; role: string; isDefault: boolean }>; // P0-1: Multi-company
   createdAt: string;
   updatedAt: string;
+  permissions?: any; // Start with any, can be typed strictly later
 }
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'USER' | 'SALES' | 'INVENTORY';
+export type UserRole = Role;
 
 export interface AuthResponse {
   token: string;
@@ -36,6 +41,7 @@ export interface Company {
   logo?: string;
   plan?: 'FREE' | 'BASIC' | 'PRO' | 'ENTERPRISE';
   features?: any;
+  enabledModules?: Record<string, boolean>;
 }
 
 // Party (Customer/Supplier)
@@ -97,6 +103,8 @@ export interface Product {
   location?: string;
   taxInclusive?: boolean;
   trackInventory?: boolean;
+  isBatchTracked?: boolean;
+  isSerialTracked?: boolean;
   sellWithoutStock?: boolean;
   companyId: string;
   createdAt: string;
@@ -139,6 +147,9 @@ export interface InvoiceItem {
   taxRate: number;
   taxAmount: number;
   amount: number;
+  batchNumber?: string;
+  expiryDate?: string;
+  serialNumbers?: string[];
 }
 
 // Purchase Order/Bill
@@ -175,6 +186,9 @@ export interface PurchaseOrderItem {
   taxRate: number;
   taxAmount: number;
   amount: number;
+  batchNumber?: string;
+  expiryDate?: string;
+  serialNumbers?: string[];
 }
 
 // Expense
@@ -372,6 +386,7 @@ export interface Quotation {
   createdAt: string;
   updatedAt: string;
   convertedToSO?: string;
+  createdBy?: string;
 }
 
 export interface QuotationItem {
@@ -386,6 +401,9 @@ export interface QuotationItem {
   taxRate: number;
   taxAmount: number;
   amount: number;
+  total?: number;
+  productName?: string;
+  hsn?: string;
 }
 
 // Warehouse Management
@@ -419,6 +437,68 @@ export interface StockMovement {
   warehouseId?: string;
   warehouse?: Warehouse;
   createdBy: string;
-  createdAt: string;
   companyId: string;
+}
+
+// Credit Note
+export interface CreditNote {
+  id: string;
+  creditNoteNumber: string;
+  date: string;
+  customerId: string;
+  customer?: Party;
+  invoiceId?: string;
+  invoice?: Invoice;
+  items: CreditNoteItem[];
+  subtotal: number;
+  totalTax: number;
+  totalAmount: number;
+  reason?: string;
+  type: 'RETURN' | 'DISCOUNT' | 'CORRECTION' | 'CANCELLATION' | 'BAD_DEBT';
+  status: 'ISSUED' | 'APPLIED' | 'REFUNDED';
+  notes?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditNoteItem {
+  id: string;
+  productId?: string;
+  product?: Product;
+  quantity: number;
+  rate: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+  reason?: string;
+}
+
+// Stock Adjustment
+export interface StockAdjustment {
+  id: string;
+  adjustmentNumber: string;
+  date: string;
+  reason?: string;
+  notes?: string;
+  status: 'COMPLETED' | 'DRAFT' | 'CANCELLED';
+  type: 'QUANTITY' | 'VALUE' | 'BOTH';
+  items: StockAdjustmentItem[];
+  companyId: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StockAdjustmentItem {
+  id: string;
+  stockAdjustmentId: string;
+  productId: string;
+  product?: Product;
+  variation: number; // Positive for addition, negative for reduction
+  previousStock: number;
+  newStock: number;
+  reason?: string;
+  batchId?: string;
+  batch?: any;
 }

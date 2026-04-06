@@ -5,8 +5,15 @@ import { GSTAnalytics } from "./GSTAnalytics";
 import { ProfitLossAnalysis } from "./ProfitLossAnalysis";
 import { CashFlowForecast } from "./CashFlowForecast";
 import { SalesFunnel } from "./SalesFunnel";
-import { TrendingUp, Download } from "lucide-react";
 import { Button } from "../ui/button";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 type TabType = "gst" | "profitloss" | "cashflow" | "salesfunnel";
 
@@ -14,26 +21,27 @@ export function AnalyticsModule() {
   const [activeTab, setActiveTab] = useState<TabType>("gst");
 
   return (
-    <div className="p-4 md:p-6">
+    <div className="p-[24px]">
       <ModuleHeader
         title="Business Analytics"
         description="Insights and trends to drive your business decisions"
-        showBackButton={false}
-        icon={<TrendingUp className="size-5 text-primary" />}
+        showBackButton={true}
+        backTo="/dashboard"
+        icon={<MIcon name="trending_up" className="text-[20px] text-primary" />}
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Download className="size-4 mr-2" />
+          <div className="flex items-center gap-[8px]">
+            <Button variant="outline" size="sm" className="gap-[8px] h-[32px] px-[12px] rounded-[8px] font-bold border-border">
+              <MIcon name="download" className="text-[16px]" />
               Export Report
             </Button>
           </div>
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-[24px]">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-          <div className="overflow-x-auto pb-2">
-            <TabsList className="inline-flex w-auto">
+          <div className="overflow-x-auto pb-[8px]">
+            <TabsList className="inline-flex w-auto bg-muted/50 p-[4px] rounded-[12px]">
               <TabsTrigger value="gst">GST Analytics</TabsTrigger>
               <TabsTrigger value="profitloss">P&L Analysis</TabsTrigger>
               <TabsTrigger value="cashflow">Cash Flow</TabsTrigger>

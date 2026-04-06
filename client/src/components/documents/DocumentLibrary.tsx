@@ -122,10 +122,10 @@ export function DocumentLibrary() {
   });
 
   const getFileIcon = (type: string) => {
-    if (type === "PDF") return <FileText className="size-8 text-[#ef4444]" />;
-    if (type === "DOCX") return <File className="size-8 text-[#2563eb]" />;
-    if (type === "XLSX") return <File className="size-8 text-[#10b981]" />;
-    if (["JPG", "PNG"].includes(type)) return <ImageIcon className="size-8 text-[#f97316]" />;
+    if (type === "PDF") return <FileText className="size-8 text-error" />;
+    if (type === "DOCX") return <File className="size-8 text-primary" />;
+    if (type === "XLSX") return <File className="size-8 text-success" />;
+    if (["JPG", "PNG"].includes(type)) return <ImageIcon className="size-8 text-warning" />;
     return <File className="size-8 text-muted-foreground" />;
   };
 
@@ -177,7 +177,7 @@ export function DocumentLibrary() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-muted-foreground mb-2">Expiring Soon</p>
-              <p className="text-foreground text-[#f97316]">
+              <p className="text-foreground text-warning">
                 {documents.filter((d) => isExpiringSoon(d.expiryDate)).length}
               </p>
             </div>
@@ -259,11 +259,11 @@ export function DocumentLibrary() {
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{doc.category}</Badge>
                     <Badge variant="outline">{doc.type}</Badge>
-                    {doc.shared && <Badge className="bg-[#10b981] text-white">Shared</Badge>}
+                    {doc.shared && <Badge className="bg-success text-white">Shared</Badge>}
                   </div>
 
                   {isExpiringSoon(doc.expiryDate) && (
-                    <Badge className="bg-[#f97316] text-white w-full justify-center">
+                    <Badge className="bg-warning text-white w-full justify-center">
                       <Calendar className="size-3 mr-1" />
                       Expiring Soon
                     </Badge>

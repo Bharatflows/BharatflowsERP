@@ -10,6 +10,7 @@ import {
   Users,
   BookUser,
 } from "lucide-react";
+import { ModuleHeader } from "../ui/module-header";
 
 type Tab = "dashboard" | "chats" | "groups" | "contacts";
 
@@ -23,21 +24,22 @@ export function MessagesModule({ onBack }: MessagesModuleProps) {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="bg-card border-b border-border/50 px-6 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground mb-1">Messages & Communication</h1>
-            <p className="text-muted-foreground text-sm">
-              Chat with your team, suppliers, and customers
-            </p>
-          </div>
-          <div className="bg-primary/10 rounded-lg px-4 py-2">
-            <div className="flex items-center gap-2 text-primary">
-              <MessageSquare className="h-5 w-5" />
-              <span className="text-sm font-medium">3 Unread</span>
+      <div className="px-6 py-4">
+        <ModuleHeader
+          title="Messages & Communication"
+          description="Chat with your team, suppliers, and customers"
+          showBackButton={true}
+          backTo="/dashboard"
+          icon={<MessageSquare className="size-5 text-primary" />}
+          actions={
+            <div className="bg-primary/10 rounded-lg px-4 py-2">
+              <div className="flex items-center gap-2 text-primary">
+                <MessageSquare className="h-5 w-5" />
+                <span className="text-sm font-medium">3 Unread</span>
+              </div>
             </div>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {/* Content */}

@@ -186,7 +186,7 @@ export function EInvoiceGeneration() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex items-start gap-4">
           <div className="bg-primary/10 p-3 rounded-xl">
             <FileText className="size-6 text-primary" />
@@ -202,7 +202,7 @@ export function EInvoiceGeneration() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -213,7 +213,7 @@ export function EInvoiceGeneration() {
           <h3 className="text-2xl font-bold text-foreground">{stats.total}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-emerald-50 p-2.5 rounded-lg">
@@ -224,7 +224,7 @@ export function EInvoiceGeneration() {
           <h3 className="text-2xl font-bold text-emerald-600">{stats.generated}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-amber-50 p-2.5 rounded-lg">
@@ -235,7 +235,7 @@ export function EInvoiceGeneration() {
           <h3 className="text-2xl font-bold text-amber-600">{stats.pending}</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-rose-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-rose-50 p-2.5 rounded-lg">
@@ -248,7 +248,7 @@ export function EInvoiceGeneration() {
       </div>
 
       {/* Main Content */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6 space-y-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-6">
         {/* Info Banner */}
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
           <div className="flex items-start gap-3">
@@ -307,7 +307,7 @@ export function EInvoiceGeneration() {
         </div>
 
         {/* E-Invoices Table */}
-        <div className="border border-border/50 rounded-lg overflow-hidden">
+        <div className="border border-border rounded-lg overflow-hidden">
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow className="hover:bg-muted/30 border-b border-border/50">
@@ -338,7 +338,7 @@ export function EInvoiceGeneration() {
                     </TableCell>
                     <TableCell className="text-foreground">{invoice.customerName}</TableCell>
                     <TableCell>
-                      <span className="font-mono text-xs bg-muted/50 px-2 py-1 rounded text-muted-foreground">{invoice.gstin || '-'}</span>
+                      <span className="font-mono text-xs bg-muted px-2 py-1 rounded text-muted-foreground">{invoice.gstin || '-'}</span>
                     </TableCell>
                     <TableCell className="text-right font-medium text-foreground">₹{Number(invoice.invoiceValue).toLocaleString("en-IN")}</TableCell>
                     <TableCell>
@@ -462,7 +462,7 @@ export function EInvoiceGeneration() {
                   <>
                     <div className="col-span-2">
                       <Label className="text-muted-foreground text-xs uppercase tracking-wider">IRN Number</Label>
-                      <div className="font-mono text-sm break-all bg-muted/50 p-3 rounded-lg mt-1 border border-border/50">
+                      <div className="font-mono text-sm break-all bg-muted p-3 rounded-lg mt-1 border border-border">
                         {selectedInvoice.irn}
                       </div>
                     </div>

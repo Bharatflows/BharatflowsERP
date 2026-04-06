@@ -3,16 +3,12 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "../ui/dialog";
-import { partiesService } from "../../services/modules.service";
+    Sheet,
+    SheetContent,
+} from "../ui/sheet";
+import { partiesService, gstinService } from "../../services/modules.service";
 import { toast } from "sonner";
-import { Loader2, Building2, Phone, Mail, MapPin, Truck, Copy } from "lucide-react";
+import { Loader2, Building2, Phone, Mail, MapPin, Truck, Copy, Search, CheckCircle, ChevronLeft, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 import {
@@ -32,6 +28,8 @@ interface AddSupplierDialogProps {
 
 export function AddSupplierDialog({ open, onOpenChange, onSuccess }: AddSupplierDialogProps) {
     const [loading, setLoading] = useState(false);
+    const [gstinLoading, setGstinLoading] = useState(false);
+    const [gstinVerified, setGstinVerified] = useState(false);
     const [activeTab, setActiveTab] = useState("basic");
 
     const [formData, setFormData] = useState({
@@ -42,51 +40,59 @@ export function AddSupplierDialog({ open, onOpenChange, onSuccess }: AddSupplier
         pan: "",
         currency: "INR",
         paymentTerms: DEFAULT_PAYMENT_TERM,
-        billingAddress: {
-            street: "",
-            city: "",
-            state: "",
-            pincode: "",
-            country: "India"
-        },
-        shippingAddress: {
-            street: "",
-            city: "",
-            state: "",
-            pincode: "",
-            country: "India"
-        },
+        billingAddress: { street: "", city: "", state: "", pincode: "", country: "India" },
+        shippingAddress: { street: "", city: "", state: "", pincode: "", country: "India" },
         remarks: ""
     });
 
     const handleAddressChange = (type: 'billingAddress' | 'shippingAddress', field: string, value: string) => {
-        setFormData(prev => ({
-            ...prev,
-            [type]: {
-                ...prev[type],
-                [field]: value
-            }
-        }));
+        setFormData(prev => ({ ...prev, [type]: { ...prev[type], [field]: value } }));
     };
 
     const copyBillingToShipping = () => {
-        setFormData(prev => ({
-            ...prev,
-            shippingAddress: { ...prev.billingAddress }
-        }));
+        setFormData(prev => ({ ...prev, shippingAddress: { ...prev.billingAddress } }));
         toast.success("Billing address copied to shipping");
+    };
+
+    const handleGSTINLookup = async () => {
+        const gstin = formData.gstin.trim();
+        if (!gstin || gstin.length !== 15) { toast.error("Please enter a valid 15-character GSTIN"); return; }
+        setGstinLoading(true);
+        setGstinVerified(false);
+        try {
+            const response = await gstinService.lookup(gstin);
+            if (response.success && response.data) {
+                const data = response.data;
+                setFormData(prev => ({
+                    ...prev,
+                    name: data.tradeName || data.legalName || prev.name,
+                    pan: gstin.substring(2, 12),
+                    billingAddress: {
+                        street: [data.address.building, data.address.street].filter(Boolean).join(', ') || prev.billingAddress.street,
+                        city: data.address.city || prev.billingAddress.city,
+                        state: data.address.state || data.stateName || prev.billingAddress.state,
+                        pincode: data.address.pincode || prev.billingAddress.pincode,
+                        country: data.address.country || 'India'
+                    }
+                }));
+                setGstinVerified(true);
+                toast.success(`GSTIN verified: ${data.legalName}`);
+                if (data.address.city || data.address.state) setActiveTab("address");
+            } else {
+                toast.error(response.message || "Could not fetch GSTIN details");
+            }
+        } catch (error: any) {
+            console.error("GSTIN lookup failed:", error);
+            toast.error(error.message || "Failed to lookup GSTIN");
+        } finally {
+            setGstinLoading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
-        if (!formData.name) {
-            toast.error("Supplier name is required");
-            return;
-        }
-
+        if (!formData.name) { toast.error("Supplier name is required"); return; }
         setLoading(true);
-
         try {
             const payload = {
                 type: "supplier",
@@ -99,21 +105,12 @@ export function AddSupplierDialog({ open, onOpenChange, onSuccess }: AddSupplier
                 shippingAddress: formData.shippingAddress,
                 partyType: "supplier",
             };
-
             const response = await partiesService.create(payload as any);
-
             toast.success("Supplier added successfully");
             onSuccess(response.data);
             onOpenChange(false);
-
-            // Reset form
             setFormData({
-                name: "",
-                phone: "",
-                email: "",
-                gstin: "",
-                pan: "",
-                currency: "INR",
+                name: "", phone: "", email: "", gstin: "", pan: "", currency: "INR",
                 paymentTerms: DEFAULT_PAYMENT_TERM,
                 billingAddress: { street: "", city: "", state: "", pincode: "", country: "India" },
                 shippingAddress: { street: "", city: "", state: "", pincode: "", country: "India" },
@@ -129,261 +126,136 @@ export function AddSupplierDialog({ open, onOpenChange, onSuccess }: AddSupplier
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Building2 className="size-5 text-primary" />
-                        Add New Supplier
-                    </DialogTitle>
-                    <DialogDescription>
-                        Add supplier details including contact, tax info, and addresses
-                    </DialogDescription>
-                </DialogHeader>
+        <Sheet open={open} onOpenChange={onOpenChange}>
+            <SheetContent side="right" className="min-w-[100vw] sm:min-w-[550px] lg:min-w-[600px] p-0 overflow-hidden flex flex-col [&>button]:hidden">
+                {/* Header */}
+                <div className="flex items-center gap-3 px-6 py-4 bg-card border-b border-border">
+                    <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-full hover:bg-muted size-9">
+                        <ChevronLeft className="size-5" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Building2 className="size-5 text-brand-primary" />
+                        <h1 className="text-xl font-bold text-foreground">Add New Supplier</h1>
+                    </div>
+                </div>
 
-                <form onSubmit={handleSubmit}>
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-4">
-                            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                            <TabsTrigger value="tax">Tax Details</TabsTrigger>
-                            <TabsTrigger value="address">Address</TabsTrigger>
-                            <TabsTrigger value="other">Other</TabsTrigger>
-                        </TabsList>
+                {/* Content */}
+                <form id="add-supplier-form" onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-y-auto px-6 py-5">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-4 mb-4">
+                                <TabsTrigger value="basic" className="text-xs">Basic</TabsTrigger>
+                                <TabsTrigger value="tax" className="text-xs">Tax</TabsTrigger>
+                                <TabsTrigger value="address" className="text-xs">Address</TabsTrigger>
+                                <TabsTrigger value="other" className="text-xs">Other</TabsTrigger>
+                            </TabsList>
 
-                        {/* Basic Info Tab */}
-                        <TabsContent value="basic" className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="name" className="text-sm font-medium">
-                                    Supplier Name <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="name"
-                                    required
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    placeholder="e.g. ABC Suppliers Pvt. Ltd."
-                                    className="h-11"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-sm font-medium flex items-center gap-1.5">
-                                        <Mail className="size-3.5" /> Email
-                                    </Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        placeholder="supplier@email.com"
-                                        className="h-11"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone" className="text-sm font-medium flex items-center gap-1.5">
-                                        <Phone className="size-3.5" /> Phone
-                                    </Label>
-                                    <Input
-                                        id="phone"
-                                        type="tel"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        placeholder="+91 98765 43210"
-                                        className="h-11"
-                                    />
-                                </div>
-                            </div>
-                        </TabsContent>
-
-                        {/* Tax Details Tab */}
-                        <TabsContent value="tax" className="space-y-4 mt-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="gstin" className="text-sm font-medium">GSTIN</Label>
-                                    <Input
-                                        id="gstin"
-                                        value={formData.gstin}
-                                        onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
-                                        placeholder="27AABCM9603R1ZM"
-                                        maxLength={15}
-                                        className="h-11 font-mono"
-                                    />
-                                    <p className="text-xs text-muted-foreground">15-character GST number</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="pan" className="text-sm font-medium">PAN</Label>
-                                    <Input
-                                        id="pan"
-                                        value={formData.pan}
-                                        onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
-                                        placeholder="ABCDE1234F"
-                                        maxLength={10}
-                                        className="h-11 font-mono"
-                                    />
-                                    <p className="text-xs text-muted-foreground">10-character PAN number</p>
-                                </div>
-                            </div>
-                        </TabsContent>
-
-                        {/* Address Tab */}
-                        <TabsContent value="address" className="space-y-6 mt-4">
-                            {/* Billing Address */}
-                            <div className="space-y-3">
-                                <Label className="text-sm font-medium flex items-center gap-1.5">
-                                    <MapPin className="size-3.5" /> Billing Address
-                                </Label>
-                                <Input
-                                    value={formData.billingAddress.street}
-                                    onChange={(e) => handleAddressChange('billingAddress', 'street', e.target.value)}
-                                    placeholder="Street address"
-                                    className="h-11"
-                                />
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Input
-                                        value={formData.billingAddress.city}
-                                        onChange={(e) => handleAddressChange('billingAddress', 'city', e.target.value)}
-                                        placeholder="City"
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        value={formData.billingAddress.state}
-                                        onChange={(e) => handleAddressChange('billingAddress', 'state', e.target.value)}
-                                        placeholder="State"
-                                        className="h-11"
-                                    />
+                            <TabsContent value="basic" className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-sm font-medium">Supplier Name <span className="text-destructive">*</span></Label>
+                                    <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. ABC Suppliers Pvt. Ltd." className="h-10" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Input
-                                        value={formData.billingAddress.pincode}
-                                        onChange={(e) => handleAddressChange('billingAddress', 'pincode', e.target.value)}
-                                        placeholder="Pincode"
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        value={formData.billingAddress.country}
-                                        onChange={(e) => handleAddressChange('billingAddress', 'country', e.target.value)}
-                                        placeholder="Country"
-                                        className="h-11"
-                                    />
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium flex items-center gap-1.5"><Mail className="size-3.5" /> Email</Label>
+                                        <Input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="supplier@email.com" className="h-10" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium flex items-center gap-1.5"><Phone className="size-3.5" /> Phone</Label>
+                                        <Input type="tel" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="+91 98765 43210" className="h-10" />
+                                    </div>
                                 </div>
-                            </div>
+                            </TabsContent>
 
-                            {/* Shipping Address */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-sm font-medium flex items-center gap-1.5">
-                                        <Truck className="size-3.5" /> Shipping Address
-                                    </Label>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={copyBillingToShipping}
-                                        className="h-7 text-xs gap-1"
-                                    >
-                                        <Copy className="size-3" /> Copy Billing
-                                    </Button>
+                            <TabsContent value="tax" className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-sm font-medium flex items-center gap-2">GSTIN {gstinVerified && <CheckCircle className="size-4 text-emerald-600" />}</Label>
+                                    <div className="flex gap-2">
+                                        <Input value={formData.gstin} onChange={e => { setFormData({ ...formData, gstin: e.target.value.toUpperCase() }); setGstinVerified(false); }} placeholder="27AABCM9603R1ZM" maxLength={15} className="h-10 font-mono flex-1" />
+                                        <Button type="button" variant="outline" onClick={handleGSTINLookup} disabled={gstinLoading || formData.gstin.length !== 15} className="h-10 gap-1.5">
+                                            {gstinLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />} Fetch
+                                        </Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Enter 15-character GSTIN and click Fetch to auto-fill</p>
                                 </div>
-                                <Input
-                                    value={formData.shippingAddress.street}
-                                    onChange={(e) => handleAddressChange('shippingAddress', 'street', e.target.value)}
-                                    placeholder="Street address"
-                                    className="h-11"
-                                />
+                                <div className="space-y-1.5">
+                                    <Label className="text-sm font-medium">PAN</Label>
+                                    <Input value={formData.pan} onChange={e => setFormData({ ...formData, pan: e.target.value.toUpperCase() })} placeholder="ABCDE1234F" maxLength={10} className="h-10 font-mono" />
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="address" className="space-y-5">
+                                <div className="space-y-2.5">
+                                    <Label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="size-3.5" /> Billing Address</Label>
+                                    <Input value={formData.billingAddress.street} onChange={e => handleAddressChange('billingAddress', 'street', e.target.value)} placeholder="Street" className="h-10" />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input value={formData.billingAddress.city} onChange={e => handleAddressChange('billingAddress', 'city', e.target.value)} placeholder="City" className="h-10" />
+                                        <Input value={formData.billingAddress.state} onChange={e => handleAddressChange('billingAddress', 'state', e.target.value)} placeholder="State" className="h-10" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input value={formData.billingAddress.pincode} onChange={e => handleAddressChange('billingAddress', 'pincode', e.target.value)} placeholder="Pincode" className="h-10" />
+                                        <Input value={formData.billingAddress.country} onChange={e => handleAddressChange('billingAddress', 'country', e.target.value)} placeholder="Country" className="h-10" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-medium flex items-center gap-1.5"><Truck className="size-3.5" /> Shipping Address</Label>
+                                        <Button type="button" variant="ghost" size="sm" onClick={copyBillingToShipping} className="h-7 text-xs gap-1"><Copy className="size-3" /> Copy Billing</Button>
+                                    </div>
+                                    <Input value={formData.shippingAddress.street} onChange={e => handleAddressChange('shippingAddress', 'street', e.target.value)} placeholder="Street" className="h-10" />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input value={formData.shippingAddress.city} onChange={e => handleAddressChange('shippingAddress', 'city', e.target.value)} placeholder="City" className="h-10" />
+                                        <Input value={formData.shippingAddress.state} onChange={e => handleAddressChange('shippingAddress', 'state', e.target.value)} placeholder="State" className="h-10" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input value={formData.shippingAddress.pincode} onChange={e => handleAddressChange('shippingAddress', 'pincode', e.target.value)} placeholder="Pincode" className="h-10" />
+                                        <Input value={formData.shippingAddress.country} onChange={e => handleAddressChange('shippingAddress', 'country', e.target.value)} placeholder="Country" className="h-10" />
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="other" className="space-y-4">
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Input
-                                        value={formData.shippingAddress.city}
-                                        onChange={(e) => handleAddressChange('shippingAddress', 'city', e.target.value)}
-                                        placeholder="City"
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        value={formData.shippingAddress.state}
-                                        onChange={(e) => handleAddressChange('shippingAddress', 'state', e.target.value)}
-                                        placeholder="State"
-                                        className="h-11"
-                                    />
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium">Currency</Label>
+                                        <Select value={formData.currency} onValueChange={v => setFormData({ ...formData, currency: v })}>
+                                            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="INR">INR - Indian Rupee</SelectItem>
+                                                <SelectItem value="USD">USD - US Dollar</SelectItem>
+                                                <SelectItem value="EUR">EUR - Euro</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium">Payment Terms</Label>
+                                        <Select value={formData.paymentTerms} onValueChange={v => setFormData({ ...formData, paymentTerms: v })}>
+                                            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {PAYMENT_TERMS.map(term => <SelectItem key={term.value} value={term.value}>{term.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Input
-                                        value={formData.shippingAddress.pincode}
-                                        onChange={(e) => handleAddressChange('shippingAddress', 'pincode', e.target.value)}
-                                        placeholder="Pincode"
-                                        className="h-11"
-                                    />
-                                    <Input
-                                        value={formData.shippingAddress.country}
-                                        onChange={(e) => handleAddressChange('shippingAddress', 'country', e.target.value)}
-                                        placeholder="Country"
-                                        className="h-11"
-                                    />
+                                <div className="space-y-1.5">
+                                    <Label className="text-sm font-medium">Remarks (Internal Use)</Label>
+                                    <Textarea value={formData.remarks} onChange={e => setFormData({ ...formData, remarks: e.target.value })} placeholder="Internal notes about this supplier..." className="min-h-[80px] resize-none" />
                                 </div>
-                            </div>
-                        </TabsContent>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
 
-                        {/* Other Tab */}
-                        <TabsContent value="other" className="space-y-4 mt-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Currency</Label>
-                                    <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
-                                        <SelectTrigger className="h-11">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="INR">INR - Indian Rupee</SelectItem>
-                                            <SelectItem value="USD">USD - US Dollar</SelectItem>
-                                            <SelectItem value="EUR">EUR - Euro</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Payment Terms</Label>
-                                    <Select value={formData.paymentTerms} onValueChange={(v) => setFormData({ ...formData, paymentTerms: v })}>
-                                        <SelectTrigger className="h-11">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {PAYMENT_TERMS.map((term) => (
-                                                <SelectItem key={term.value} value={term.value}>
-                                                    {term.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="remarks" className="text-sm font-medium">Remarks (Internal Use)</Label>
-                                <Textarea
-                                    id="remarks"
-                                    value={formData.remarks}
-                                    onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                                    placeholder="Add any internal notes about this supplier..."
-                                    className="min-h-[80px] resize-none"
-                                />
-                            </div>
-                        </TabsContent>
-                    </Tabs>
-
-                    <DialogFooter className="mt-6 gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => onOpenChange(false)}
-                            disabled={loading}
-                        >
+                    {/* Bottom Action Bar */}
+                    <div className="flex items-center justify-between px-6 py-3.5 bg-card border-t border-border">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="h-9 px-5 text-sm font-medium">
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading} className="gap-2">
-                            {loading && <Loader2 className="size-4 animate-spin" />}
-                            Add Supplier
+                        <Button type="submit" disabled={loading} className="h-9 px-5 text-sm font-medium gap-1.5 bg-brand-primary hover:bg-brand-primary-hover text-white shadow-sm">
+                            {loading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Add Supplier
                         </Button>
-                    </DialogFooter>
+                    </div>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </SheetContent>
+        </Sheet>
     );
 }

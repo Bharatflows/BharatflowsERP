@@ -7,6 +7,7 @@ exports.convertEstimateToInvoice = exports.deleteEstimate = exports.updateEstima
 const prisma_1 = __importDefault(require("../config/prisma"));
 const logger_1 = __importDefault(require("../config/logger"));
 const sequenceService_1 = require("../services/sequenceService");
+const eventBus_1 = require("../services/eventBus");
 // @desc    Get all estimates
 // @route   GET /api/v1/sales/estimates
 // @access  Private
@@ -22,7 +23,7 @@ const getEstimates = async (req, res) => {
         }
         if (search) {
             where.OR = [
-                { estimateNumber: { contains: search, mode: 'insensitive' } },
+                { estimateNumber: { contains: search } },
             ];
         }
         const [estimates, total] = await Promise.all([
@@ -149,6 +150,15 @@ const createEstimate = async (req, res) => {
                 customer: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.ESTIMATE_CREATED,
+            aggregateType: 'Estimate',
+            aggregateId: estimate.id,
+            payload: estimate,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         return res.status(201).json({
             success: true,
             message: 'Estimate created successfully',
@@ -225,6 +235,15 @@ const updateEstimate = async (req, res) => {
                 customer: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.ESTIMATE_UPDATED,
+            aggregateType: 'Estimate',
+            aggregateId: estimate.id,
+            payload: estimate,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         return res.status(200).json({
             success: true,
             message: 'Estimate updated successfully',
@@ -259,6 +278,8 @@ const deleteEstimate = async (req, res) => {
         await prisma_1.default.estimate.delete({
             where: { id }
         });
+        // Decrement the sequence number to reuse the freed number
+        await (0, sequenceService_1.decrementSequence)(req.user.companyId, 'ESTIMATE');
         return res.status(200).json({
             success: true,
             message: 'Estimate deleted successfully'
@@ -345,6 +366,24 @@ const convertEstimateToInvoice = async (req, res) => {
             })
         ]);
         logger_1.default.info(`Estimate ${estimate.estimateNumber} converted to Invoice ${invoice.invoiceNumber} by ${req.user.email}`);
+        // Emit INVOICE_CREATED event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.INVOICE_CREATED,
+            aggregateType: 'Invoice',
+            aggregateId: invoice.id,
+            payload: invoice,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        // Emit ESTIMATE_UPDATED event (status change)
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.ESTIMATE_UPDATED,
+            aggregateType: 'Estimate',
+            aggregateId: updatedEstimate.id,
+            payload: updatedEstimate,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         return res.status(201).json({
             success: true,
             message: 'Estimate converted to invoice successfully',

@@ -73,10 +73,10 @@ export function GroupChat() {
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      const response = await messagingService.getConversations({ type: "GROUP" });
-      if (response.data?.data) {
-        const groupConversations = response.data.data;
-        const displayGroups = groupConversations.map((conv, index) =>
+      const response: any = await messagingService.getConversations({ type: "GROUP" });
+      if (response.data?.data || response.data) {
+        const groupConversations = response.data?.data || response.data || response;
+        const displayGroups = groupConversations.map((conv: any, index: number) =>
           transformToGroup(conv, index)
         );
         setGroups(displayGroups);
@@ -150,13 +150,13 @@ export function GroupChat() {
 
     try {
       setCreating(true);
-      const response = await messagingService.createConversation({
+      const response: any = await messagingService.createConversation({
         type: "GROUP",
         name: newGroupName,
         description: newGroupDescription,
       });
 
-      if (response.data?.data) {
+      if (response.data?.data || response.data) {
         toast.success("Group created successfully");
         setNewGroupName("");
         setNewGroupDescription("");
@@ -351,7 +351,7 @@ function GroupCard({
   onLeave?: () => void;
 }) {
   return (
-    <Card className="border border-border/50 hover:shadow-md transition-shadow cursor-pointer">
+    <Card className="border border-border hover:shadow-md transition-shadow cursor-pointer">
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <Avatar className="h-12 w-12">

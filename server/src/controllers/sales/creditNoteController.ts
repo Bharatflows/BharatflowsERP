@@ -4,7 +4,9 @@ import { AuthRequest } from '../../middleware/auth';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
 import { getNextNumber, decrementSequence } from '../../services/sequenceService';
-import { postCreditNote, CreditNoteData } from '../../services/postingService';
+import { requireUnlockedPeriod } from '../../services/periodLockService';
+// P0: postCreditNote removed - ledger posting handled by Accounting domain via event subscription
+import { eventBus, EventTypes } from '../../services/eventBus';
 
 // @desc    Get all credit notes
 // @route   GET /api/v1/sales/credit-notes
@@ -39,7 +41,7 @@ export const getCreditNote = async (req: AuthRequest, res: Response): Promise<Re
         const { id } = req.params;
 
         const creditNote = await prisma.creditNote.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: {
                 customer: true,
                 invoice: true,
@@ -76,6 +78,9 @@ export const getCreditNote = async (req: AuthRequest, res: Response): Promise<Re
 export const createCreditNote = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { customerId, invoiceId, date, reason, items, type } = req.body;
+
+        // P0: FY Locking Check
+        await requireUnlockedPeriod(req.user.companyId, new Date(date));
 
         const creditNoteNumber = await getNextNumber(req.user.companyId, 'CREDIT_NOTE');
 
@@ -164,25 +169,26 @@ export const createCreditNote = async (req: AuthRequest, res: Response): Promise
                 }
             });
 
+            // P0: Emit domain event for ledger posting (handled by Accounting domain subscriber)
+            await eventBus.emit({
+                companyId: req.user.companyId,
+                eventType: EventTypes.CREDIT_NOTE_CREATED,
+                aggregateType: 'CreditNote',
+                aggregateId: creditNote.id,
+                payload: {
+                    creditNoteId: creditNote.id,
+                    creditNoteNumber: creditNote.creditNoteNumber,
+                    date: creditNote.date.toISOString(),
+                    customerId: creditNote.customerId,
+                    subtotal: Number(creditNote.subtotal),
+                    totalTax: Number(creditNote.totalTax),
+                    totalAmount: Number(creditNote.totalAmount)
+                },
+                metadata: { userId: req.user.id, source: 'api' }
+            }, tx);
+
             return creditNote;
         });
-
-        // Accounting Entries
-        try {
-            const noteData: CreditNoteData = {
-                companyId: req.user.companyId,
-                creditNoteNumber: result.creditNoteNumber,
-                date: result.date,
-                customerId: result.customerId,
-                subtotal: Number(result.subtotal),
-                totalTax: Number(result.totalTax),
-                totalAmount: Number(result.totalAmount),
-                id: result.id
-            };
-            await postCreditNote(noteData);
-        } catch (postError) {
-            logger.warn('Failed to post credit note ledger:', postError);
-        }
 
         return res.status(201).json({
             success: true,
@@ -207,7 +213,7 @@ export const deleteCreditNote = async (req: AuthRequest, res: Response): Promise
         const { id } = req.params;
 
         const creditNote = await prisma.creditNote.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: { items: true }
         });
 
@@ -218,7 +224,20 @@ export const deleteCreditNote = async (req: AuthRequest, res: Response): Promise
             });
         }
 
+        // P0: FY Locking Check - Block deletion if original date is in locked period
+        await requireUnlockedPeriod(req.user.companyId, new Date(creditNote.date), 'delete credit note');
+
+        // C1 FIX: Block deletion of non-DRAFT credit notes
+        if (creditNote.status !== 'DRAFT') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete credit note with status '${creditNote.status}'. Only DRAFT credit notes can be deleted.`,
+                code: 'CREDIT_NOTE_STATUS_LOCKED'
+            });
+        }
+
         await prisma.$transaction(async (tx) => {
+
             // 1. Revert Stock (If RETURN, we added stock, now we must remove it? Or just void?)
             // If we delete the Credit Note, it means the return never happened.
             // So we must DECREMENT stock (take it back).

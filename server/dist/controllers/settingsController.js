@@ -36,8 +36,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNextPreview = exports.previewSequence = exports.updateSequence = exports.getSequence = exports.getSequences = void 0;
+exports.applyIndustryDefaults = exports.checkIntegrity = exports.getNextPreview = exports.previewSequence = exports.updateSequence = exports.getSequence = exports.getSequences = void 0;
 const sequenceService = __importStar(require("../services/sequenceService"));
+const auditService_1 = require("../services/auditService");
 const logger_1 = __importDefault(require("../config/logger"));
 // @desc    Get all sequences for company
 // @route   GET /api/v1/settings/sequences
@@ -102,11 +103,30 @@ const updateSequence = async (req, res) => {
                 message: 'Next number must be a positive integer',
             });
         }
+        // RISK MITIGATION: Check for sequence gaps
+        const warnings = [];
+        if (nextNumber !== undefined) {
+            const currentSequence = await sequenceService.getSequence(req.user.companyId, documentType.toUpperCase());
+            if (nextNumber < currentSequence.nextNumber) {
+                const gap = currentSequence.nextNumber - nextNumber;
+                warnings.push(`Warning: Sequence number decreased from ${currentSequence.nextNumber} to ${nextNumber}. ` +
+                    `This creates a gap of ${gap} numbers and may cause duplicate document numbers.`);
+                logger_1.default.warn('Sequence backward change detected', {
+                    companyId: req.user.companyId,
+                    userId: req.user.id,
+                    documentType,
+                    oldValue: currentSequence.nextNumber,
+                    newValue: nextNumber,
+                    gap
+                });
+            }
+        }
         const sequence = await sequenceService.updateSequence(req.user.companyId, documentType.toUpperCase(), { prefix, nextNumber, format });
         return res.json({
             success: true,
             message: 'Sequence updated successfully',
             data: sequence,
+            warnings: warnings.length > 0 ? warnings : undefined
         });
     }
     catch (error) {
@@ -174,4 +194,126 @@ const getNextPreview = async (req, res) => {
     }
 };
 exports.getNextPreview = getNextPreview;
+// @desc    Check data integrity (audit logs)
+// @route   POST /api/v1/settings/integrity-check
+// @access  Private
+const checkIntegrity = async (req, res) => {
+    try {
+        const result = await auditService_1.AuditService.verifyChain(req.user.companyId);
+        if (result === true) {
+            return res.json({
+                success: true,
+                message: 'Data integrity verified successfully',
+            });
+        }
+        else {
+            return res.status(409).json({
+                success: false,
+                message: 'Data integrity check failed',
+                tamperedLogId: result,
+            });
+        }
+    }
+    catch (error) {
+        logger_1.default.error('Check integrity error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to check data integrity',
+            error: error.message,
+        });
+    }
+};
+exports.checkIntegrity = checkIntegrity;
+// Industry defaults configuration
+const INDUSTRY_DEFAULTS = {
+    MANUFACTURING: {
+        modules: { inventory: true, pos: false, production: true, accounting: true, gst: true, crm: false, hr: true, banking: true },
+        features: { barcode: true, bom: true, wastage: true, serialTracking: false, batchTracking: true, multiWarehouse: true, ecommerce: false }
+    },
+    TRADING: {
+        modules: { inventory: true, pos: true, production: false, accounting: true, gst: true, crm: true, hr: false, banking: true },
+        features: { barcode: true, bom: false, wastage: false, serialTracking: false, batchTracking: false, multiWarehouse: true, ecommerce: true }
+    },
+    SERVICE: {
+        modules: { inventory: false, pos: true, production: false, accounting: true, gst: true, crm: true, hr: true, banking: true },
+        features: { barcode: false, bom: false, wastage: false, serialTracking: false, batchTracking: false, multiWarehouse: false, ecommerce: false }
+    },
+    HYBRID: {
+        modules: { inventory: true, pos: true, production: true, accounting: true, gst: true, crm: true, hr: true, banking: true },
+        features: { barcode: true, bom: true, wastage: true, serialTracking: true, batchTracking: true, multiWarehouse: true, ecommerce: true }
+    }
+};
+// @desc    Apply industry-specific default settings
+// @route   POST /api/v1/settings/apply-industry-defaults
+// @access  Private (Admin/Owner only)
+const applyIndustryDefaults = async (req, res) => {
+    try {
+        const { industry, sector } = req.body;
+        // PATH 1: Sector-Specific Blueprint (New MSME OS Flow)
+        if (sector) {
+            // Lazy load service to avoid circular deps if any
+            const { autoConfigService } = await Promise.resolve().then(() => __importStar(require('../services/autoConfigService')));
+            try {
+                await autoConfigService.applySectorBlueprint(req.user.companyId, sector);
+                return res.json({
+                    success: true,
+                    message: `Sector blueprint for ${sector} applied successfully`,
+                    data: { sector }
+                });
+            }
+            catch (err) {
+                logger_1.default.error(`Failed to apply sector blueprint ${sector}:`, err);
+                return res.status(400).json({
+                    success: false,
+                    message: err.message || 'Invalid sector blueprint'
+                });
+            }
+        }
+        // PATH 2: Generic Business Type Defaults (Legacy/Fallback)
+        if (!industry || !INDUSTRY_DEFAULTS[industry.toUpperCase()]) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid industry/business type. Valid options: MANUFACTURING, TRADING, SERVICE, HYBRID',
+            });
+        }
+        const defaults = INDUSTRY_DEFAULTS[industry.toUpperCase()];
+        // Import prisma here to avoid circular dependency
+        const prisma = (await Promise.resolve().then(() => __importStar(require('../config/prisma')))).default;
+        // Update company with recommended modules and features
+        const updatedCompany = await prisma.company.update({
+            where: { id: req.user.companyId },
+            data: {
+                enabledModules: defaults.modules,
+                features: defaults.features,
+                businessType: industry.toUpperCase()
+            }
+        });
+        // Log the configuration change
+        logger_1.default.info('Industry defaults applied', {
+            companyId: req.user.companyId,
+            userId: req.user.id,
+            industry: industry.toUpperCase(),
+            modules: defaults.modules,
+            features: defaults.features
+        });
+        return res.json({
+            success: true,
+            message: `Industry defaults for ${industry} applied successfully`,
+            data: {
+                enabledModules: updatedCompany.enabledModules,
+                features: updatedCompany.features,
+                businessType: updatedCompany.businessType
+            }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Apply industry defaults error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to apply industry defaults',
+            error: error.message,
+        });
+    }
+};
+exports.applyIndustryDefaults = applyIndustryDefaults;
 //# sourceMappingURL=settingsController.js.map

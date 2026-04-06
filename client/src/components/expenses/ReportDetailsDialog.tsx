@@ -147,7 +147,7 @@ export function ReportDetailsDialog({
                                 </TableRow>
                             ))}
                             {data.length > 0 && (
-                                <TableRow className="bg-muted/50 font-bold">
+                                <TableRow className="bg-muted font-bold">
                                     <TableCell>Total Input Credit</TableCell>
                                     <TableCell className="text-right">
                                         {formatCurrency(data.reduce((sum, item) => sum + item.taxableAmount, 0))}

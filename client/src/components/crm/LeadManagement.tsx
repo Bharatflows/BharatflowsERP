@@ -27,9 +27,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import { Plus, Phone, Mail, RefreshCw, Search, MoreVertical, Edit, Trash2, UserPlus, Filter, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { crmService } from "@/services/modules.service";
+import { LEAD_STATUSES, LEAD_SOURCES } from "@/constants/crm";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface Lead {
   id: string;
@@ -43,9 +51,6 @@ interface Lead {
   notes?: string;
   createdAt: string;
 }
-
-const LEAD_STATUSES = ["NEW", "CONTACTED", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "WON", "LOST"];
-const LEAD_SOURCES = ["WEBSITE", "REFERRAL", "SOCIAL_MEDIA", "COLD_CALL", "ADVERTISEMENT", "OTHER"];
 
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
@@ -194,74 +199,76 @@ export function LeadManagement() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-[24px] p-[24px] animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Lead Management</h1>
-          <p className="text-muted-foreground">Track and manage your sales leads</p>
+          <h1 className="text-3xl font-bold text-foreground">Lead Management</h1>
+          <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">Track and manage your sales leads</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchLeads} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+        <div className="flex gap-[12px]">
+          <Button variant="outline" onClick={fetchLeads} disabled={loading} className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+            <MIcon name="sync" className={`text-[18px] ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button onClick={() => { resetForm(); setIsDialogOpen(true); }}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={() => { resetForm(); setIsDialogOpen(true); }} className="gap-[8px] h-[40px] px-[24px] rounded-[8px] font-bold">
+            <MIcon name="add" className="text-[20px]" />
             Add Lead
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Leads</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-[16px]">
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Total Leads</p>
+            <p className="text-3xl font-bold text-foreground">{stats.total}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">New</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.new}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">New</p>
+            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.new}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Qualified</p>
-            <p className="text-2xl font-bold text-purple-600">{stats.qualified}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Qualified</p>
+            <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.qualified}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Won</p>
-            <p className="text-2xl font-bold text-green-600">{stats.won}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Won</p>
+            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{stats.won}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pipeline Value</p>
-            <p className="text-2xl font-bold">₹{stats.totalValue.toLocaleString("en-IN")}</p>
+        <Card className="border border-border shadow-sm rounded-[16px] bg-card">
+          <CardContent className="p-[20px]">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Pipeline Value</p>
+            <p className="text-3xl font-bold text-foreground">₹{stats.totalValue.toLocaleString("en-IN")}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Search and Filter */}
-      <div className="flex gap-4">
+      <div className="flex gap-[16px]">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <MIcon name="search" className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[20px] text-muted-foreground" />
           <Input
             placeholder="Search leads..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-[40px] h-[44px] rounded-[8px] bg-card border-border"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filter by status" />
+          <SelectTrigger className="w-[200px] h-[44px] rounded-[8px] bg-card border-border">
+            <div className="flex items-center gap-[8px]">
+              <MIcon name="filter_list" className="text-[18px] text-muted-foreground" />
+              <span>{statusFilter === "all" ? "All Statuses" : LEAD_STATUSES.find(s => s === statusFilter)}</span>
+            </div>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
@@ -273,62 +280,62 @@ export function LeadManagement() {
       </div>
 
       {/* Leads Table */}
-      <Card>
+      <Card className="border border-border shadow-sm bg-card rounded-[16px] overflow-hidden">
         <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="flex items-center justify-center py-[48px]">
+              <MIcon name="sync" className="text-[32px] animate-spin text-primary" />
             </div>
           ) : filteredLeads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <UserPlus className="h-12 w-12 mb-4" />
-              <p>No leads found</p>
-              <Button variant="link" onClick={() => { resetForm(); setIsDialogOpen(true); }}>
+            <div className="flex flex-col items-center justify-center py-[48px] text-muted-foreground">
+              <MIcon name="person_add" className="text-[48px] mb-[16px] opacity-20" />
+              <p className="font-medium text-body">No leads found</p>
+              <Button variant="link" onClick={() => { resetForm(); setIsDialogOpen(true); }} className="mt-[8px] font-bold">
                 Add your first lead
               </Button>
             </div>
           ) : (
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
+              <TableHeader className="bg-muted dark:bg-slate-950">
+                <TableRow className="border-b border-border">
+                  <TableHead className="font-bold text-foreground dark:text-muted-foreground">Name</TableHead>
+                  <TableHead className="font-bold text-foreground dark:text-muted-foreground">Company</TableHead>
+                  <TableHead className="font-bold text-foreground dark:text-muted-foreground">Contact</TableHead>
+                  <TableHead className="font-bold text-foreground dark:text-muted-foreground">Source</TableHead>
+                  <TableHead className="font-bold text-foreground dark:text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-right font-bold text-foreground dark:text-muted-foreground">Value</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredLeads.map((lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="font-medium">{lead.name}</TableCell>
-                    <TableCell>{lead.company || "-"}</TableCell>
+                  <TableRow key={lead.id} className="border-b border-border">
+                    <TableCell className="font-bold text-foreground">{lead.name}</TableCell>
+                    <TableCell className="text-foreground dark:text-muted-foreground font-medium">{lead.company || "-"}</TableCell>
                     <TableCell>
-                      <div className="space-y-1">
+                      <div className="space-y-[4px]">
                         {lead.email && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Mail className="h-3 w-3" />
+                          <div className="flex items-center gap-[6px] text-body-sm text-muted-foreground font-medium">
+                            <MIcon name="mail" className="text-[14px]" />
                             {lead.email}
                           </div>
                         )}
                         {lead.phone && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Phone className="h-3 w-3" />
+                          <div className="flex items-center gap-[6px] text-body-sm text-muted-foreground font-medium">
+                            <MIcon name="phone" className="text-[14px]" />
                             {lead.phone}
                           </div>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{lead.source}</TableCell>
+                    <TableCell className="text-foreground dark:text-muted-foreground font-medium">{lead.source}</TableCell>
                     <TableCell>
                       <Select
                         value={lead.status}
                         onValueChange={(value) => handleStatusChange(lead.id, value)}
                       >
-                        <SelectTrigger className="w-[130px] h-7">
-                          <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                        <SelectTrigger className="w-[140px] h-[32px] rounded-[6px] border-slate-200 bg-white">
+                          <Badge className={`${getStatusColor(lead.status)} border-0 font-bold text-[11px] rounded-[4px]`}>{lead.status}</Badge>
                         </SelectTrigger>
                         <SelectContent>
                           {LEAD_STATUSES.map((status) => (
@@ -337,26 +344,26 @@ export function LeadManagement() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right font-bold text-foreground">
                       {lead.value ? `₹${lead.value.toLocaleString("en-IN")}` : "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-[32px] w-[32px] text-muted-foreground rounded-[8px]">
+                            <MIcon name="more_vert" className="text-[20px]" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDialog(lead)}>
-                            <Edit className="h-4 w-4 mr-2" />
+                        <DropdownMenuContent align="end" className="rounded-[12px] p-[8px] min-w-[160px]">
+                          <DropdownMenuItem onClick={() => openEditDialog(lead)} className="gap-[8px] font-medium rounded-[6px] cursor-pointer">
+                            <MIcon name="edit" className="text-[18px]" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleDelete(lead.id)}
-                            className="text-destructive"
+                            className="text-red-600 focus:bg-red-50 focus:text-red-700 gap-[8px] font-medium rounded-[6px] cursor-pointer cursor-pointer"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <MIcon name="delete" className="text-[18px]" />
                             Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -372,59 +379,63 @@ export function LeadManagement() {
 
       {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg sm:rounded-[16px] p-[24px]">
           <DialogHeader>
-            <DialogTitle>{editingLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-bold text-foreground">{editingLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
+            <DialogDescription className="text-body-sm font-medium text-muted-foreground mt-[4px]">
               {editingLead ? "Update lead information" : "Enter details for the new lead"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Name *</Label>
+          <div className="grid gap-[24px] py-[16px]">
+            <div className="grid grid-cols-2 gap-[16px]">
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Name *</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Lead name"
+                  className="h-[44px] rounded-[8px]"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Company</Label>
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Company</Label>
                 <Input
                   value={formData.company}
                   onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                   placeholder="Company name"
+                  className="h-[44px] rounded-[8px]"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
+            <div className="grid grid-cols-2 gap-[16px]">
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Email</Label>
                 <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="email@example.com"
+                  className="h-[44px] rounded-[8px]"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Phone</Label>
                 <Input
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+91 98765 43210"
+                  className="h-[44px] rounded-[8px]"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Source</Label>
+            <div className="grid grid-cols-2 gap-[16px]">
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Source</Label>
                 <Select
                   value={formData.source}
                   onValueChange={(value) => setFormData({ ...formData, source: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-[44px] rounded-[8px] border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -434,13 +445,13 @@ export function LeadManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
+              <div className="space-y-[8px]">
+                <Label className="text-body-sm font-bold text-foreground">Status</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value) => setFormData({ ...formData, status: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-[44px] rounded-[8px] border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -451,30 +462,32 @@ export function LeadManagement() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Estimated Value (₹)</Label>
+            <div className="space-y-[8px]">
+              <Label className="text-body-sm font-bold text-foreground">Estimated Value (₹)</Label>
               <Input
                 type="number"
                 value={formData.value}
                 onChange={(e) => setFormData({ ...formData, value: e.target.value })}
                 placeholder="0"
+                className="h-[44px] rounded-[8px]"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
+            <div className="space-y-[8px]">
+              <Label className="text-body-sm font-bold text-foreground">Notes</Label>
               <Textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Additional notes about this lead..."
                 rows={3}
+                className="rounded-[12px] border-slate-200"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          <DialogFooter className="mt-[24px]">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-[8px] h-[40px] px-[24px] font-bold border-border">
               Cancel
             </Button>
-            <Button onClick={handleSubmit}>
+            <Button onClick={handleSubmit} className="rounded-[8px] h-[40px] px-[24px] font-bold">
               {editingLead ? "Update Lead" : "Create Lead"}
             </Button>
           </DialogFooter>

@@ -111,9 +111,8 @@ export function AlertRules() {
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className={`p-4 border rounded-lg ${
-                  rule.enabled ? "bg-white" : "bg-accent/50"
-                }`}
+                className={`p-4 border rounded-lg ${rule.enabled ? "bg-white" : "bg-accent/50"
+                  }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -134,10 +133,10 @@ export function AlertRules() {
                           key={idx}
                           className={
                             channel === "Email"
-                              ? "bg-[#2563eb] text-white"
+                              ? "bg-info text-white"
                               : channel === "SMS"
-                              ? "bg-[#10b981] text-white"
-                              : "bg-[#f97316] text-white"
+                                ? "bg-success text-white"
+                                : "bg-warning text-white"
                           }
                         >
                           {channel}

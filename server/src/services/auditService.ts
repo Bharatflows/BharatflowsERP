@@ -7,7 +7,21 @@ import prisma from '../config/prisma';
 import crypto from 'crypto';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'EXPORT' | 'RESTORE';
-export type EntityType = 'INVOICE' | 'PARTY' | 'PRODUCT' | 'USER' | 'COMPANY' | 'SETTINGS' | 'STOCK_MOVEMENT';
+// H6 FIX: Expanded to include all financial entities for comprehensive audit trail
+export type EntityType =
+    | 'INVOICE'
+    | 'PARTY'
+    | 'PRODUCT'
+    | 'USER'
+    | 'COMPANY'
+    | 'SETTINGS'
+    | 'STOCK_MOVEMENT'
+    | 'PDC'              // H6: Post-dated cheques
+    | 'EXPENSE'          // H6: Expenses
+    | 'TRANSACTION'      // H6: Banking transactions
+    | 'CREDIT_NOTE'      // Sales credit notes
+    | 'DEBIT_NOTE'       // Purchase debit notes
+    | 'PURCHASE_BILL';   // Purchase bills
 
 export class AuditService {
     /**
@@ -80,8 +94,8 @@ export class AuditService {
                     entityType,
                     entityId,
                     action,
-                    oldValue: oldValue ? JSON.parse(JSON.stringify(oldValue)) : undefined,
-                    newValue: newValue ? JSON.parse(JSON.stringify(newValue)) : undefined,
+                    oldValue: oldValue ? JSON.stringify(oldValue) : undefined,
+                    newValue: newValue ? JSON.stringify(newValue) : undefined,
                     userIp: ip,
                     userAgent,
                     resourceGroup,

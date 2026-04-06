@@ -75,7 +75,7 @@ export function DocumentUpload() {
                 {files.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
-                      <FileText className="size-5 text-[#2563eb]" />
+                      <FileText className="size-5 text-primary" />
                       <div>
                         <p className="text-foreground">{file.name}</p>
                         <p className="text-muted-foreground">

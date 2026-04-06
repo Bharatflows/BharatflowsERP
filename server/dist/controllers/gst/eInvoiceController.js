@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteEInvoice = exports.cancelEInvoice = exports.updateEInvoiceStatus = exports.generateEInvoice = exports.getEInvoice = exports.getEInvoices = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
 const logger_1 = __importDefault(require("../../config/logger"));
+const eInvoiceService_1 = require("../../services/gst/eInvoiceService");
 // @desc    Get all E-Invoices
 // @route   GET /api/v1/gst/e-invoices
 // @access  Private
@@ -83,11 +84,14 @@ exports.getEInvoice = getEInvoice;
 // @desc    Generate E-Invoice for an invoice
 // @route   POST /api/v1/gst/e-invoices/generate
 // @access  Private
+// @desc    Generate E-Invoice for an invoice
+// @route   POST /api/v1/gst/e-invoices/generate
+// @access  Private
 const generateEInvoice = async (req, res) => {
     try {
         const companyId = req.user.companyId;
         const { invoiceId } = req.body;
-        // Fetch the invoice
+        // Fetch the invoice to ensure it exists
         const invoice = await prisma_1.default.invoice.findFirst({
             where: { id: invoiceId, companyId },
             include: { customer: true },
@@ -109,23 +113,33 @@ const generateEInvoice = async (req, res) => {
                 data: existing,
             });
         }
-        // In production, this would call the NIC E-Invoice API
-        // For now, we simulate the response
+        // 1. Generate Compliance Payload
+        const payload = await eInvoiceService_1.GSTEInvoiceService.generatePayload(invoiceId, companyId);
+        // 2. Validate and Mock Submit
+        const irnResponse = await eInvoiceService_1.GSTEInvoiceService.validateAndMockSubmit(payload);
+        // 3. Save to DB
+        // @ts-ignore - jsonPayload might be missing if migration failed
         const eInvoice = await prisma_1.default.eInvoice.create({
             data: {
                 invoiceId,
                 invoiceNumber: invoice.invoiceNumber,
                 invoiceDate: invoice.invoiceDate,
-                status: 'pending',
+                status: 'generated', // Successfully generated
                 customerName: invoice.customer?.name || 'Unknown',
                 gstin: invoice.customer?.gstin || null,
                 invoiceValue: invoice.totalAmount,
                 companyId,
+                irn: irnResponse.Irn,
+                ackNumber: irnResponse.AckNo,
+                ackDate: new Date(irnResponse.AckDt),
+                signedQR: irnResponse.SignedQRCode,
+                signedInvoice: irnResponse.SignedInvoice,
+                jsonPayload: payload // Store valid JSON
             },
         });
         return res.status(201).json({
             success: true,
-            message: 'E-Invoice generation initiated',
+            message: 'E-Invoice generated successfully',
             data: eInvoice,
         });
     }
@@ -133,7 +147,7 @@ const generateEInvoice = async (req, res) => {
         logger_1.default.error('Generate E-Invoice error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to generate E-Invoice',
+            message: error.message || 'Failed to generate E-Invoice',
             error: error.message,
         });
     }

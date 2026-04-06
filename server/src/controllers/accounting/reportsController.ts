@@ -202,3 +202,58 @@ export const getBalanceSheet = async (req: AuthRequest, res: Response) => {
         res.status(500).json({ success: false, message: 'Error generating Balance Sheet' });
     }
 };
+
+// @desc    Get Profit & Loss Monthly Trends
+// @route   GET /api/v1/accounting/reports/profit-loss-trends
+export const getProfitLossTrends = async (req: AuthRequest, res: Response) => {
+    try {
+        const companyId = req.user.companyId;
+        const monthsToFetch = 12; // Typical for P&L analysis
+        const trends = [];
+
+        for (let i = 0; i < monthsToFetch; i++) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+            const month = date.getMonth() + 1;
+            const year = date.getFullYear();
+
+            const startDate = new Date(year, month - 1, 1);
+            const endDate = new Date(year, month, 0, 23, 59, 59);
+
+            // Fetch Income & Expense Ledgers
+            const ledgers = await prisma.ledger.findMany({
+                where: {
+                    companyId,
+                    group: { type: { in: ['INCOME', 'EXPENSE'] } }
+                },
+                include: { group: true }
+            });
+
+            let monthlyRevenue = 0;
+            let monthlyExpense = 0;
+
+            for (const ledger of ledgers) {
+                const { debit, credit } = await getLedgerBalance(ledger.id, companyId, startDate, endDate);
+                if (ledger.group.type === 'INCOME') {
+                    monthlyRevenue += (credit - debit);
+                } else {
+                    monthlyExpense += (debit - credit);
+                }
+            }
+
+            trends.unshift({
+                month: date.toLocaleString('default', { month: 'short' }),
+                year,
+                revenue: monthlyRevenue,
+                expenses: monthlyExpense,
+                profit: monthlyRevenue - monthlyExpense
+            });
+        }
+
+        res.json({ success: true, data: trends });
+
+    } catch (error: any) {
+        logger.error('Get P&L Trends error:', error);
+        res.status(500).json({ success: false, message: 'Error generating P&L trends' });
+    }
+};

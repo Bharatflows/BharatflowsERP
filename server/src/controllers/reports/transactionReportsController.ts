@@ -5,14 +5,15 @@
  * Split from reportsController.ts for better maintainability.
  */
 
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../../config/prisma';
+import logger from '../../config/logger';
+import { ProtectedRequest } from '../../middleware/auth';
 
 // Sales Report
-export const getSalesReport = async (req: Request, res: Response) => {
+export const getSalesReport = async (req: ProtectedRequest, res: Response) => {
     try {
         const { startDate, endDate, groupBy = 'day' } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
@@ -102,7 +103,7 @@ export const getSalesReport = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get sales report error:', error);
+        logger.error('Get sales report error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating sales report'
@@ -111,10 +112,9 @@ export const getSalesReport = async (req: Request, res: Response) => {
 };
 
 // Purchase Report
-export const getPurchaseReport = async (req: Request, res: Response) => {
+export const getPurchaseReport = async (req: ProtectedRequest, res: Response) => {
     try {
         const { startDate, endDate } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
@@ -180,7 +180,7 @@ export const getPurchaseReport = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get purchase report error:', error);
+        logger.error('Get purchase report error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error generating purchase report'
@@ -189,9 +189,8 @@ export const getPurchaseReport = async (req: Request, res: Response) => {
 };
 
 // Inventory Report
-export const getInventoryReport = async (req: Request, res: Response) => {
+export const getInventoryReport = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const products = await prisma.product.findMany({
@@ -253,7 +252,7 @@ export const getInventoryReport = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get inventory report error:', error);
+        logger.error('Get inventory report error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error generating inventory report'
@@ -262,11 +261,10 @@ export const getInventoryReport = async (req: Request, res: Response) => {
 };
 
 // Party Statement (Customer/Supplier ledger)
-export const getPartyStatement = async (req: Request, res: Response) => {
+export const getPartyStatement = async (req: ProtectedRequest, res: Response) => {
     try {
         const { partyId } = req.params;
         const { startDate, endDate } = req.query;
-        // @ts-ignore
         const companyId = req.user.companyId;
 
         const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
@@ -369,10 +367,25 @@ export const getPartyStatement = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
-        console.error('Get party statement error:', error);
+        logger.error('Get party statement error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error generating party statement'
         });
     }
 };
+
+// Supplier Dependency Analysis
+export const analyzeConcentration = async (req: ProtectedRequest, res: Response) => {
+    try {
+        const supplierService = (await import('../../services/supplierDependencyService')).default;
+        const companyId = req.user.companyId;
+        const months = parseInt(req.query.months as string) || 12;
+        const data = await supplierService.analyzeConcentration(companyId, months);
+        res.json({ success: true, data });
+    } catch (error: any) {
+        logger.error('Supplier dependency error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+

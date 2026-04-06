@@ -1,19 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
-import {
-    Upload,
-    CheckCircle,
-    XCircle,
-    AlertTriangle,
-    RefreshCw,
-    FileText,
-    Download,
-    Search,
-} from "lucide-react";
 import { toast } from "sonner";
+import { gstService } from "../../services/modules.service";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+    <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+        {name}
+    </span>
+);
 
 interface GSTR2BRecord {
     id: string;
@@ -29,59 +28,43 @@ interface GSTR2BRecord {
     matchStatus: "MATCHED" | "UNMATCHED" | "MISMATCH" | "PENDING";
     mismatchReason?: string;
     purchaseBillNumber?: string;
+    purchaseBillId?: string;
 }
 
-// Mock data for demonstration
-const mockRecords: GSTR2BRecord[] = [
-    {
-        id: "1",
-        supplierGstin: "29GGGGG1314R9Z6",
-        supplierName: "ABC Suppliers Pvt Ltd",
-        invoiceNumber: "INV-2024-001",
-        invoiceDate: "2024-11-05",
-        invoiceValue: 118000,
-        taxableValue: 100000,
-        igst: 0,
-        cgst: 9000,
-        sgst: 9000,
-        matchStatus: "MATCHED",
-        purchaseBillNumber: "PB-2024-045",
-    },
-    {
-        id: "2",
-        supplierGstin: "27AABCU9603R1ZM",
-        supplierName: "XYZ Traders",
-        invoiceNumber: "INV-112024",
-        invoiceDate: "2024-11-10",
-        invoiceValue: 59000,
-        taxableValue: 50000,
-        igst: 0,
-        cgst: 4500,
-        sgst: 4500,
-        matchStatus: "MISMATCH",
-        mismatchReason: "Amount mismatch: Portal ₹59,000, Books ₹58,500",
-        purchaseBillNumber: "PB-2024-052",
-    },
-    {
-        id: "3",
-        supplierGstin: "33AADCB2230R1ZL",
-        supplierName: "Raw Materials Co",
-        invoiceNumber: "RM-2024-789",
-        invoiceDate: "2024-11-15",
-        invoiceValue: 23600,
-        taxableValue: 20000,
-        igst: 3600,
-        cgst: 0,
-        sgst: 0,
-        matchStatus: "UNMATCHED",
-    },
-];
-
 export function GSTR2BReconciliation() {
-    const [records, setRecords] = useState<GSTR2BRecord[]>(mockRecords);
+    const [records, setRecords] = useState<GSTR2BRecord[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("ALL");
     const [uploading, setUploading] = useState(false);
+    const [returnPeriod, setReturnPeriod] = useState("112024"); // Default for demo/late 2024
+
+    const fetchRecords = async () => {
+        setLoading(true);
+        try {
+            const response = await gstService.getGSTR2BRecords({ returnPeriod });
+            if (response.success && response.data) {
+                const mappedRecords = response.data.map((r: any) => ({
+                    ...r,
+                    invoiceValue: Number(r.invoiceValue),
+                    taxableValue: Number(r.taxableValue),
+                    igst: Number(r.igst),
+                    cgst: Number(r.cgst),
+                    sgst: Number(r.sgst),
+                    invoiceDate: r.invoiceDate.split("T")[0],
+                }));
+                setRecords(mappedRecords);
+            }
+        } catch (error) {
+            toast.error("Failed to fetch reconciliation records");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRecords();
+    }, [returnPeriod]);
 
     const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -92,46 +75,71 @@ export function GSTR2BReconciliation() {
             return;
         }
 
-        setUploading(true);
-        try {
-            // In production, this would parse the GSTR-2B JSON and match with purchase bills
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            toast.success("GSTR-2B file uploaded and processed!");
-            // Records would be populated from the API response
-        } catch (error) {
-            toast.error("Failed to process GSTR-2B file");
-        } finally {
-            setUploading(false);
-        }
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const content = e.target?.result as string;
+                const parsedData = JSON.parse(content);
+
+                // Expecting { records: [...] } or an array
+                const recordsToUpload = Array.isArray(parsedData) ? parsedData : (parsedData.records || []);
+
+                if (recordsToUpload.length === 0) {
+                    toast.error("No valid GSTR-2B records found in file");
+                    return;
+                }
+
+                setUploading(true);
+                const response = await gstService.uploadGSTR2B({
+                    records: recordsToUpload,
+                    returnPeriod
+                });
+
+                if (response.success) {
+                    toast.success(response.message || "GSTR-2B file uploaded and processed!");
+                    fetchRecords();
+                } else {
+                    toast.error(response.message || "Failed to process GSTR-2B file");
+                }
+            } catch (error: any) {
+                console.error("Parse error:", error);
+                toast.error("Failed to parse JSON file: " + error.message);
+            } finally {
+                setUploading(false);
+                // Clear the input
+                event.target.value = "";
+            }
+        };
+        reader.readAsText(file);
     };
 
     const getStatusBadge = (status: string) => {
         switch (status) {
             case "MATCHED":
                 return (
-                    <Badge className="bg-green-100 text-green-700">
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                    <Badge className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 rounded-[6px] font-bold">
+                        <MIcon name="check_circle" className="text-[14px] mr-[4px]" />
                         Matched
                     </Badge>
                 );
             case "UNMATCHED":
                 return (
-                    <Badge className="bg-gray-100 text-gray-700">
-                        <XCircle className="h-3 w-3 mr-1" />
+                    <Badge className="bg-muted dark:bg-card text-foreground dark:text-muted-foreground border-slate-200 dark:border-slate-700 rounded-[6px] font-bold">
+                        <MIcon name="cancel" className="text-[14px] mr-[4px]" />
                         Unmatched
                     </Badge>
                 );
             case "MISMATCH":
                 return (
-                    <Badge className="bg-amber-100 text-amber-700">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
+                    <Badge className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 rounded-[6px] font-bold">
+                        <MIcon name="warning" className="text-[14px] mr-[4px]" />
                         Mismatch
                     </Badge>
                 );
             default:
                 return (
-                    <Badge className="bg-blue-100 text-blue-700">
-                        <RefreshCw className="h-3 w-3 mr-1" />
+                    <Badge className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 rounded-[6px] font-bold">
+                        <MIcon name="refresh" className="text-[14px] mr-[4px]" />
                         Pending
                     </Badge>
                 );
@@ -163,16 +171,16 @@ export function GSTR2BReconciliation() {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-[24px] animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-[16px]">
                 <div>
-                    <h2 className="text-2xl font-bold">GSTR-2B Reconciliation</h2>
-                    <p className="text-muted-foreground">
+                    <h2 className="text-3xl font-bold text-foreground">GSTR-2B Reconciliation</h2>
+                    <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">
                         Match your purchase bills with GSTR-2B portal data
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-[12px]">
                     <label>
                         <input
                             type="file"
@@ -180,65 +188,65 @@ export function GSTR2BReconciliation() {
                             onChange={handleFileUpload}
                             className="hidden"
                         />
-                        <Button variant="outline" asChild disabled={uploading}>
-                            <span className="cursor-pointer">
-                                <Upload className="h-4 w-4 mr-2" />
+                        <Button variant="outline" asChild disabled={uploading} className="h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+                            <span className="cursor-pointer gap-[8px]">
+                                <MIcon name="upload" className="text-[18px]" />
                                 {uploading ? "Processing..." : "Upload GSTR-2B JSON"}
                             </span>
                         </Button>
                     </label>
-                    <Button variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
+                    <Button variant="outline" className="h-[40px] px-[16px] rounded-[8px] font-bold gap-[8px] border-border">
+                        <MIcon name="download" className="text-[18px]" />
                         Export Report
                     </Button>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent className="p-4">
-                        <p className="text-sm text-muted-foreground">Total Records</p>
-                        <p className="text-2xl font-bold">{stats.total}</p>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-[16px]">
+                <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                    <CardContent className="p-[20px]">
+                        <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-[4px]">Total Records</p>
+                        <p className="text-3xl font-bold text-foreground">{stats.total}</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-green-50 border-green-200">
-                    <CardContent className="p-4">
-                        <p className="text-sm text-green-600">Matched</p>
-                        <p className="text-2xl font-bold text-green-700">{stats.matched}</p>
+                <Card className="rounded-[16px] border-emerald-200 dark:border-emerald-900/50 shadow-sm bg-emerald-50 dark:bg-emerald-950/20">
+                    <CardContent className="p-[20px]">
+                        <p className="text-[12px] font-bold text-emerald-600/80 dark:text-emerald-400/80 uppercase tracking-wider mb-[4px]">Matched</p>
+                        <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-300">{stats.matched}</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-gray-50 border-gray-200">
-                    <CardContent className="p-4">
-                        <p className="text-sm text-gray-600">Unmatched</p>
-                        <p className="text-2xl font-bold text-gray-700">{stats.unmatched}</p>
+                <Card className="rounded-[16px] border-border shadow-sm bg-muted dark:bg-slate-800/20">
+                    <CardContent className="p-[20px]">
+                        <p className="text-[12px] font-bold text-muted-foreground/80 dark:text-muted-foreground/80 uppercase tracking-wider mb-[4px]">Unmatched</p>
+                        <p className="text-3xl font-bold text-foreground dark:text-muted-foreground">{stats.unmatched}</p>
                     </CardContent>
                 </Card>
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardContent className="p-4">
-                        <p className="text-sm text-amber-600">Mismatch</p>
-                        <p className="text-2xl font-bold text-amber-700">{stats.mismatch}</p>
+                <Card className="rounded-[16px] border-amber-200 dark:border-amber-900/50 shadow-sm bg-amber-50 dark:bg-amber-950/20">
+                    <CardContent className="p-[20px]">
+                        <p className="text-[12px] font-bold text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wider mb-[4px]">Mismatch</p>
+                        <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">{stats.mismatch}</p>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4">
+            <div className="flex flex-col md:flex-row gap-[16px]">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <MIcon name="search" className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[20px] text-muted-foreground" />
                     <Input
                         placeholder="Search by supplier name, GSTIN, or invoice number..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-[40px] h-[40px] rounded-[8px] border-border bg-card"
                     />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-[8px] flex-wrap">
                     {["ALL", "MATCHED", "UNMATCHED", "MISMATCH"].map((status) => (
                         <Button
                             key={status}
                             variant={filterStatus === status ? "default" : "outline"}
-                            size="sm"
+                            className="h-[40px] px-[16px] rounded-[8px] font-bold"
                             onClick={() => setFilterStatus(status)}
                         >
                             {status === "ALL" ? "All" : status.charAt(0) + status.slice(1).toLowerCase()}
@@ -248,62 +256,65 @@ export function GSTR2BReconciliation() {
             </div>
 
             {/* Records Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+            <Card className="rounded-[16px] border-border shadow-sm overflow-hidden">
+                <CardHeader className="p-[20px] pb-[16px] border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="text-2xl font-bold flex items-center gap-[12px] text-foreground">
+                        <MIcon name="description" className="text-[24px] text-primary" />
                         Reconciliation Records
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-body-sm font-medium text-muted-foreground">
                         Compare GSTR-2B data with your purchase records
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="text-left py-3 px-4 font-medium">Supplier</th>
-                                    <th className="text-left py-3 px-4 font-medium">Invoice</th>
-                                    <th className="text-left py-3 px-4 font-medium">Date</th>
-                                    <th className="text-right py-3 px-4 font-medium">Value</th>
-                                    <th className="text-right py-3 px-4 font-medium">Tax</th>
-                                    <th className="text-center py-3 px-4 font-medium">Status</th>
-                                    <th className="text-left py-3 px-4 font-medium">Our Bill</th>
+                        <table className="w-full text-left">
+                            <thead className="bg-muted dark:bg-slate-950 border-b border-border">
+                                <tr>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Supplier</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Invoice</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Date</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Value</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Tax</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-center">Status</th>
+                                    <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Our Bill</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredRecords.map((record) => (
-                                    <tr key={record.id} className="border-b hover:bg-muted/20">
-                                        <td className="py-3 px-4">
+                                {filteredRecords.map((record, index) => (
+                                    <tr key={record.id} className={cn(
+                                        "border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors",
+                                        index === filteredRecords.length - 1 && "border-b-0"
+                                    )}>
+                                        <td className="px-[24px] py-[16px]">
                                             <div>
-                                                <p className="font-medium">{record.supplierName}</p>
-                                                <p className="text-xs text-muted-foreground font-mono">
+                                                <p className="text-body-sm font-bold text-foreground">{record.supplierName}</p>
+                                                <p className="text-[12px] font-medium text-muted-foreground font-mono mt-[2px]">
                                                     {record.supplierGstin}
                                                 </p>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-4 font-mono">{record.invoiceNumber}</td>
-                                        <td className="py-3 px-4">
+                                        <td className="px-[24px] py-[16px] font-mono text-body-sm font-bold text-foreground dark:text-muted-foreground">{record.invoiceNumber}</td>
+                                        <td className="px-[24px] py-[16px] text-body-sm font-medium text-muted-foreground">
                                             {new Date(record.invoiceDate).toLocaleDateString("en-IN")}
                                         </td>
-                                        <td className="py-3 px-4 text-right font-mono">
+                                        <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-medium text-foreground dark:text-muted-foreground">
                                             {formatCurrency(record.invoiceValue)}
                                         </td>
-                                        <td className="py-3 px-4 text-right font-mono">
+                                        <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-foreground">
                                             {formatCurrency(record.igst + record.cgst + record.sgst)}
                                         </td>
-                                        <td className="py-3 px-4 text-center">
+                                        <td className="px-[24px] py-[16px] text-center">
                                             {getStatusBadge(record.matchStatus)}
                                             {record.mismatchReason && (
-                                                <p className="text-xs text-amber-600 mt-1">{record.mismatchReason}</p>
+                                                <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 mt-[4px]">{record.mismatchReason}</p>
                                             )}
                                         </td>
-                                        <td className="py-3 px-4">
-                                            {record.purchaseBillNumber ? (
-                                                <span className="font-mono text-primary">{record.purchaseBillNumber}</span>
+                                        <td className="px-[24px] py-[16px]">
+                                            {record.purchaseBillId ? (
+                                                <Badge variant="outline" className="font-mono text-[10px] font-bold rounded-[4px] border-primary/30 text-primary bg-primary/5">MATCHED</Badge>
                                             ) : (
-                                                <Button variant="link" size="sm" className="p-0 h-auto">
+                                                <Button variant="link" size="sm" className="p-0 h-auto text-body-sm font-bold text-primary">
                                                     Link Bill
                                                 </Button>
                                             )}

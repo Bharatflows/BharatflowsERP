@@ -83,18 +83,18 @@ export function PurchaseReports() {
     switch (status?.toUpperCase()) {
       case 'RECEIVED':
       case 'PAID':
-        return 'bg-green-100 text-green-700';
+        return 'badge-paid';
       case 'PENDING':
       case 'SENT':
       case 'DRAFT':
-        return 'bg-yellow-100 text-yellow-700';
+        return 'badge-draft';
       case 'DUE':
       case 'CANCELLED':
-        return 'bg-red-100 text-red-700';
+        return 'badge-overdue';
       case 'PARTIAL':
-        return 'bg-blue-100 text-blue-700';
+        return 'badge-partial';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'badge-draft';
     }
   };
 
@@ -120,9 +120,9 @@ export function PurchaseReports() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-border shadow-sm">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold">Purchase Reports</h2>
-          <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-1.5">
-            <Calendar className="size-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-700">{period}</span>
+          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+            <Calendar className="size-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">{period}</span>
           </div>
         </div>
         <div className="flex gap-2">

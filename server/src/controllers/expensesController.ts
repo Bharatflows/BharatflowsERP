@@ -2,6 +2,10 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import * as accountingService from '../services/accountingService';
+// P0: postingService calls moved to domain event subscriber
+import eventBus, { EventTypes } from '../services/eventBus';  // P0: Domain events
+import { AuditService } from '../services/auditService';  // D1: Audit logging
+import logger from '../config/logger';
 
 const prisma = new PrismaClient();
 
@@ -23,7 +27,7 @@ export const getExpenses = async (req: AuthRequest, res: Response) => {
             data: expenses
         });
     } catch (error) {
-        console.error('Error fetching expenses:', error);
+        logger.error('Error fetching expenses:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -56,7 +60,7 @@ export const getExpense = async (req: AuthRequest, res: Response) => {
             data: expense
         });
     } catch (error) {
-        console.error('Error fetching expense:', error);
+        logger.error('Error fetching expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -113,8 +117,9 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
         const expenseNumber = `EXP-${month}-${String(seqNum).padStart(3, '0')}`;
 
         // Auto-create category if it doesn't exist
+        let policyWarning: string | null = null;
         if (category) {
-            await prisma.expenseCategory.upsert({
+            const expenseCategory = await prisma.expenseCategory.upsert({
                 where: {
                     companyId_name: {
                         companyId: companyId!,
@@ -130,30 +135,90 @@ export const createExpense = async (req: AuthRequest, res: Response) => {
                     color: '#6b7280'
                 }
             });
+
+            // Check policy limit
+            if (expenseCategory.maxAmount && Number(amount) > Number(expenseCategory.maxAmount)) {
+                policyWarning = `Amount exceeds category limit of ₹${Number(expenseCategory.maxAmount).toLocaleString('en-IN')}`;
+            }
         }
+
+        const gstVal = Number(gstAmount || 0);
+        const amountVal = Number(amount);
+
+        // Auto-detect status based on payment method
+        const initialStatus = paymentMethod ? 'PAID' : 'PENDING';
 
         const expense = await prisma.expense.create({
             data: {
                 companyId: companyId!,
                 expenseNumber,
                 category,
-                amount: Number(amount),
+                amount: amountVal,
                 date: expenseDate,
                 description,
                 vendor,
                 paymentMethod,
-                gstAmount: Number(gstAmount || 0),
-                notes,
-                status: 'PENDING'
+                gstAmount: gstVal,
+                notes: policyWarning ? `${notes || ''}\n⚠️ POLICY WARNING: ${policyWarning}` : notes,
+                status: initialStatus
             }
         });
 
+        // P0: Emit domain event instead of direct postingService call
+        // The Accounting domain will subscribe to this event and handle ledger posting
+        try {
+            await eventBus.emit({
+                companyId: companyId!,
+                eventType: EventTypes.EXPENSE_CREATED,
+                aggregateType: 'Expense',
+                aggregateId: expense.id,
+                payload: {
+                    expenseId: expense.id,
+                    expenseNumber: expense.expenseNumber,
+                    category: expense.category,
+                    amount: Number(expense.amount),
+                    gstAmount: Number(expense.gstAmount || 0),
+                    totalAmount: Number(expense.amount) + Number(expense.gstAmount || 0),
+                    date: expense.date.toISOString(),
+                    description: expense.description,
+                    vendor: expense.vendor,
+                    paymentMethod: expense.paymentMethod,
+                    status: expense.status
+                },
+                metadata: {
+                    userId: req.user?.id || 'system',
+                    source: 'api'
+                }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit EXPENSE_CREATED event:', eventError);
+        }
+
+        // D1: Audit log for expense creation
+        try {
+            await AuditService.logChange(
+                companyId!,
+                req.user?.id || 'system',
+                'INVOICE', // Using INVOICE as closest EntityType for Expense
+                expense.id,
+                'CREATE',
+                null,
+                { expenseNumber: expense.expenseNumber, amount: amountVal, category, vendor },
+                req.ip || 'UNKNOWN',
+                req.headers['user-agent'] as string || 'UNKNOWN',
+                'EXPENSES'
+            );
+        } catch (auditError) {
+            logger.warn('Failed to log expense audit:', auditError);
+        }
+
         res.status(201).json({
             success: true,
-            data: expense
+            data: expense,
+            policyWarning
         });
     } catch (error) {
-        console.error('Error creating expense:', error);
+        logger.error('Error creating expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -194,7 +259,7 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
         }
 
         const updatedExpense = await prisma.expense.update({
-            where: { id: expenseId },
+            where: { id: expenseId , companyId: req.user.companyId },
             data: {
                 category,
                 amount: Number(amount),
@@ -213,7 +278,7 @@ export const updateExpense = async (req: AuthRequest, res: Response) => {
             data: updatedExpense
         });
     } catch (error) {
-        console.error('Error updating expense:', error);
+        logger.error('Error updating expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -242,15 +307,33 @@ export const deleteExpense = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.expense.delete({
-            where: { id: req.params.id }
+            where: { id: req.params.id , companyId: req.user.companyId }
         });
+
+        // D1: Audit log for expense deletion
+        try {
+            await AuditService.logChange(
+                req.user?.companyId!,
+                req.user?.id || 'system',
+                'INVOICE',
+                expense.id,
+                'DELETE',
+                { expenseNumber: expense.expenseNumber, amount: Number(expense.amount), category: expense.category },
+                null,
+                req.ip || 'UNKNOWN',
+                req.headers['user-agent'] as string || 'UNKNOWN',
+                'EXPENSES'
+            );
+        } catch (auditError) {
+            logger.warn('Failed to log expense delete audit:', auditError);
+        }
 
         res.json({
             success: true,
             data: {}
         });
     } catch (error) {
-        console.error('Error deleting expense:', error);
+        logger.error('Error deleting expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -288,7 +371,7 @@ export const approveExpense = async (req: AuthRequest, res: Response) => {
         }
 
         const updatedExpense = await prisma.expense.update({
-            where: { id: expenseId },
+            where: { id: expenseId , companyId: req.user.companyId },
             data: {
                 status: 'APPROVED',
                 approvedById: userId,
@@ -301,12 +384,32 @@ export const approveExpense = async (req: AuthRequest, res: Response) => {
             }
         });
 
+        // Emit EXPENSE_APPROVED event
+        try {
+            await eventBus.emit({
+                companyId: companyId!,
+                eventType: EventTypes.EXPENSE_APPROVED,
+                aggregateType: 'Expense',
+                aggregateId: updatedExpense.id,
+                payload: {
+                    expenseId: updatedExpense.id,
+                    expenseNumber: expense.expenseNumber,
+                    amount: Number(expense.amount),
+                    approvedById: userId,
+                    approvalDate: updatedExpense.approvalDate
+                },
+                metadata: { userId: userId || 'system', source: 'api' }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit EXPENSE_APPROVED event:', eventError);
+        }
+
         res.json({
             success: true,
             data: updatedExpense
         });
     } catch (error) {
-        console.error('Error approving expense:', error);
+        logger.error('Error approving expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -352,7 +455,7 @@ export const rejectExpense = async (req: AuthRequest, res: Response) => {
         }
 
         const updatedExpense = await prisma.expense.update({
-            where: { id: expenseId },
+            where: { id: expenseId , companyId: req.user.companyId },
             data: {
                 status: 'REJECTED',
                 rejectionReason: reason
@@ -364,7 +467,7 @@ export const rejectExpense = async (req: AuthRequest, res: Response) => {
             data: updatedExpense
         });
     } catch (error) {
-        console.error('Error rejecting expense:', error);
+        logger.error('Error rejecting expense:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -394,60 +497,36 @@ export const markAsPaid = async (req: AuthRequest, res: Response) => {
             return;
         }
 
-        // Expense must be APPROVED before it can be marked as PAID
-        if (expense.status !== 'APPROVED') {
-            res.status(400).json({
-                success: false,
-                message: `Expense must be approved before marking as paid. Current status: ${expense.status}`
-            });
-            return;
-        }
 
-        // Create journal entry for accounting
-        let voucherId: string | null = null;
+
+        // P0: Emit domain event for ledger posting
         try {
-            // Get expense ledger - first try category-linked ledger
-            const expenseCategory = await prisma.expenseCategory.findFirst({
-                where: { companyId, name: expense.category }
-            });
-
-            let expenseLedgerId: string;
-            if (expenseCategory?.ledgerId) {
-                expenseLedgerId = expenseCategory.ledgerId;
-            } else {
-                // Fall back to "Miscellaneous Expenses" ledger
-                expenseLedgerId = await accountingService.getSystemLedgerByCode(companyId!, 'MISC_EXPENSES');
-            }
-
-            // Get Cash ledger for credit
-            const cashLedgerId = await accountingService.getSystemLedgerByCode(companyId!, 'CASH');
-
-            // Generate voucher number
-            const voucherNumber = await accountingService.getNextVoucherNumber(companyId!, 'PAYMENT');
-
-            // Create PAYMENT voucher
-            const voucher = await accountingService.createVoucher({
-                voucherNumber,
-                date: new Date(),
-                type: 'PAYMENT',
-                referenceType: 'EXPENSE',
-                referenceId: expenseId,
-                narration: `Payment for expense: ${expense.description || expense.category} (${expense.expenseNumber || expenseId})`,
+            await eventBus.emit({
                 companyId: companyId!,
-                createdById: userId,
-                postings: [
-                    { ledgerId: expenseLedgerId, amount: Number(expense.amount), type: 'DEBIT' },
-                    { ledgerId: cashLedgerId, amount: Number(expense.amount), type: 'CREDIT' }
-                ]
+                eventType: 'EXPENSE_PAID',
+                aggregateType: 'Expense',
+                aggregateId: expense.id,
+                payload: {
+                    expenseId: expense.id,
+                    description: expense.description || expense.category,
+                    date: new Date().toISOString(),
+                    amount: Number(expense.amount),
+                    gstAmount: Number(expense.gstAmount || 0),
+                    totalAmount: Number(expense.amount) + Number(expense.gstAmount || 0),
+                    category: expense.category,
+                    paymentMethod: paymentMethod || expense.paymentMethod
+                },
+                metadata: {
+                    userId: userId || 'system',
+                    source: 'api'
+                }
             });
-            voucherId = voucher.id;
-        } catch (accountingError) {
-            // Log but don't fail the payment if accounting integration fails
-            console.error('Accounting integration failed:', accountingError);
+        } catch (eventError) {
+            logger.warn('Failed to emit EXPENSE_PAID event:', eventError);
         }
 
         const updatedExpense = await prisma.expense.update({
-            where: { id: expenseId },
+            where: { id: expenseId , companyId: req.user.companyId },
             data: {
                 status: 'PAID',
                 paymentMethod: paymentMethod || expense.paymentMethod
@@ -456,11 +535,10 @@ export const markAsPaid = async (req: AuthRequest, res: Response) => {
 
         res.json({
             success: true,
-            data: updatedExpense,
-            voucherId // Include voucher ID if created
+            data: updatedExpense
         });
     } catch (error) {
-        console.error('Error marking expense as paid:', error);
+        logger.error('Error marking expense as paid:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -542,7 +620,7 @@ export const getVendorPaymentSummary = async (req: AuthRequest, res: Response) =
             data: vendors
         });
     } catch (error) {
-        console.error('Error fetching vendor payments:', error);
+        logger.error('Error fetching vendor payments:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -587,7 +665,7 @@ export const recordVendorPayment = async (req: AuthRequest, res: Response) => {
             if (remainingAmount >= expenseAmount) {
                 // Fully pay this expense
                 const updated = await prisma.expense.update({
-                    where: { id: expense.id },
+                    where: { id: expense.id , companyId: req.user.companyId },
                     data: {
                         status: 'PAID',
                         paymentMethod: paymentMethod || expense.paymentMethod
@@ -607,7 +685,7 @@ export const recordVendorPayment = async (req: AuthRequest, res: Response) => {
             }
         });
     } catch (error) {
-        console.error('Error recording vendor payment:', error);
+        logger.error('Error recording vendor payment:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -781,7 +859,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response) => {
         });
 
     } catch (error) {
-        console.error('Error fetching dashboard stats:', error);
+        logger.error('Error fetching dashboard stats:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -835,7 +913,7 @@ export const getBudgetVsActualReport = async (req: AuthRequest, res: Response) =
             data
         });
     } catch (error) {
-        console.error('Error generating budget vs actual report:', error);
+        logger.error('Error generating budget vs actual report:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -885,7 +963,7 @@ export const getCategoryTrendReport = async (req: AuthRequest, res: Response) =>
             data
         });
     } catch (error) {
-        console.error('Error generating category trend report:', error);
+        logger.error('Error generating category trend report:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -924,7 +1002,7 @@ export const getVendorSummaryReport = async (req: AuthRequest, res: Response) =>
             data
         });
     } catch (error) {
-        console.error('Error generating vendor summary report:', error);
+        logger.error('Error generating vendor summary report:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'
@@ -973,7 +1051,7 @@ export const getTaxReport = async (req: AuthRequest, res: Response) => {
             data
         });
     } catch (error) {
-        console.error('Error generating tax report:', error);
+        logger.error('Error generating tax report:', error);
         res.status(500).json({
             success: false,
             message: 'Server Error'

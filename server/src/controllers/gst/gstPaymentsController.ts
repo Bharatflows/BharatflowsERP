@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../../middleware/auth';
 import prisma from '../../config/prisma';
 import logger from '../../config/logger';
+import eventBus, { EventTypes } from '../../services/eventBus';
 
 // @desc    Get all GST Payments
 // @route   GET /api/v1/gst/payments
@@ -125,6 +126,23 @@ export const createGSTPayment = async (req: AuthRequest, res: Response) => {
                 transactionId,
                 companyId,
             },
+        });
+
+        // Emit GST_PAYMENT_MADE event
+        await eventBus.emit({
+            companyId,
+            eventType: EventTypes.GST_PAYMENT_MADE,
+            aggregateType: 'GSTPayment',
+            aggregateId: payment.id,
+            payload: {
+                challanNumber: payment.challanNumber,
+                period: payment.period,
+                total: payment.total,
+                cgst: payment.cgst,
+                sgst: payment.sgst,
+                igst: payment.igst
+            },
+            metadata: { userId: req.user.id, source: 'api' }
         });
 
         return res.status(201).json({

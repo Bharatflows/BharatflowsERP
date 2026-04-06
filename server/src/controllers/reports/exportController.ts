@@ -1,5 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import prisma from '../../config/prisma';
+import logger from '../../config/logger';
+import { ProtectedRequest } from '../../middleware/auth';
 
 // CSV helper functions
 const escapeCsvValue = (value: any): string => {
@@ -21,9 +23,8 @@ const arrayToCSV = (headers: string[], rows: any[][]): string => {
 // @desc    Export reports as CSV
 // @route   GET /api/v1/reports/export/:type
 // @access  Private
-export const exportReport = async (req: Request, res: Response) => {
+export const exportReport = async (req: ProtectedRequest, res: Response) => {
     try {
-        // @ts-ignore
         const companyId = req.user.companyId;
         const { type } = req.params;
         const { startDate, endDate, format = 'csv' } = req.query;
@@ -214,7 +215,7 @@ export const exportReport = async (req: Request, res: Response) => {
         return res.status(200).send(csvContent);
 
     } catch (error: any) {
-        console.error('Export report error:', error);
+        logger.error('Export report error:', error);
         return res.status(500).json({
             success: false,
             message: error.message || 'Error exporting report'

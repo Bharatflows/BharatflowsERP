@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Zap, Smartphone, ArrowLeft } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { Smartphone, ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "./ui/input-otp";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import { Input } from "./ui/input";
+import { AuthLayout } from "./layout/AuthLayout";
+import { Logo } from "./common/Logo";
 
 export function OTPLogin() {
   const navigate = useNavigate();
@@ -35,147 +37,155 @@ export function OTPLogin() {
 
     try {
       await verifyOTP(phone, otp);
-      navigate('/dashboard');
+      navigate("/dashboard");
     } catch (err: any) {
-      setError(err.message || 'Invalid OTP');
+      setError(err.message || "Invalid OTP");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-muted flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          className="mb-4"
-          onClick={() => {
-            if (step === "otp") {
-              setStep("phone");
-              setOtp("");
-            } else {
-              navigate(-1);
-            }
-          }}
-        >
-          <ArrowLeft className="size-4 mr-2" />
-          Back
-        </Button>
-
-        {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="bg-primary p-3 rounded-2xl shadow-lg">
-              <Zap className="size-8 text-white" />
-            </div>
-          </div>
-          <h1 className="mb-2">Login with OTP</h1>
-          <p className="text-muted-foreground">
-            {step === "phone"
-              ? "Enter your phone number to receive OTP"
-              : "Enter the 6-digit OTP sent to your phone"}
-          </p>
+    <AuthLayout>
+      <div className="space-y-5">
+        <div className="mb-4">
+          <Logo />
         </div>
 
-        {/* OTP Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-border">
-          {step === "phone" ? (
-            <form onSubmit={handleSendOTP} className="space-y-5">
-              {/* Demo Info */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-2"><strong>Demo Mode:</strong></p>
-                <p className="text-sm text-blue-600">Enter any phone number</p>
-                <p className="text-sm text-blue-600">OTP will be: 123456</p>
-              </div>
+        {/* Icon + Header */}
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+            <Smartphone className="w-6 h-6 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+              Sign in with OTP
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {step === "phone"
+                ? "Enter your phone number to receive a code"
+                : "Enter the 6-digit code sent to your phone"}
+            </p>
+          </div>
+        </div>
 
-              {/* Phone Input */}
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="relative">
-                  <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+91 98765 43210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="pl-10 h-12"
-                    required
-                  />
+        {/* Phone Step */}
+        {step === "phone" ? (
+          <form onSubmit={handleSendOTP} className="space-y-4">
+            <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg text-sm text-foreground">
+              <p className="font-medium">Demo mode</p>
+              <p className="text-muted-foreground mt-0.5">Enter any phone number. OTP: <span className="font-mono font-semibold text-foreground">123456</span></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="phone" className="text-sm font-medium text-foreground">
+                Phone number
+              </Label>
+              <div className="flex">
+                <div className="flex items-center justify-center px-3 border border-r-0 border-input bg-muted rounded-l-md text-muted-foreground text-sm font-medium">
+                  +91
                 </div>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  className="h-10 rounded-l-none"
+                  placeholder="98765 43210"
+                  autoFocus
+                />
               </div>
+            </div>
 
-              {/* Send OTP Button */}
-              <Button
-                type="submit"
-                className="w-full h-12 bg-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading}
+            <Button
+              type="submit"
+              disabled={phone.length < 10 || isLoading}
+              className="w-full h-10 font-medium shadow-sm transition-all"
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin mr-2" size={16} />
+              ) : null}
+              {isLoading ? "Sending..." : "Send OTP"}
+            </Button>
+          </form>
+        ) : (
+          /* OTP Step */
+          <form onSubmit={handleVerifyOTP} className="space-y-4">
+            {error && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-lg flex items-center gap-2 text-sm border border-destructive/20">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="text-center p-3 bg-muted rounded-lg border border-border">
+              <p className="text-xs text-muted-foreground">OTP sent to</p>
+              <p className="font-semibold text-foreground mt-0.5">+91 {phone}</p>
+            </div>
+
+            <div className="flex justify-center py-2">
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(value) => setOtp(value)}
               >
-                {isLoading ? "Sending OTP..." : "Send OTP"}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOTP} className="space-y-5">
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                  {error}
-                </div>
-              )}
+                <InputOTPGroup className="gap-2">
+                  {[0, 1, 2, 3, 4, 5].map((idx) => (
+                    <InputOTPSlot
+                      key={idx}
+                      index={idx}
+                      className="w-10 h-12 text-lg font-semibold border-input"
+                    />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
 
-              {/* Phone Display */}
-              <div className="text-center p-3 bg-accent rounded-lg">
-                <p className="text-muted-foreground">OTP sent to</p>
-                <p className="text-foreground">{phone}</p>
-              </div>
+            <Button
+              type="submit"
+              disabled={isLoading || otp.length !== 6}
+              className="w-full h-10 font-medium shadow-sm transition-all"
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin mr-2" size={16} />
+              ) : null}
+              {isLoading ? "Verifying..." : "Verify OTP"}
+            </Button>
 
-              {/* OTP Input */}
-              <div className="space-y-2">
-                <Label htmlFor="otp">Enter OTP</Label>
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={otp}
-                    onChange={(value) => setOtp(value)}
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-              </div>
-
-              {/* Verify Button */}
-              <Button
-                type="submit"
-                className="w-full h-12 bg-primary hover:opacity-90 transition-opacity"
-                disabled={isLoading || otp.length !== 6}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("phone");
+                  setOtp("");
+                }}
+                className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                {isLoading ? "Verifying..." : "Verify OTP"}
-              </Button>
+                Resend OTP
+              </button>
+            </div>
+          </form>
+        )}
 
-              {/* Resend OTP */}
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("phone");
-                    setOtp("");
-                  }}
-                  className="text-primary hover:underline"
-                >
-                  Resend OTP
-                </button>
-              </div>
-            </form>
-          )}
+        {/* Back navigation */}
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (step === "otp") {
+                setStep("phone");
+                setOtp("");
+              } else {
+                navigate("/login");
+              }
+            }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center"
+          >
+            <ArrowLeft size={14} className="mr-1.5" />
+            {step === "otp" ? "Change number" : "Back to sign in"}
+          </button>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

@@ -22,8 +22,10 @@ exports.registerValidation = [
     (0, express_validator_1.body)('name').trim().notEmpty().withMessage('Name is required'),
     (0, express_validator_1.body)('email').isEmail().withMessage('Invalid email format'),
     (0, express_validator_1.body)('password')
-        .isLength({ min: 6 })
-        .withMessage('Password must be at least 6 characters'),
+        .isLength({ min: 8 })
+        .withMessage('Password must be at least 8 characters')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
     (0, express_validator_1.body)('phone')
         .optional({ checkFalsy: true })
         .matches(/^[6-9]\d{9}$/)

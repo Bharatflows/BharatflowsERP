@@ -3,6 +3,7 @@
  *
  * Handles core invoice CRUD operations.
  * Split from salesController.ts for better maintainability.
+ * Fixed syntax errors and duplicates.
  */
 import { Response } from 'express';
 import { AuthRequest } from '../../middleware/auth';

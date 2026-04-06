@@ -65,8 +65,8 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
       try {
         setLoading(true);
         const response = await messagingService.getMessages(chat.id, { limit: 50 });
-        if (response.data?.data?.items) {
-          setMessages(response.data.data.items);
+        if (response.success && response.data?.items) {
+          setMessages(response.data.items);
         }
       } catch (error) {
         console.error("Failed to fetch messages:", error);
@@ -96,7 +96,7 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
   useEffect(() => {
     const cleanup = onNewMessage((message) => {
       if (message.conversationId === chat.id) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => [...prev, message as any]);
         markAsRead(chat.id);
       }
     });
@@ -158,8 +158,8 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
           const response = await messagingService.sendMessage(chat.id, {
             content: messageContent,
           });
-          if (response.data?.data) {
-            setMessages((prev) => [...prev, response.data!.data!]);
+          if (response.success && response.data) {
+            setMessages((prev) => [...prev, response.data! as any]);
           }
         } catch (error) {
           toast.error("Failed to send message");
@@ -173,8 +173,8 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
         const response = await messagingService.sendMessage(chat.id, {
           content: messageContent,
         });
-        if (response.data?.data) {
-          setMessages((prev) => [...prev, response.data!.data!]);
+        if (response.success && response.data) {
+          setMessages((prev) => [...prev, response.data! as any]);
         }
       } catch (error) {
         toast.error("Failed to send message");
@@ -245,7 +245,7 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
                     : "Offline"}
               </span>
               {isConnected && (
-                <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700">
+                <Badge variant="outline" className="text-2xs bg-green-50 text-green-700">
                   Live
                 </Badge>
               )}
@@ -299,8 +299,8 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
                 >
                   <div
                     className={`max-w-[70%] rounded-2xl px-4 py-2 ${isSent
-                        ? "bg-primary text-primary-foreground rounded-br-md"
-                        : "bg-muted text-foreground rounded-bl-md"
+                      ? "bg-primary text-primary-foreground rounded-br-md"
+                      : "bg-muted text-foreground rounded-bl-md"
                       }`}
                   >
                     {!isSent && chat.type === "Group" && (
@@ -313,7 +313,7 @@ export function ChatView({ chat, onBack }: ChatViewProps) {
                       className={`flex items-center gap-1 mt-1 ${isSent ? "justify-end" : "justify-start"
                         }`}
                     >
-                      <span className="text-[10px] opacity-70">
+                      <span className="text-2xs opacity-70">
                         {formatTime(message.createdAt)}
                       </span>
                       {isSent && getStatusIcon(message.status)}

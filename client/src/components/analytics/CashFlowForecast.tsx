@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from "recharts";
 import { reportsService, bankingService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
+import { chartColors } from "@/lib/chartColors";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+    {name}
+  </span>
+);
 
 interface AgingData {
   range: string;
@@ -29,14 +37,18 @@ export function CashFlowForecast() {
   const [upcomingCollections, setUpcomingCollections] = useState<any[]>([]);
   const [upcomingPayments, setUpcomingPayments] = useState<any[]>([]);
 
+  const [alerts, setAlerts] = useState<any[]>([]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch aging reports
-      const [receivablesRes, payablesRes, bankingRes] = await Promise.all([
+      // Fetch aging reports, banking trends, and forecast
+      const [receivablesRes, payablesRes, bankingRes, trendsRes, forecastRes] = await Promise.all([
         reportsService.getAgingReceivables(),
         reportsService.getAgingPayables(),
-        bankingService.getDashboard()
+        bankingService.getDashboard(),
+        bankingService.getCashFlowTrends(),
+        bankingService.getCashFlowForecast()
       ]);
 
       // Process receivables aging
@@ -97,40 +109,29 @@ export function CashFlowForecast() {
 
       // Process banking dashboard
       if (bankingRes.success && bankingRes.data) {
-        const { totalBalance, totalInflow, totalOutflow, monthlyData } = bankingRes.data;
-        setCurrentCash(totalBalance || 0);
+        setCurrentCash(bankingRes.data.summary?.totalBalance || 0);
+      }
 
-        // Generate cash flow chart data from monthly data or create from current data
-        if (monthlyData && Array.isArray(monthlyData) && monthlyData.length > 0) {
-          setCashFlowData(monthlyData.map((m: any) => ({
-            month: m.month,
-            actual: m.netFlow,
-            forecast: null,
-            inflow: m.inflow,
-            outflow: m.outflow
-          })));
-        } else {
-          // Generate basic forecast from current data
-          const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const currentMonth = new Date().getMonth();
-          const baseInflow = totalInflow || 500000;
-          const baseOutflow = totalOutflow || 350000;
+      // Process cash flow trends and forecast
+      if (trendsRes.success && trendsRes.data && forecastRes.success && forecastRes.data) {
+        const trends = trendsRes.data.map((m: any) => ({
+          month: m.month,
+          actual: m.net,
+          forecast: null,
+          inflow: m.inflow,
+          outflow: m.outflow
+        }));
 
-          setCashFlowData(months.map((month, i) => {
-            const monthIndex = (i + 3) % 12; // April = 3 in 0-indexed
-            const isActual = monthIndex <= currentMonth;
-            const growthFactor = 1 + (i * 0.05);
-            const inflow = Math.round(baseInflow * growthFactor / 6);
-            const outflow = Math.round(baseOutflow * growthFactor / 6);
-            return {
-              month,
-              actual: isActual ? inflow - outflow : null,
-              forecast: !isActual ? Math.round((inflow - outflow) * 1.1) : null,
-              inflow,
-              outflow
-            };
-          }));
-        }
+        const forecast = forecastRes.data.forecast.map((f: any) => ({
+          month: f.month,
+          actual: null,
+          forecast: f.balance,
+          inflow: f.inflow,
+          outflow: f.outflow
+        }));
+
+        setCashFlowData([...trends, ...forecast]);
+        setAlerts(forecastRes.data.alerts || []);
       }
     } catch (error) {
       console.error('Error fetching cash flow data:', error);
@@ -148,108 +149,108 @@ export function CashFlowForecast() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading cash flow data...</span>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <MIcon name="autorenew" className="text-[32px] animate-spin text-primary" />
+        <span className="ml-[8px] text-body font-medium text-muted-foreground font-medium">Loading cash flow data...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[24px]">
       {/* Header with Refresh */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Cash Flow Forecast</h2>
+        <h2 className="text-2xl font-bold text-foreground">Cash Flow Forecast</h2>
         <button
           onClick={fetchData}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-[8px] text-body-sm font-bold text-muted-foreground hover:text-foreground dark:hover:text-slate-100 transition-colors"
         >
-          <RefreshCw className="h-4 w-4" />
+          <MIcon name="autorenew" className="text-[16px]" />
           Refresh
         </button>
       </div>
 
       {/* Summary Cards - Mobile Optimized */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-info-light p-4 rounded-lg border border-info/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Current Cash</p>
-            <div className="bg-[#3b82f6]/10 p-2 rounded">
-              <TrendingUp className="size-4 text-[#3b82f6]" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px]">
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-sky-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Current Cash</p>
+            <div className="bg-sky-50 dark:bg-sky-900/20 p-[8px] rounded-[8px]">
+              <MIcon name="trending_up" className="text-[20px] text-sky-500" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-foreground mb-[4px]">
             ₹{currentCash.toLocaleString("en-IN")}
           </p>
-          <p className="text-muted-foreground">Bank + Cash on hand</p>
+          <p className="text-body-sm font-medium text-muted-foreground">Bank + Cash on hand</p>
         </div>
 
-        <div className="bg-success-light p-4 rounded-lg border border-success/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Receivables</p>
-            <div className="bg-[#10b981]/10 p-2 rounded">
-              <TrendingUp className="size-4 text-[#10b981]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-emerald-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Receivables</p>
+            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-[8px] rounded-[8px]">
+              <MIcon name="trending_up" className="text-[20px] text-emerald-500" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-foreground mb-[4px]">
             ₹{totalReceivables.toLocaleString("en-IN")}
           </p>
-          <p className="text-muted-foreground">To be collected</p>
+          <p className="text-body-sm font-medium text-muted-foreground">To be collected</p>
         </div>
 
-        <div className="bg-warning-light p-4 rounded-lg border border-warning/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Payables</p>
-            <div className="bg-[#f59e0b]/10 p-2 rounded">
-              <TrendingDown className="size-4 text-[#f59e0b]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-amber-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Payables</p>
+            <div className="bg-amber-50 dark:bg-amber-900/20 p-[8px] rounded-[8px]">
+              <MIcon name="trending_down" className="text-[20px] text-amber-500" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-foreground mb-[4px]">
             ₹{totalPayables.toLocaleString("en-IN")}
           </p>
-          <p className="text-muted-foreground">To be paid</p>
+          <p className="text-body-sm font-medium text-muted-foreground">To be paid</p>
         </div>
 
-        <div className="bg-purple-light p-4 rounded-lg border border-purple/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Net Position</p>
-            <div className="bg-[#a855f7]/10 p-2 rounded">
-              <CheckCircle className="size-4 text-[#a855f7]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-purple-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Net Position</p>
+            <div className="bg-purple-50 dark:bg-purple-900/20 p-[8px] rounded-[8px]">
+              <MIcon name="check_circle" className="text-[20px] text-purple-500" />
             </div>
           </div>
-          <p className="text-foreground mb-1">
+          <p className="text-3xl font-black text-foreground mb-[4px]">
             ₹{netPosition.toLocaleString("en-IN")}
           </p>
-          <p className="text-muted-foreground">Working capital</p>
+          <p className="text-body-sm font-medium text-muted-foreground">Working capital</p>
         </div>
       </div>
 
       {/* Cash Flow Forecast Chart */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
-          <h3 className="text-foreground">Cash Flow Forecast (Next 3 Months)</h3>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-[#3b82f6]" />
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-[16px] gap-[8px]">
+          <h3 className="text-h3 font-bold text-foreground">Cash Flow Forecast (Next 3 Months)</h3>
+          <div className="flex items-center gap-[16px] text-body-sm font-medium">
+            <div className="flex items-center gap-[8px]">
+              <div className="w-[12px] h-[12px] rounded-full bg-slate-400" />
               <span className="text-muted-foreground">Actual</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-[#10b981]" />
+            <div className="flex items-center gap-[8px]">
+              <div className="w-[12px] h-[12px] rounded-full bg-emerald-500" />
               <span className="text-muted-foreground">Forecast</span>
             </div>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={cashFlowData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.slateGrid} vertical={false} />
+            <XAxis dataKey="month" stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+            <YAxis stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
             <Area
               type="monotone"
               dataKey="actual"
-              stroke="#3b82f6"
-              fill="#3b82f6"
+              stroke={chartColors.slate}
+              fill={chartColors.slate}
               fillOpacity={0.2}
               strokeWidth={2}
               name="Actual Cash"
@@ -257,8 +258,8 @@ export function CashFlowForecast() {
             <Area
               type="monotone"
               dataKey="forecast"
-              stroke="#10b981"
-              fill="#10b981"
+              stroke="#10B981"
+              fill="#10B981"
               fillOpacity={0.2}
               strokeWidth={2}
               strokeDasharray="5 5"
@@ -269,53 +270,53 @@ export function CashFlowForecast() {
       </div >
 
       {/* Inflow vs Outflow */}
-      < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-        <h3 className="text-foreground mb-4">Cash Inflow vs Outflow</h3>
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <h3 className="text-h3 font-bold text-foreground mb-[16px]">Cash Inflow vs Outflow</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={cashFlowData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="month" stroke="#6b7280" />
-            <YAxis stroke="#6b7280" />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="inflow" fill="#10b981" name="Cash Inflow" />
-            <Bar dataKey="outflow" fill="#ef4444" name="Cash Outflow" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.slateGrid} vertical={false} />
+            <XAxis dataKey="month" stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+            <YAxis stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'var(--tw-colors-slate-100)', opacity: 0.1 }} />
+            <Legend wrapperStyle={{ paddingTop: '20px' }} />
+            <Bar dataKey="inflow" fill="#10B981" name="Cash Inflow" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="outflow" fill="#F43F5E" name="Cash Outflow" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div >
 
       {/* Receivables & Payables Aging */}
-      < div className="grid grid-cols-1 lg:grid-cols-2 gap-6" >
+      < div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]" >
         {/* Receivables Aging */}
-        < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-          <h3 className="text-foreground mb-4">Receivables Aging</h3>
-          <div className="space-y-3">
+        < div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm" >
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Receivables Aging</h3>
+          <div className="space-y-[12px]">
             {receivablesAging.map((item, index) => (
-              <div key={index} className="space-y-2">
+              <div key={index} className="space-y-[8px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{item.range}</span>
-                  <span className="text-foreground">
+                  <span className="text-body-sm font-medium text-muted-foreground">{item.range}</span>
+                  <span className="text-body font-bold text-foreground">
                     ₹{item.amount.toLocaleString("en-IN")}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-[#f8fafc] rounded-full h-2">
+                <div className="flex items-center gap-[8px]">
+                  <div className="flex-1 bg-muted rounded-full h-[8px]">
                     <div
-                      className="bg-[#10b981] h-2 rounded-full"
+                      className="bg-emerald-500 h-[8px] rounded-full"
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>
-                  <span className="text-muted-foreground text-sm w-12 text-right">
+                  <span className="text-body-sm font-bold text-muted-foreground w-[40px] text-right">
                     {item.percentage}%
                   </span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-[16px] pt-[16px] border-t border-slate-100 dark:border-slate-800">
             <div className="flex justify-between">
-              <span className="text-foreground">Total Receivables:</span>
-              <span className="text-foreground">
+              <span className="text-body-sm font-bold text-muted-foreground">Total Receivables:</span>
+              <span className="text-h3 font-black text-foreground">
                 ₹{totalReceivables.toLocaleString("en-IN")}
               </span>
             </div>
@@ -323,35 +324,35 @@ export function CashFlowForecast() {
         </div >
 
         {/* Payables Aging */}
-        < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-          <h3 className="text-foreground mb-4">Payables Aging</h3>
-          <div className="space-y-3">
+        < div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm" >
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Payables Aging</h3>
+          <div className="space-y-[12px]">
             {payablesAging.map((item, index) => (
-              <div key={index} className="space-y-2">
+              <div key={index} className="space-y-[8px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">{item.range}</span>
-                  <span className="text-foreground">
+                  <span className="text-body-sm font-medium text-muted-foreground">{item.range}</span>
+                  <span className="text-body font-bold text-foreground">
                     ₹{item.amount.toLocaleString("en-IN")}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-[#f8fafc] rounded-full h-2">
+                <div className="flex items-center gap-[8px]">
+                  <div className="flex-1 bg-muted rounded-full h-[8px]">
                     <div
-                      className="bg-[#ef4444] h-2 rounded-full"
+                      className="bg-rose-500 h-[8px] rounded-full"
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>
-                  <span className="text-muted-foreground text-sm w-12 text-right">
+                  <span className="text-body-sm font-bold text-muted-foreground w-[40px] text-right">
                     {item.percentage}%
                   </span>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-[16px] pt-[16px] border-t border-slate-100 dark:border-slate-800">
             <div className="flex justify-between">
-              <span className="text-foreground">Total Payables:</span>
-              <span className="text-foreground">
+              <span className="text-body-sm font-bold text-muted-foreground">Total Payables:</span>
+              <span className="text-h3 font-black text-foreground">
                 ₹{totalPayables.toLocaleString("en-IN")}
               </span>
             </div>
@@ -360,106 +361,124 @@ export function CashFlowForecast() {
       </div >
 
       {/* Upcoming Collections & Payments */}
-      < div className="grid grid-cols-1 lg:grid-cols-2 gap-6" >
+      < div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]" >
         {/* Upcoming Collections */}
-        < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-          <h3 className="text-foreground mb-4">Upcoming Collections</h3>
-          <div className="space-y-3">
+        < div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm" >
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Upcoming Collections</h3>
+          <div className="space-y-[12px]">
             {upcomingCollections.map((item, index) => (
               <div
                 key={index}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-[#f0fdf4] rounded-lg border border-[#10b981]/20 gap-2"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-[12px] bg-emerald-50 dark:bg-emerald-900/10 rounded-[12px] border border-emerald-200 dark:border-emerald-800/50 gap-[8px]"
               >
                 <div className="flex-1">
-                  <p className="text-foreground">{item.party}</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-body font-bold text-foreground">{item.party}</p>
+                  <p className="text-body-sm font-medium text-muted-foreground">
                     Due: {new Date(item.date).toLocaleDateString("en-IN")}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[#10b981]">
+                  <p className="text-body font-bold text-emerald-600 dark:text-emerald-400">
                     ₹{item.amount.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-muted-foreground">in {item.days} days</p>
+                  <p className="text-body-sm text-muted-foreground font-medium">in {item.days} days</p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex justify-between">
-              <span className="text-foreground">Total Expected:</span>
-              <span className="text-[#10b981]">
-                ₹
-                {upcomingCollections
-                  .reduce((sum, item) => sum + item.amount, 0)
-                  .toLocaleString("en-IN")}
+          <div className="mt-[16px] pt-[16px] border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-between items-center">
+              <span className="text-body-sm font-bold text-muted-foreground">Total Expected:</span>
+              <span className="text-h3 font-black text-emerald-600 dark:text-emerald-400">
+                ₹{upcomingCollections.reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-IN")}
               </span>
             </div>
           </div>
         </div >
 
         {/* Upcoming Payments */}
-        < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-          <h3 className="text-foreground mb-4">Upcoming Payments</h3>
-          <div className="space-y-3">
+        < div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm" >
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Upcoming Payments</h3>
+          <div className="space-y-[12px]">
             {upcomingPayments.map((item, index) => (
               <div
                 key={index}
-                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-[#fef2f2] rounded-lg border border-[#ef4444]/20 gap-2"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-[12px] bg-rose-50 dark:bg-rose-900/10 rounded-[12px] border border-rose-200 dark:border-rose-800/50 gap-[8px]"
               >
                 <div className="flex-1">
-                  <p className="text-foreground">{item.party}</p>
-                  <p className="text-muted-foreground">
+                  <p className="text-body font-bold text-foreground">{item.party}</p>
+                  <p className="text-body-sm font-medium text-muted-foreground">
                     Due: {new Date(item.date).toLocaleDateString("en-IN")}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[#ef4444]">
+                  <p className="text-body font-bold text-rose-600 dark:text-rose-400">
                     ₹{item.amount.toLocaleString("en-IN")}
                   </p>
-                  <p className="text-muted-foreground">in {item.days} days</p>
+                  <p className="text-body-sm text-muted-foreground font-medium">in {item.days} days</p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex justify-between">
-              <span className="text-foreground">Total Due:</span>
-              <span className="text-[#ef4444]">
-                ₹
-                {upcomingPayments
-                  .reduce((sum, item) => sum + item.amount, 0)
-                  .toLocaleString("en-IN")}
+          <div className="mt-[16px] pt-[16px] border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-between items-center">
+              <span className="text-body-sm font-bold text-muted-foreground">Total Due:</span>
+              <span className="text-h3 font-black text-rose-600 dark:text-rose-400">
+                ₹{upcomingPayments.reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-IN")}
               </span>
             </div>
           </div>
         </div >
       </div >
 
-      {/* Alerts */}
-      < div className="bg-white p-4 md:p-6 rounded-lg border border-border" >
-        <h3 className="text-foreground mb-4">Cash Flow Alerts</h3>
-        <div className="space-y-3">
-          <div className="flex items-start gap-3 p-3 bg-[#fef3c7] rounded-lg border border-[#f59e0b]/20">
-            <AlertCircle className="size-5 text-[#f59e0b] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-foreground mb-1">Overdue Receivables</p>
-              <p className="text-muted-foreground">
-                ₹35,000 in receivables are overdue by 90+ days. Consider follow-up actions.
-              </p>
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <h3 className="text-h3 font-bold text-foreground mb-[16px]">Cash Flow Alerts</h3>
+        <div className="space-y-[12px]">
+          {alerts.length > 0 ? (
+            alerts.map((alert, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "flex items-start gap-[12px] p-[16px] rounded-[12px] border",
+                  alert.type === "critical"
+                    ? "bg-rose-50 dark:bg-rose-900/10 border-rose-200 dark:border-rose-800/50"
+                    : alert.type === "warning"
+                      ? "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/50"
+                      : "bg-sky-50 dark:bg-sky-900/10 border-sky-200 dark:border-sky-800/50"
+                )}
+              >
+                {alert.type === "critical" ? (
+                  <div className="bg-rose-100 dark:bg-rose-900/50 p-[8px] rounded-[8px] flex-shrink-0">
+                    <MIcon name="trending_down" className="text-[20px] text-rose-600 dark:text-rose-400" />
+                  </div>
+                ) : alert.type === "warning" ? (
+                  <div className="bg-amber-100 dark:bg-amber-900/50 p-[8px] rounded-[8px] flex-shrink-0">
+                    <MIcon name="warning" className="text-[20px] text-amber-600 dark:text-amber-400" />
+                  </div>
+                ) : (
+                  <div className="bg-sky-100 dark:bg-sky-900/50 p-[8px] rounded-[8px] flex-shrink-0">
+                    <MIcon name="info" className="text-[20px] text-sky-600 dark:text-sky-400" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-body font-bold text-foreground mb-[4px]">{alert.message}</p>
+                  <p className="text-body-sm text-muted-foreground font-medium">{alert.action}</p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="flex items-start gap-[12px] p-[16px] bg-emerald-50 dark:bg-emerald-900/10 rounded-[12px] border border-emerald-200 dark:border-emerald-800/50">
+              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-[8px] rounded-[8px] flex-shrink-0">
+                <MIcon name="check_circle" className="text-[20px] text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <p className="text-body font-bold text-foreground mb-[4px]">No urgent alerts</p>
+                <p className="text-body-sm text-muted-foreground font-medium">Your cash position looks stable for the upcoming period.</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-start gap-3 p-3 bg-[#eff6ff] rounded-lg border border-[#3b82f6]/20">
-            <CheckCircle className="size-5 text-[#3b82f6] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-foreground mb-1">Healthy Cash Position</p>
-              <p className="text-muted-foreground">
-                Current cash balance can cover 2.8 months of operating expenses.
-              </p>
-            </div>
-          </div>
+          )}
         </div>
-      </div >
+      </div>
     </div >
   );
 }

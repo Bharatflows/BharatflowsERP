@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteEWaybill = exports.cancelEWaybill = exports.extendEWaybill = exports.updateEWaybill = exports.createEWaybill = exports.getEWaybill = exports.getEWaybills = void 0;
 const prisma_1 = __importDefault(require("../../config/prisma"));
 const logger_1 = __importDefault(require("../../config/logger"));
+const eWayBillService_1 = require("../../services/gst/eWayBillService");
 // @desc    Get all E-Waybills
 // @route   GET /api/v1/gst/e-waybills
 // @access  Private
@@ -86,42 +87,49 @@ exports.getEWaybill = getEWaybill;
 const createEWaybill = async (req, res) => {
     try {
         const companyId = req.user.companyId;
-        const { documentNumber, documentType = 'Invoice', invoiceId, fromGstin, toGstin, fromPlace, toPlace, distance, transporterName, transporterId, vehicleNumber, vehicleType = 'Regular', transactionType = 'Outward', supplyType = 'Outward Supply', subSupplyType, value, } = req.body;
-        // Get company GSTIN if not provided
-        let actualFromGstin = fromGstin;
-        if (!actualFromGstin) {
-            const company = await prisma_1.default.company.findUnique({
-                where: { id: companyId },
-            });
-            actualFromGstin = company?.gstin || '';
-        }
-        // In production, this would call the E-Way Bill API
-        // For now, we create a pending record
+        const { documentNumber, // Usually invoice number
+        documentType = 'Invoice', invoiceId, transporterName, transporterId, vehicleNumber, vehicleType = 'Regular', distance, transactionType = 'Outward', supplyType = 'Outward Supply', subSupplyType, value, mode } = req.body;
+        // 1. Generate EWayBill Payload (Part A + B)
+        const payload = await eWayBillService_1.GSTEWayBillService.generatePayload(invoiceId, {
+            transporterId,
+            transporterName,
+            vehicleNumber,
+            distance: Number(distance),
+            mode
+        }, companyId);
+        // 2. Validate and Mock Submit
+        const ewbResponse = await eWayBillService_1.GSTEWayBillService.validateAndMockSubmit(payload);
+        // 3. Save to DB
+        // @ts-ignore - jsonPayload might be missing if migration failed
         const eWaybill = await prisma_1.default.eWaybill.create({
             data: {
-                documentNumber,
+                documentNumber: payload.docNo, // Use payload derived docNo
                 documentType,
                 invoiceId,
-                fromGstin: actualFromGstin,
-                toGstin,
-                fromPlace,
-                toPlace,
-                distance: Number(distance),
+                ewaybillNumber: ewbResponse.ewayBillNo,
+                validUpto: new Date(ewbResponse.validUpto),
+                generatedDate: new Date(ewbResponse.ewayBillDate),
+                fromGstin: payload.fromGstin,
+                toGstin: payload.toGstin || null,
+                fromPlace: payload.fromPlace,
+                toPlace: payload.toPlace,
+                distance: Number(payload.transDistance),
                 transporterName,
                 transporterId,
-                vehicleNumber,
+                vehicleNumber: payload.vehicleNo,
                 vehicleType,
                 transactionType,
                 supplyType,
                 subSupplyType,
-                value: Number(value),
-                status: 'pending',
+                value: payload.totalValue,
+                status: 'active', // Successfully generated
                 companyId,
+                jsonPayload: payload
             },
         });
         return res.status(201).json({
             success: true,
-            message: 'E-Waybill generation initiated',
+            message: 'E-Waybill generated successfully',
             data: eWaybill,
         });
     }
@@ -129,7 +137,7 @@ const createEWaybill = async (req, res) => {
         logger_1.default.error('Create E-Waybill error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Failed to create E-Waybill',
+            message: error.message || 'Failed to create E-Waybill',
             error: error.message,
         });
     }

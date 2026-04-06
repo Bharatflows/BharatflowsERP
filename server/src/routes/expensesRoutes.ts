@@ -1,5 +1,7 @@
 import express from 'express';
 import { protect } from '../middleware/auth';
+import validate from '../middleware/validate';  // Audit Fix: Zod validation
+import { createExpenseSchema, updateExpenseSchema } from '../schemas/expenses.schema';  // Audit Fix
 import {
     getExpenses,
     getExpense,
@@ -30,13 +32,14 @@ router.route('/reports/category-trend').get(getCategoryTrendReport);
 router.route('/reports/vendor-summary').get(getVendorSummaryReport);
 router.route('/reports/tax').get(getTaxReport);
 
+// AUDIT FIX: Added Zod validation to create/update
 router.route('/')
     .get(getExpenses)
-    .post(createExpense);
+    .post(validate(createExpenseSchema), createExpense);
 
 router.route('/:id')
     .get(getExpense)
-    .put(updateExpense)
+    .put(validate(updateExpenseSchema), updateExpense)
     .delete(deleteExpense);
 
 router.post('/:id/approve', approveExpense);

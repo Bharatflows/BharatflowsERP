@@ -3,19 +3,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { NotificationCenter } from "./NotificationCenter";
 import { AlertRules } from "./AlertRules";
 import { NotificationSettings } from "./NotificationSettings";
+import { ModuleHeader } from "../ui/module-header";
+import { Bell } from "lucide-react";
 
 export function NotificationsModule() {
   const [activeTab, setActiveTab] = useState("center");
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc]">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div className="p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-foreground mb-2">Notifications & Alerts</h1>
-          <p className="text-muted-foreground">
-            Stay updated with real-time alerts and business notifications
-          </p>
-        </div>
+        <ModuleHeader
+          title="Notifications & Alerts"
+          description="Stay updated with real-time alerts and business notifications"
+          showBackButton={true}
+          backTo="/dashboard"
+          icon={<Bell className="size-5 text-primary" />}
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="overflow-x-auto pb-2">

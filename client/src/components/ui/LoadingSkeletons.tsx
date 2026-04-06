@@ -1,5 +1,5 @@
 import React from 'react';
-import { Skeleton } from './Skeleton';
+import { Skeleton } from './skeleton';
 
 // Table skeleton for data lists
 export const TableSkeleton: React.FC<{ rows?: number; columns?: number }> = ({

@@ -11,8 +11,8 @@ async function removeTestData() {
         const testLedgers = await prisma.ledger.findMany({
             where: {
                 OR: [
-                    { name: { contains: 'Test', mode: 'insensitive' } },
-                    { name: { contains: 'Tee', mode: 'insensitive' } }
+                    { name: { contains: 'Test' } },
+                    { name: { contains: 'Tee' } }
                 ]
             }
         });

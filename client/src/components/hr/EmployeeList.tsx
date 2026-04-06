@@ -1,41 +1,51 @@
-import { useState, useEffect } from "react";
-import { hrService } from "../../services/modules.service";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Badge } from "../ui/badge";
+import { useState, useMemo } from "react";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "../ui/avatar";
-import {
-  Search,
-  Download,
+  Users,
+  Briefcase,
+  IndianRupee,
+  Building2,
   MoreVertical,
   Edit,
   Trash2,
   Eye,
   Mail,
   Phone,
+  Search,
+  Filter,
+  Download,
+  Plus,
+  FileDown,
+  Sheet,
+  ChevronDown,
+  UserCheck,
+  UserX
 } from "lucide-react";
+import { DataTable } from "../ui/data-table";
+import { StatsCard } from "../ui/stats-card";
+import { ListFilters } from "../ui/ListFilters";
+import { exportToCSV, exportToExcel, exportToPDF, formatCurrency, formatDate } from "../../lib/exportUtils";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import { Avatar, AvatarFallback } from "../ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "../ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { cn } from "../../lib/utils";
+import { useEmployees, useDeleteEmployee } from "../../hooks/useHR";
 import { toast } from "sonner";
 
 interface Employee {
@@ -53,74 +63,48 @@ interface Employee {
 
 interface EmployeeListProps {
   onEditEmployee: (employeeId: string) => void;
+  onCreateNew?: () => void;
 }
 
-export function EmployeeList({ onEditEmployee }: EmployeeListProps) {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+export function EmployeeList({ onEditEmployee, onCreateNew }: EmployeeListProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
+  // TanStack Query
+  const { data: employeesData, isLoading: loading, isFetching, refetch } = useEmployees();
+  const deleteMutation = useDeleteEmployee();
 
-  const fetchEmployees = async () => {
-    setLoading(true);
-    try {
-      const response = await hrService.getAll();
-      const mappedEmployees = (response.data || []).map((emp: any) => ({
-        id: emp.id,
-        name: emp.name,
-        email: emp.email,
-        phone: emp.phone,
-        department: emp.department,
-        designation: emp.designation,
-        joiningDate: emp.joiningDate,
-        salary: Number(emp.salary),
-        status: (emp.status || 'active').toLowerCase(),
-        employeeId: emp.employeeId
-      }));
-      setEmployees(mappedEmployees);
-    } catch (error) {
-      console.error("Failed to fetch employees:", error);
-      toast.error("Failed to load employees");
-    } finally {
-      setLoading(false);
-    }
+  // Map API response
+  const employees: Employee[] = useMemo(() => {
+    const data = (employeesData?.data as any) || [];
+    return data.map((emp: any) => ({
+      id: emp.id,
+      name: emp.name,
+      email: emp.email,
+      phone: emp.phone,
+      department: emp.department,
+      designation: emp.designation,
+      joiningDate: emp.joiningDate,
+      salary: Number(emp.salary),
+      status: (emp.status || 'active').toLowerCase(),
+      employeeId: emp.employeeId
+    }));
+  }, [employeesData]);
+
+  const departments = useMemo(() =>
+    ["Sales", "Operations", "Accounts", "Admin", "IT", "Marketing", ...new Set(employees.map(e => e.department))].filter((v, i, a) => a.indexOf(v) === i && v !== "all"),
+    [employees]);
+
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
   };
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterDepartment, setFilterDepartment] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-
-  const departments = [
-    "all",
-    "Sales",
-    "Operations",
-    "Accounts",
-    "Admin",
-    "IT",
-    "Marketing",
-  ];
-
-  const filteredEmployees = employees.filter((employee) => {
-    const matchesSearch =
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDepartment =
-      filterDepartment === "all" || employee.department === filterDepartment;
-    const matchesStatus = filterStatus === "all" || employee.status === filterStatus;
-    return matchesSearch && matchesDepartment && matchesStatus;
-  });
-
-  const handleDelete = async (employeeId: string) => {
-    try {
-      await hrService.delete(employeeId);
-      setEmployees(employees.filter((e) => e.id !== employeeId));
-      toast.success("Employee removed successfully");
-    } catch (error) {
-      console.error("Failed to delete employee:", error);
-      toast.error("Failed to delete employee");
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
+      setDeleteId(null);
     }
   };
 
@@ -133,210 +117,400 @@ export function EmployeeList({ onEditEmployee }: EmployeeListProps) {
       .slice(0, 2);
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+  const filteredEmployees = employees.filter((employee) => {
+    const matchesSearch =
+      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employee.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDepartment =
+      departmentFilter === "all" || employee.department === departmentFilter;
+    const matchesStatus = statusFilter === "all" || employee.status === statusFilter;
+    return matchesSearch && matchesDepartment && matchesStatus;
+  });
+
+  const stats = {
+    total: employees.length,
+    active: employees.filter((e) => e.status === "active").length,
+    totalSalary: employees.filter((e) => e.status === "active").reduce((sum, e) => sum + e.salary, 0),
+    departments: new Set(employees.map((e) => e.department)).size,
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredEmployees.map(e => ({
+      'Name': e.name,
+      'Employee ID': e.employeeId,
+      'Email': e.email,
+      'Phone': e.phone,
+      'Department': e.department,
+      'Designation': e.designation,
+      'Joining Date': formatDate(e.joiningDate),
+      'Salary': e.salary,
+      'Status': e.status
+    }));
+    exportToCSV(data, 'Employees');
+  };
+
+  const handleExportExcel = () => {
+    const data = filteredEmployees.map(e => ({
+      'Name': e.name,
+      'Employee ID': e.employeeId,
+      'Email': e.email,
+      'Phone': e.phone,
+      'Department': e.department,
+      'Designation': e.designation,
+      'Joining Date': formatDate(e.joiningDate),
+      'Salary': e.salary,
+      'Status': e.status
+    }));
+    exportToExcel(data, 'Employees');
+  };
+
+  const handleExportPDF = () => {
+    const columns = ['Name', 'ID', 'Department', 'Designation', 'Date', 'Salary', 'Status'];
+    const data = filteredEmployees.map(e => [
+      e.name,
+      e.employeeId,
+      e.department,
+      e.designation,
+      formatDate(e.joiningDate),
+      formatCurrency(e.salary),
+      e.status
+    ]);
+    exportToPDF({ title: 'Employee List', columns, data, filename: 'Employees' });
+  };
+
+  const columns = [
+    {
+      header: "Employee",
+      cell: (employee: Employee) => (
+        <div className="flex items-center gap-3">
+          <Avatar>
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white font-medium">
+              {getInitials(employee.name)}
+            </AvatarFallback>
+          </Avatar>
           <div>
-            <CardTitle>All Employees</CardTitle>
-            <CardDescription>
-              {filteredEmployees.length} employees
-            </CardDescription>
+            <p className="text-foreground font-medium">{employee.name}</p>
+            <p className="text-muted-foreground text-xs">{employee.employeeId}</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+        </div>
+      )
+    },
+    {
+      header: "Contact",
+      className: "hidden lg:table-cell",
+      cell: (employee: Employee) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Mail className="size-3" />
+            <span className="truncate max-w-[150px]">{employee.email}</span>
+          </div>
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Phone className="size-3" />
+            <span>{employee.phone}</span>
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "Department",
+      cell: (employee: Employee) => (
+        <Badge variant="outline" className="font-normal">{employee.department}</Badge>
+      )
+    },
+    {
+      header: "Designation",
+      className: "hidden md:table-cell",
+      cell: (employee: Employee) => (
+        <span className="text-foreground">{employee.designation}</span>
+      )
+    },
+    {
+      header: "Joining Date",
+      className: "hidden xl:table-cell",
+      cell: (employee: Employee) => (
+        <span className="text-muted-foreground">{formatDate(employee.joiningDate)}</span>
+      )
+    },
+    {
+      header: "Salary",
+      className: "hidden lg:table-cell text-right",
+      cell: (employee: Employee) => (
+        <span className="text-foreground font-medium">{formatCurrency(employee.salary)}</span>
+      )
+    },
+    {
+      header: "Status",
+      className: "text-center",
+      cell: (employee: Employee) => (
+        <div className="flex justify-center">
+          <Badge
+            className={cn(
+              "rounded-full px-3 py-0.5",
+              employee.status === "active"
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                : "bg-muted text-foreground hover:bg-muted"
+            )}
+          >
+            {employee.status === "active" ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+      )
+    },
+    {
+      header: "Actions",
+      className: "text-center",
+      cell: (employee: Employee) => (
+        <div className="flex items-center justify-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onEditEmployee(employee.id)}
+          >
+            <Edit className="size-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-xl">
+              <DropdownMenuItem onClick={() => onEditEmployee(employee.id)} className="rounded-lg">
+                <Edit className="size-4 mr-2" />
+                Edit Details
+              </DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg">
+                <Eye className="size-4 mr-2" />
+                View Profile
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="rounded-lg" onClick={() => toast.success(`Sending email to ${employee.email}`)}>
+                <Mail className="size-4 mr-2" />
+                Send Email
+              </DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive rounded-lg" onClick={() => handleDelete(employee.id)}>
+                <Trash2 className="size-4 mr-2" />
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )
+    }
+  ];
+
+  const renderMobileItem = (employee: Employee) => (
+    <div
+      key={employee.id}
+      className="bg-white rounded-2xl border border-border p-5 space-y-4 shadow-sm hover:shadow-md transition-shadow"
+      onClick={() => onEditEmployee(employee.id)}
+    >
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          <Avatar>
+            <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white font-medium">
+              {getInitials(employee.name)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <h3 className="font-medium text-foreground">{employee.name}</h3>
+            <p className="text-sm text-muted-foreground">{employee.designation}</p>
+          </div>
+        </div>
+        <Badge
+          className={cn(
+            "rounded-full px-3 py-0.5",
+            employee.status === "active"
+              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+              : "bg-muted text-foreground hover:bg-muted"
+          )}
+        >
+          {employee.status}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-muted-foreground mb-1">Department</p>
+          <p className="font-medium">{employee.department}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-muted-foreground mb-1">Salary</p>
+          <p className="font-medium">{formatCurrency(employee.salary)}</p>
+        </div>
+        <div className="col-span-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Mail className="size-3" />
+            <span className="truncate">{employee.email}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-2 border-t border-border">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 rounded-xl"
+          onClick={(e) => { e.stopPropagation(); onEditEmployee(employee.id); }}
+        >
+          Edit
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl">
+              <MoreVertical className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem className="rounded-lg">
+              <Eye className="size-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive rounded-lg" onClick={() => handleDelete(employee.id)}>
+              <Trash2 className="size-4 mr-2" />
+              Remove
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          label="Total Employees"
+          value={stats.total}
+          icon={Users}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+        <StatsCard
+          label="Active"
+          value={stats.active}
+          icon={UserCheck}
+          gradient="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          shadowColor="shadow-emerald-500/20"
+        />
+        <StatsCard
+          label="Departments"
+          value={stats.departments}
+          icon={Briefcase}
+          gradient="bg-gradient-to-br from-amber-500 to-amber-600"
+          shadowColor="shadow-amber-500/20"
+        />
+        <StatsCard
+          label="Total Monthly Salary"
+          value={formatCurrency(stats.totalSalary)}
+          icon={IndianRupee}
+          gradient="bg-gradient-to-br from-primary to-primary/80"
+          shadowColor="shadow-primary/20"
+        />
+      </div>
+
+      <ListFilters
+        searchPlaceholder="Search employees by name, ID, or email..."
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        onRefresh={refetch}
+        isFetching={isFetching}
+        statusValue={statusFilter}
+        onStatusChange={setStatusFilter}
+        statusOptions={[
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ]}
+      >
+        <div key="dept-filter" className="w-[160px]">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full justify-between h-11 rounded-xl">
+                <span className="truncate">
+                  {departmentFilter === "all" ? "Departments" : departmentFilter}
+                </span>
+                <ChevronDown className="size-3 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[160px] rounded-xl">
+              <DropdownMenuItem onClick={() => setDepartmentFilter("all")}>
+                All Departments
+              </DropdownMenuItem>
+              {departments.map(dept => (
+                <DropdownMenuItem key={dept} onClick={() => setDepartmentFilter(dept)}>
+                  {dept}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2 h-11 rounded-xl">
               <Download className="size-4" />
               Export
+              <ChevronDown className="size-3" />
             </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-          <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-3 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search employees..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Select value={filterDepartment} onValueChange={setFilterDepartment}>
-            <SelectTrigger>
-              <SelectValue placeholder="Department" />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept} value={dept}>
-                  {dept === "all" ? "All Departments" : dept}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={handleExportCSV} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportExcel} className="rounded-lg">
+              <Sheet className="size-4 mr-2" />
+              Export as Excel
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPDF} className="rounded-lg">
+              <FileDown className="size-4 mr-2" />
+              Export as PDF
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </ListFilters>
 
-        {/* Employees Table */}
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead className="hidden lg:table-cell">Contact</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead className="hidden md:table-cell">Designation</TableHead>
-                <TableHead className="hidden xl:table-cell">Joining Date</TableHead>
-                <TableHead className="hidden lg:table-cell">Salary</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEmployees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No employees found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredEmployees.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback className="bg-primary text-white">
-                            {getInitials(employee.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-foreground">{employee.name}</p>
-                          <p className="text-muted-foreground">{employee.employeeId}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Mail className="size-3" />
-                          <span>{employee.email}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Phone className="size-3" />
-                          <span>{employee.phone}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{employee.department}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {employee.designation}
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell text-muted-foreground">
-                      {new Date(employee.joiningDate).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      ₹{employee.salary.toLocaleString("en-IN")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          employee.status === "active"
-                            ? "bg-[#10b981] text-white"
-                            : "bg-[#6b7280] text-white"
-                        }
-                      >
-                        {employee.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="size-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onEditEmployee(employee.id)}>
-                            <Edit className="size-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Mail className="size-4 mr-2" />
-                            Send Email
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(employee.id)}
-                          >
-                            <Trash2 className="size-4 mr-2" />
-                            Remove
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+      <DataTable
+        data={filteredEmployees}
+        columns={columns}
+        mobileRenderer={renderMobileItem}
+        isLoading={loading}
+        onRowClick={(employee) => onEditEmployee(employee.id)}
+        emptyState={{
+          title: "No employees found",
+          description: "Add your first employee to get started",
+          icon: Users,
+          action: onCreateNew ? (
+            <Button onClick={onCreateNew} className="mt-2 gap-2 rounded-xl">
+              <Plus className="size-4" />
+              Add Employee
+            </Button>
+          ) : undefined
+        }}
+      />
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          <div className="p-4 border rounded-lg">
-            <p className="text-muted-foreground">Total Active</p>
-            <p className="text-foreground">
-              {employees.filter((e) => e.status === "active").length}
-            </p>
-          </div>
-          <div className="p-4 border rounded-lg">
-            <p className="text-muted-foreground">Total Salary</p>
-            <p className="text-foreground">
-              ₹
-              {employees
-                .filter((e) => e.status === "active")
-                .reduce((sum, e) => sum + e.salary, 0)
-                .toLocaleString("en-IN")}
-            </p>
-          </div>
-          <div className="p-4 border rounded-lg">
-            <p className="text-muted-foreground">Departments</p>
-            <p className="text-foreground">
-              {new Set(employees.map((e) => e.department)).size}
-            </p>
-          </div>
-          <div className="p-4 border rounded-lg">
-            <p className="text-muted-foreground">Avg Salary</p>
-            <p className="text-foreground">
-              ₹
-              {Math.round(
-                employees.reduce((sum, e) => sum + e.salary, 0) / employees.length
-              ).toLocaleString("en-IN")}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Employee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <span className="font-semibold text-foreground">{employees.find(e => e.id === deleteId)?.name}</span>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" onClick={() => setDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
-

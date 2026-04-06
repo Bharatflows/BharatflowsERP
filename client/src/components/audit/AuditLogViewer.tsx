@@ -1,33 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { auditService } from '../../services/modules.service';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import {
-    Box,
-    Card,
-    Typography,
     Table,
     TableBody,
     TableCell,
-    TableContainer,
     TableHead,
+    TableHeader,
     TableRow,
-    Paper,
-    Chip,
-    IconButton,
-    Collapse,
-    Button,
-    Alert,
-    Tooltip,
-    CircularProgress
-} from '@mui/material';
+} from '../ui/table';
 import {
-    KeyboardArrowDown,
-    KeyboardArrowUp,
-    History,
-    Security,
-    VerifiedUser,
-    GppBad
-} from '@mui/icons-material';
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '../ui/collapsible';
+import { ChevronDown, ChevronUp, History, Shield, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '../../lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Eye, ArrowRight } from 'lucide-react';
 
 interface AuditLogViewerProps {
     entityType?: string;
@@ -40,6 +33,7 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ entityType, entityId, s
     const [loading, setLoading] = useState(true);
     const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string } | null>(null);
     const [verifying, setVerifying] = useState(false);
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         fetchLogs();
@@ -51,13 +45,14 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ entityType, entityId, s
             let response;
             if (showGlobal) {
                 response = await auditService.getGlobalLogs();
-                setLogs(response.data.logs || response.data); // Handle paginated or rough response
+                setLogs(response.data.logs || response.data || []);
             } else if (entityType && entityId) {
                 response = await auditService.getEntityLogs(entityType, entityId);
-                setLogs(response.data);
+                setLogs(response.data || []);
             }
         } catch (error) {
             console.error('Failed to fetch audit logs', error);
+            setLogs([]);
         } finally {
             setLoading(false);
         }
@@ -66,8 +61,8 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ entityType, entityId, s
     const verifyChain = async () => {
         setVerifying(true);
         try {
-            const response = await auditService.verifyIntegrity(); // This might fail if API not fully ready or route issues
-            if (response && response.success) {
+            const response = await auditService.verifyIntegrity();
+            if (response && response.data?.success) {
                 setVerificationResult({ success: true, message: 'Blockchain Integrity Verified: All logs are tamper-evident and valid.' });
             } else {
                 setVerificationResult({ success: false, message: 'Verification Failed: Tampering detected!' });
@@ -79,133 +74,220 @@ const AuditLogViewer: React.FC<AuditLogViewerProps> = ({ entityType, entityId, s
         }
     };
 
-    const Row = ({ row }: { row: any }) => {
-        const [open, setOpen] = useState(false);
+    const toggleRow = (id: string) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
 
-        return (
-            <React.Fragment>
-                <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
-                    <TableCell>
-                        <IconButton
-                            aria-label="expand row"
-                            size="small"
-                            onClick={() => setOpen(!open)}
-                        >
-                            {open ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
-                        </IconButton>
-                    </TableCell>
-                    <TableCell component="th" scope="row">
-                        {format(new Date(row.changedAt), 'PPpp')}
-                    </TableCell>
-                    <TableCell>{row.action}</TableCell>
-                    <TableCell>{row.changedBy}</TableCell>
-                    <TableCell>
-                        <Chip label={row.resourceGroup || 'General'} size="small" color="primary" variant="outlined" />
-                    </TableCell>
-                    <TableCell align="right">
-                        <Tooltip title="SHA-256 Hash">
-                            <Typography variant="caption" sx={{ fontFamily: 'monospace', display: 'block', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {row.hash?.substring(0, 10)}...
-                            </Typography>
-                        </Tooltip>
-                    </TableCell>
-                </TableRow>
-                <TableRow>
-                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
-                        <Collapse in={open} timeout="auto" unmountOnExit>
-                            <Box sx={{ margin: 1 }}>
-                                <Typography variant="h6" gutterBottom component="div">
-                                    Change Details
-                                </Typography>
+    const getObjectDiff = (oldObj: any, newObj: any) => {
+        const diff: any = {};
+        if (!oldObj || typeof oldObj !== 'object') return newObj;
+        if (!newObj || typeof newObj !== 'object') return {};
 
-                                {/* Simple Diff View for mvp */}
-                                <div style={{ display: 'flex', gap: '20px' }}>
-                                    <div style={{ flex: 1, padding: '10px', backgroundColor: '#fee', borderRadius: '4px' }}>
-                                        <Typography variant="subtitle2" color="error">Old Value</Typography>
-                                        <pre style={{ overflow: 'auto', fontSize: '12px' }}>
-                                            {JSON.stringify(row.oldValue, null, 2)}
-                                        </pre>
-                                    </div>
-                                    <div style={{ flex: 1, padding: '10px', backgroundColor: '#eef', borderRadius: '4px' }}>
-                                        <Typography variant="subtitle2" color="primary">New Value</Typography>
-                                        <pre style={{ overflow: 'auto', fontSize: '12px' }}>
-                                            {JSON.stringify(row.newValue, null, 2)}
-                                        </pre>
-                                    </div>
-                                </div>
-
-                                <Box mt={2}>
-                                    <Typography variant="caption" display="block">
-                                        <strong>Hash:</strong> {row.hash}
-                                    </Typography>
-                                    <Typography variant="caption" display="block">
-                                        <strong>Previous Hash:</strong> {row.previousHash || 'GENESIS'}
-                                    </Typography>
-                                    <Typography variant="caption" display="block">
-                                        <strong>IP:</strong> {row.userIp} | <strong>Agent:</strong> {row.userAgent}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </Collapse>
-                    </TableCell>
-                </TableRow>
-            </React.Fragment>
-        );
+        const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
+        allKeys.forEach(key => {
+            if (JSON.stringify(oldObj[key]) !== JSON.stringify(newObj[key])) {
+                diff[key] = {
+                    old: oldObj[key],
+                    new: newObj[key]
+                };
+            }
+        });
+        return diff;
     };
 
     return (
-        <Card sx={{ p: 3, mt: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Box display="flex" alignItems="center" gap={1}>
-                    <History />
-                    <Typography variant="h5">Audit Trail</Typography>
-                </Box>
+        <Card className="mt-6">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <div className="flex items-center gap-2">
+                    <History className="h-5 w-5" />
+                    <CardTitle>Audit Trail</CardTitle>
+                </div>
                 <Button
-                    variant="outlined"
-                    color={verificationResult?.success ? "success" : "warning"}
-                    startIcon={verifying ? <CircularProgress size={20} /> : (verificationResult?.success ? <VerifiedUser /> : <Security />)}
+                    variant="outline"
                     onClick={verifyChain}
                     disabled={verifying}
+                    className={cn(
+                        verificationResult?.success && "border-green-500 text-green-600",
+                        verificationResult && !verificationResult.success && "border-red-500 text-red-600"
+                    )}
                 >
-                    {verifying ? 'Verifying Chain...' : 'Verify Integrity'}
+                    {verifying ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Verifying...
+                        </>
+                    ) : (
+                        <>
+                            <Shield className="mr-2 h-4 w-4" />
+                            Verify Integrity
+                        </>
+                    )}
                 </Button>
-            </Box>
+            </CardHeader>
+            <CardContent>
+                {verificationResult && (
+                    <div className={cn(
+                        "mb-4 p-3 rounded-lg border",
+                        verificationResult.success ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"
+                    )}>
+                        <div className="flex items-center gap-2">
+                            {verificationResult.success ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                            <span>{verificationResult.message}</span>
+                        </div>
+                    </div>
+                )}
 
-            {verificationResult && (
-                <Alert severity={verificationResult.success ? "success" : "error"} sx={{ mb: 2 }}>
-                    {verificationResult.message}
-                </Alert>
-            )}
-
-            {loading ? (
-                <Box display="flex" justifyContent="center" p={3}><CircularProgress /></Box>
-            ) : (
-                <TableContainer component={Paper} variant="outlined">
-                    <Table aria-label="audit logs table">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell />
-                                <TableCell>Date & Time</TableCell>
-                                <TableCell>Action</TableCell>
-                                <TableCell>User</TableCell>
-                                <TableCell>Group</TableCell>
-                                <TableCell align="right">Hash</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {logs.length > 0 ? (
-                                logs.map((row) => (
-                                    <Row key={row.id} row={row} />
-                                ))
-                            ) : (
+                {loading ? (
+                    <div className="flex justify-center p-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : (
+                    <div className="rounded-lg border">
+                        <Table>
+                            <TableHeader>
                                 <TableRow>
-                                    <TableCell colSpan={6} align="center">No audit logs found.</TableCell>
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead>Date & Time</TableHead>
+                                    <TableHead>Action</TableHead>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Group</TableHead>
+                                    <TableHead className="text-right">Hash</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            )}
+                            </TableHeader>
+                            <TableBody>
+                                {logs.length > 0 ? (
+                                    logs.map((row) => (
+                                        <React.Fragment key={row.id}>
+                                            <TableRow>
+                                                <TableCell>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => toggleRow(row.id)}
+                                                    >
+                                                        {expandedRows.has(row.id) ? (
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        ) : (
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {row.changedAt ? format(new Date(row.changedAt), 'PPpp') : '-'}
+                                                </TableCell>
+                                                <TableCell>{row.action}</TableCell>
+                                                <TableCell>{row.changedBy}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline">{row.resourceGroup || 'General'}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <span className="font-mono text-xs text-muted-foreground" title={row.hash}>
+                                                        {row.hash?.substring(0, 10)}...
+                                                    </span>
+                                                </TableCell>
+                                            </TableRow>
+                                            {expandedRows.has(row.id) && (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="bg-muted/50 dark:bg-card p-6 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                        <div className="space-y-6">
+                                                            <div className="flex items-center justify-between">
+                                                                <h4 className="font-bold text-foreground dark:text-white flex items-center gap-2">
+                                                                    <Eye className="size-4 text-primary" />
+                                                                    Version Comparison
+                                                                </h4>
+                                                                <Badge variant="secondary" className="font-mono text-2xs">ID: {row.id}</Badge>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                                {/* Formatted Diff Cards */}
+                                                                <div className="space-y-3">
+                                                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Changed Fields</p>
+                                                                    <div className="space-y-2">
+                                                                        {Object.entries(getObjectDiff(row.oldValue, row.newValue)).map(([key, value]: [string, any]) => (
+                                                                            <div key={key} className="bg-white dark:bg-card p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                                                <div className="flex items-center justify-between mb-2">
+                                                                                    <span className="text-xs font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-md uppercase">{key}</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className="flex-1 min-w-0 p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900/30">
+                                                                                        <p className="text-2xs font-bold text-red-600 mb-1 uppercase">Old</p>
+                                                                                        <p className="text-xs truncate text-red-700 dark:text-red-400 font-mono">
+                                                                                            {typeof value.old === 'object' ? JSON.stringify(value.old) : String(value.old || 'N/A')}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                    <ArrowRight className="size-4 text-muted-foreground shrink-0" />
+                                                                                    <div className="flex-1 min-w-0 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-900/30">
+                                                                                        <p className="text-2xs font-bold text-green-600 mb-1 uppercase">New</p>
+                                                                                        <p className="text-xs truncate text-green-700 dark:text-green-400 font-bold font-mono">
+                                                                                            {typeof value.new === 'object' ? JSON.stringify(value.new) : String(value.new || 'N/A')}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                        {Object.keys(getObjectDiff(row.oldValue, row.newValue)).length === 0 && (
+                                                                            <p className="text-xs text-muted-foreground italic p-4 text-center bg-muted rounded-lg border border-dashed border-border dark:border-slate-700">
+                                                                                No specific data changes found in payload.
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Raw Meta Data */}
+                                                                <div className="space-y-3">
+                                                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Audit Metadata</p>
+                                                                    <div className="bg-white dark:bg-card p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 shadow-sm">
+                                                                        <div>
+                                                                            <p className="text-2xs font-bold text-muted-foreground uppercase mb-1">Entity Reference</p>
+                                                                            <p className="text-xs font-mono break-all text-foreground dark:text-muted-foreground">
+                                                                                {row.entityType}: {row.entityId}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-2xs font-bold text-muted-foreground uppercase mb-1">Digital Signature (Hash)</p>
+                                                                            <p className="text-2xs font-mono break-all text-primary bg-primary/5 p-2 rounded-lg border border-primary/10">
+                                                                                {row.hash}
+                                                                            </p>
+                                                                        </div>
+                                                                        <div className="flex gap-4">
+                                                                            <div className="flex-1">
+                                                                                <p className="text-2xs font-bold text-muted-foreground uppercase mb-1">Source IP</p>
+                                                                                <p className="text-xs font-mono">{row.userIp || '127.0.0.1'}</p>
+                                                                            </div>
+                                                                            <div className="flex-1">
+                                                                                <p className="text-2xs font-bold text-muted-foreground uppercase mb-1">Environment</p>
+                                                                                <p className="text-xs truncate" title={row.userAgent}>{row.userAgent?.split(' ')[0] || 'Web API'}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </React.Fragment>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                            No audit logs found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
         </Card>
     );
 };

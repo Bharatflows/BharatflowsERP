@@ -1,4 +1,8 @@
-# ✅ BharatFlow - Final Implementation Status
+> [!IMPORTANT]
+> **This file is partially archived.**
+> For the most up-to-date implementation status, please refer to [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md).
+
+# ✅ BharatFlow - Final Status (Legacy)
 
 ## 🎉 **COMPLETED UPDATES**
 

@@ -1,17 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
-import {
-    Plus,
-    Search,
-    FileText,
-    Download,
-    Calculator,
-    Building,
-} from "lucide-react";
 import { toast } from "sonner";
+import { gstService } from "@/services/modules.service";
+import { cn } from "../../lib/utils";
+
+// Reusable icon component
+const MIcon = ({ name, className }: { name: string; className?: string }) => (
+    <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit' }}>
+        {name}
+    </span>
+);
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "../ui/dialog";
+import { Label } from "../ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "../ui/select";
 
 interface TDSTCSEntry {
     id: string;
@@ -41,53 +58,106 @@ const sections = {
     ],
 };
 
-// Mock data
-const mockEntries: TDSTCSEntry[] = [
-    {
-        id: "1",
-        type: "TDS",
-        sectionCode: "194C",
-        partyName: "ABC Contractors",
-        partyPan: "ABCDE1234F",
-        referenceNumber: "PB-2024-100",
-        baseAmount: 100000,
-        rate: 1,
-        taxAmount: 1000,
-        transactionDate: "2024-11-15",
-        status: "PENDING",
-    },
-    {
-        id: "2",
-        type: "TDS",
-        sectionCode: "194J",
-        partyName: "XYZ Consultants",
-        partyPan: "XYZAB5678G",
-        referenceNumber: "PB-2024-095",
-        baseAmount: 50000,
-        rate: 10,
-        taxAmount: 5000,
-        transactionDate: "2024-11-10",
-        status: "FILED",
-    },
-    {
-        id: "3",
-        type: "TCS",
-        sectionCode: "206C(1H)",
-        partyName: "Large Buyer Ltd",
-        partyPan: "LBUYR9999H",
-        referenceNumber: "INV-2024-500",
-        baseAmount: 7500000,
-        rate: 0.1,
-        taxAmount: 7500,
-        transactionDate: "2024-11-20",
-        status: "PENDING",
-    },
-];
-
 export function TDSTCSManagement() {
-    const [entries, setEntries] = useState<TDSTCSEntry[]>(mockEntries);
+    const [entries, setEntries] = useState<TDSTCSEntry[]>([]);
+    const [loading, setLoading] = useState(true);
     const [filterType, setFilterType] = useState<"ALL" | "TDS" | "TCS">("ALL");
     const [searchQuery, setSearchQuery] = useState("");
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const [formData, setFormData] = useState({
+        type: "TDS" as "TDS" | "TCS",
+        sectionCode: "",
+        partyName: "",
+        partyPan: "",
+        referenceNumber: "",
+        referenceType: "MANUAL",
+        referenceId: "",
+        baseAmount: 0,
+        rate: 0,
+        taxAmount: 0,
+        transactionDate: new Date().toISOString().split("T")[0],
+    });
+
+    const fetchEntries = async () => {
+        setLoading(true);
+        try {
+            const response = await gstService.getTDSTCSEntries();
+            if (response.success && response.data) {
+                const mappedEntries = response.data.map((e: any) => ({
+                    ...e,
+                    baseAmount: Number(e.baseAmount),
+                    rate: Number(e.rate),
+                    taxAmount: Number(e.taxAmount),
+                    transactionDate: e.transactionDate.split("T")[0],
+                }));
+                setEntries(mappedEntries);
+            }
+        } catch (error) {
+            toast.error("Failed to fetch tax records");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchEntries();
+    }, []);
+
+    const calculateTax = (base: number, rate: number) => {
+        return (base * rate) / 100;
+    };
+
+    const handleBaseAmountChange = (val: number) => {
+        const tax = calculateTax(val, formData.rate);
+        setFormData({ ...formData, baseAmount: val, taxAmount: tax });
+    };
+
+    const handleSectionChange = (val: string) => {
+        const section = [...sections.TDS, ...sections.TCS].find((s) => s.code === val);
+        const rate = section?.rate || 0;
+        const tax = calculateTax(formData.baseAmount, rate);
+        setFormData({ ...formData, sectionCode: val, rate, taxAmount: tax });
+    };
+
+    const handleSubmit = async () => {
+        if (!formData.partyName || !formData.sectionCode || formData.baseAmount <= 0) {
+            toast.error("Please fill in all required fields");
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const response = await gstService.createTDSTCSEntry({
+                ...formData,
+                referenceId: formData.referenceId || formData.referenceNumber,
+                referenceType: formData.referenceType || "MANUAL"
+            });
+            if (response.success) {
+                toast.success("Entry recorded successfully");
+                setIsDialogOpen(false);
+                fetchEntries();
+                setFormData({
+                    type: "TDS",
+                    sectionCode: "",
+                    partyName: "",
+                    partyPan: "",
+                    referenceNumber: "",
+                    referenceType: "MANUAL",
+                    referenceId: "",
+                    baseAmount: 0,
+                    rate: 0,
+                    taxAmount: 0,
+                    transactionDate: new Date().toISOString().split("T")[0],
+                });
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Failed to save entry");
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat("en-IN", {
@@ -125,68 +195,68 @@ export function TDSTCSManagement() {
     };
 
     return (
-        <div className="space-y-6 p-6">
+        <div className="space-y-[24px] p-[24px] animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-[16px]">
                 <div>
-                    <h1 className="text-2xl font-bold">TDS / TCS Management</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-3xl font-bold text-foreground">TDS / TCS Management</h1>
+                    <p className="text-body-sm font-medium text-muted-foreground mt-[4px]">
                         Track Tax Deducted/Collected at Source
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
+                <div className="flex gap-[12px]">
+                    <Button variant="outline" className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold border-border">
+                        <MIcon name="download" className="text-[18px]" />
                         Export
                     </Button>
-                    <Button>
-                        <Plus className="h-4 w-4 mr-2" />
+                    <Button onClick={() => setIsDialogOpen(true)} className="gap-[8px] h-[40px] px-[16px] rounded-[8px] font-bold">
+                        <MIcon name="add" className="text-[18px]" />
                         Add Entry
                     </Button>
                 </div>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-blue-50 border-blue-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-2 rounded-lg">
-                                <Calculator className="h-5 w-5 text-blue-600" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
+                <Card className="rounded-[16px] border-blue-200 dark:border-blue-900/50 shadow-sm bg-blue-50 dark:bg-blue-950/20">
+                    <CardContent className="p-[20px]">
+                        <div className="flex items-center gap-[16px]">
+                            <div className="bg-blue-100 dark:bg-blue-900/40 p-[12px] rounded-[12px]">
+                                <MIcon name="calculate" className="text-[24px] text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                                <p className="text-sm text-blue-600">Total TDS Deducted</p>
-                                <p className="text-2xl font-bold text-blue-700">
+                                <p className="text-[12px] font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-wider mb-[4px]">Total TDS Deducted</p>
+                                <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
                                     {formatCurrency(stats.totalTDS)}
                                 </p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="bg-purple-50 border-purple-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-purple-100 p-2 rounded-lg">
-                                <Building className="h-5 w-5 text-purple-600" />
+                <Card className="rounded-[16px] border-purple-200 dark:border-purple-900/50 shadow-sm bg-purple-50 dark:bg-purple-950/20">
+                    <CardContent className="p-[20px]">
+                        <div className="flex items-center gap-[16px]">
+                            <div className="bg-purple-100 dark:bg-purple-900/40 p-[12px] rounded-[12px]">
+                                <MIcon name="business" className="text-[24px] text-purple-600 dark:text-purple-400" />
                             </div>
                             <div>
-                                <p className="text-sm text-purple-600">Total TCS Collected</p>
-                                <p className="text-2xl font-bold text-purple-700">
+                                <p className="text-[12px] font-bold text-purple-600/80 dark:text-purple-400/80 uppercase tracking-wider mb-[4px]">Total TCS Collected</p>
+                                <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">
                                     {formatCurrency(stats.totalTCS)}
                                 </p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="bg-amber-50 border-amber-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-amber-100 p-2 rounded-lg">
-                                <FileText className="h-5 w-5 text-amber-600" />
+                <Card className="rounded-[16px] border-amber-200 dark:border-amber-900/50 shadow-sm bg-amber-50 dark:bg-amber-950/20">
+                    <CardContent className="p-[20px]">
+                        <div className="flex items-center gap-[16px]">
+                            <div className="bg-amber-100 dark:bg-amber-900/40 p-[12px] rounded-[12px]">
+                                <MIcon name="description" className="text-[24px] text-amber-600 dark:text-amber-400" />
                             </div>
                             <div>
-                                <p className="text-sm text-amber-600">Pending Filing</p>
-                                <p className="text-2xl font-bold text-amber-700">{stats.pending}</p>
+                                <p className="text-[12px] font-bold text-amber-600/80 dark:text-amber-400/80 uppercase tracking-wider mb-[4px]">Pending Filing</p>
+                                <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{stats.pending}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -194,22 +264,22 @@ export function TDSTCSManagement() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4">
+            <div className="flex flex-col md:flex-row gap-[16px]">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <MIcon name="search" className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[20px] text-muted-foreground" />
                     <Input
                         placeholder="Search by party name or reference..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
+                        className="pl-[40px] h-[40px] rounded-[8px] bg-card border-border"
                     />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-[8px]">
                     {(["ALL", "TDS", "TCS"] as const).map((type) => (
                         <Button
                             key={type}
                             variant={filterType === type ? "default" : "outline"}
-                            size="sm"
+                            className="h-[40px] px-[16px] rounded-[8px] font-bold"
                             onClick={() => setFilterType(type)}
                         >
                             {type}
@@ -219,86 +289,228 @@ export function TDSTCSManagement() {
             </div>
 
             {/* Entries Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>TDS/TCS Entries ({filteredEntries.length})</CardTitle>
+            <Card className="rounded-[16px] border-border shadow-sm bg-card overflow-hidden">
+                <CardHeader className="p-[20px] pb-[16px] border-b border-slate-100 dark:border-slate-800">
+                    <CardTitle className="text-2xl font-bold text-foreground">TDS/TCS Entries ({filteredEntries.length})</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="text-left py-3 px-4 font-medium">Type</th>
-                                    <th className="text-left py-3 px-4 font-medium">Section</th>
-                                    <th className="text-left py-3 px-4 font-medium">Party</th>
-                                    <th className="text-left py-3 px-4 font-medium">Reference</th>
-                                    <th className="text-right py-3 px-4 font-medium">Base Amount</th>
-                                    <th className="text-right py-3 px-4 font-medium">Rate</th>
-                                    <th className="text-right py-3 px-4 font-medium">Tax</th>
-                                    <th className="text-center py-3 px-4 font-medium">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredEntries.map((entry) => (
-                                    <tr key={entry.id} className="border-b hover:bg-muted/20">
-                                        <td className="py-3 px-4">
-                                            <Badge variant={entry.type === "TDS" ? "default" : "secondary"}>
-                                                {entry.type}
-                                            </Badge>
-                                        </td>
-                                        <td className="py-3 px-4 font-mono">{entry.sectionCode}</td>
-                                        <td className="py-3 px-4">
-                                            <div>
-                                                <p className="font-medium">{entry.partyName}</p>
-                                                <p className="text-xs text-muted-foreground">{entry.partyPan}</p>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4 font-mono text-sm">{entry.referenceNumber}</td>
-                                        <td className="py-3 px-4 text-right font-mono">
-                                            {formatCurrency(entry.baseAmount)}
-                                        </td>
-                                        <td className="py-3 px-4 text-right">{entry.rate}%</td>
-                                        <td className="py-3 px-4 text-right font-mono font-bold">
-                                            {formatCurrency(entry.taxAmount)}
-                                        </td>
-                                        <td className="py-3 px-4 text-center">{getStatusBadge(entry.status)}</td>
+                <CardContent className="p-0">
+                    {loading ? (
+                        <div className="flex items-center justify-center py-[60px]">
+                            <MIcon name="sync" className="text-[32px] animate-spin text-primary" />
+                        </div>
+                    ) : filteredEntries.length === 0 ? (
+                        <div className="text-center py-[60px] text-muted-foreground">
+                            <MIcon name="business" className="text-[48px] mx-auto mb-[12px] opacity-20" />
+                            <p className="font-medium">No records found</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-muted dark:bg-slate-950 border-b border-border">
+                                    <tr>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Type</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Section</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Party</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Reference</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Base Amount</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Rate</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Tax</th>
+                                        <th className="px-[24px] py-[16px] text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-center">Status</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {filteredEntries.map((entry, index) => (
+                                        <tr key={entry.id} className={cn(
+                                            "border-b border-border hover:bg-muted/50 dark:hover:bg-muted/50 transition-colors",
+                                            index === filteredEntries.length - 1 && "border-b-0"
+                                        )}>
+                                            <td className="px-[24px] py-[16px]">
+                                                <Badge variant={entry.type === "TDS" ? "default" : "secondary"} className="rounded-[6px] font-bold">
+                                                    {entry.type}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-[24px] py-[16px] font-mono text-body-sm text-foreground dark:text-muted-foreground font-bold">{entry.sectionCode}</td>
+                                            <td className="px-[24px] py-[16px]">
+                                                <div>
+                                                    <p className="text-body-sm font-bold text-foreground">{entry.partyName}</p>
+                                                    <p className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider mt-[2px]">{entry.partyPan}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-[24px] py-[16px] font-mono text-body-sm font-medium text-muted-foreground">{entry.referenceNumber}</td>
+                                            <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-medium text-foreground dark:text-muted-foreground">
+                                                {formatCurrency(entry.baseAmount)}
+                                            </td>
+                                            <td className="px-[24px] py-[16px] text-right text-body-sm font-medium text-foreground dark:text-muted-foreground">{entry.rate}%</td>
+                                            <td className="px-[24px] py-[16px] text-right font-mono text-body-sm font-bold text-foreground">
+                                                {formatCurrency(entry.taxAmount)}
+                                            </td>
+                                            <td className="px-[24px] py-[16px] text-center">{getStatusBadge(entry.status)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
+            {/* New Entry Dialog */}
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="sm:max-w-2xl p-[24px] rounded-[16px] bg-card border-border">
+                    <DialogHeader className="mb-[16px]">
+                        <DialogTitle className="text-2xl font-bold text-foreground">Record New TDS/TCS Entry</DialogTitle>
+                        <DialogDescription className="text-body-sm font-medium text-muted-foreground">
+                            Manually record tax deductions or collections.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-[16px] py-[8px]">
+                        <div className="grid grid-cols-2 gap-[16px]">
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Entry Type</Label>
+                                <Select
+                                    value={formData.type}
+                                    onValueChange={(val: any) => setFormData({ ...formData, type: val })}
+                                >
+                                    <SelectTrigger className="h-[40px] rounded-[8px] border-slate-200">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="TDS">TDS (Deduction)</SelectItem>
+                                        <SelectItem value="TCS">TCS (Collection)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Section Code *</Label>
+                                <Select
+                                    value={formData.sectionCode}
+                                    onValueChange={handleSectionChange}
+                                >
+                                    <SelectTrigger className="h-[40px] rounded-[8px] border-slate-200">
+                                        <SelectValue placeholder="Select Section" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {(formData.type === "TDS" ? sections.TDS : sections.TCS).map((s) => (
+                                            <SelectItem key={s.code} value={s.code}>
+                                                {s.code} - {s.desc} ({s.rate}%)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-[8px]">
+                            <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Party Name *</Label>
+                            <Input
+                                value={formData.partyName}
+                                onChange={(e) => setFormData({ ...formData, partyName: e.target.value })}
+                                placeholder="Recipient or Collection Party"
+                                className="h-[40px] rounded-[8px] border-slate-200"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-[16px]">
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Party PAN</Label>
+                                <Input
+                                    value={formData.partyPan}
+                                    onChange={(e) => setFormData({ ...formData, partyPan: e.target.value.toUpperCase() })}
+                                    maxLength={10}
+                                    placeholder="e.g., ABCDE1234F"
+                                    className="h-[40px] rounded-[8px] border-slate-200 uppercase"
+                                />
+                            </div>
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Reference #</Label>
+                                <Input
+                                    value={formData.referenceNumber}
+                                    onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
+                                    placeholder="Invoice or Receipt #"
+                                    className="h-[40px] rounded-[8px] border-slate-200"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-[16px]">
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Base Amount *</Label>
+                                <Input
+                                    type="number"
+                                    value={formData.baseAmount}
+                                    onChange={(e) => handleBaseAmountChange(Number(e.target.value))}
+                                    className="h-[40px] rounded-[8px] border-slate-200"
+                                />
+                            </div>
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Tax Rate (%)</Label>
+                                <Input value={formData.rate} readOnly className="h-[40px] rounded-[8px] bg-muted dark:bg-card border-slate-200 font-bold" />
+                            </div>
+                            <div className="space-y-[8px]">
+                                <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Tax Amount</Label>
+                                <Input value={formData.taxAmount} readOnly className="h-[40px] rounded-[8px] bg-primary/5 border-primary/20 font-bold text-primary" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-[8px]">
+                            <Label className="text-[12px] font-bold text-foreground dark:text-muted-foreground">Transaction Date</Label>
+                            <Input
+                                type="date"
+                                value={formData.transactionDate}
+                                onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
+                                className="h-[40px] rounded-[8px] border-slate-200"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="mt-[24px]">
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={submitting} className="h-[40px] px-[16px] rounded-[8px] font-bold">
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSubmit} disabled={submitting} className="h-[40px] px-[16px] rounded-[8px] font-bold gap-[8px]">
+                            {submitting ? (
+                                <>
+                                    <MIcon name="sync" className="text-[16px] animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                "Record Entry"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Section Reference */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>TDS Sections</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+                <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                    <CardHeader className="p-[20px] pb-[16px]">
+                        <CardTitle className="text-2xl font-bold text-foreground">TDS Sections</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
+                    <CardContent className="p-[20px] pt-0">
+                        <div className="space-y-[8px]">
                             {sections.TDS.map((s) => (
-                                <div key={s.code} className="flex justify-between p-2 border rounded">
-                                    <span className="font-mono">{s.code}</span>
-                                    <span className="text-muted-foreground">{s.desc}</span>
-                                    <Badge variant="outline">{s.rate}%</Badge>
+                                <div key={s.code} className="flex justify-between items-center p-[12px] border border-border rounded-[8px] hover:border-border transition-colors">
+                                    <span className="font-mono text-body-sm font-bold text-foreground dark:text-muted-foreground">{s.code}</span>
+                                    <span className="text-body-sm text-muted-foreground font-medium text-right flex-1 mx-[12px]">{s.desc}</span>
+                                    <Badge variant="outline" className="rounded-[4px] font-bold text-[11px] bg-muted dark:bg-card px-[8px] py-[2px]">{s.rate}%</Badge>
                                 </div>
                             ))}
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>TCS Sections</CardTitle>
+                <Card className="rounded-[16px] border-border shadow-sm bg-card">
+                    <CardHeader className="p-[20px] pb-[16px]">
+                        <CardTitle className="text-2xl font-bold text-foreground">TCS Sections</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
+                    <CardContent className="p-[20px] pt-0">
+                        <div className="space-y-[8px]">
                             {sections.TCS.map((s) => (
-                                <div key={s.code} className="flex justify-between p-2 border rounded">
-                                    <span className="font-mono">{s.code}</span>
-                                    <span className="text-muted-foreground">{s.desc}</span>
-                                    <Badge variant="outline">{s.rate}%</Badge>
+                                <div key={s.code} className="flex justify-between items-center p-[12px] border border-border rounded-[8px] hover:border-border transition-colors">
+                                    <span className="font-mono text-body-sm font-bold text-foreground dark:text-muted-foreground">{s.code}</span>
+                                    <span className="text-body-sm text-muted-foreground font-medium text-right flex-1 mx-[12px]">{s.desc}</span>
+                                    <Badge variant="outline" className="rounded-[4px] font-bold text-[11px] bg-muted dark:bg-card px-[8px] py-[2px]">{s.rate}%</Badge>
                                 </div>
                             ))}
                         </div>

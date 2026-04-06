@@ -1,31 +1,5 @@
 import { useState } from "react";
-import {
-  Zap,
-  LayoutDashboard,
-  FileText,
-  ShoppingCart,
-  Package,
-  Users,
-  Wallet,
-  IndianRupee,
-  BarChart3,
-  MessageSquare,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  TrendingUp,
-  CreditCard,
-  UserCog,
-  Target,
-  Scan,
-  Bell,
-  Factory,
-  FolderOpen,
-  Moon,
-  Sun,
-  BookOpen
-} from "lucide-react";
+
 import { cn } from "../lib/utils";
 import { Separator } from "./ui/separator";
 import { useAuth } from "../contexts/AuthContext";
@@ -35,7 +9,7 @@ import { hasPermission } from "../lib/permissions";
 interface NavItem {
   id: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  iconName: string;
   badge?: number;
 }
 
@@ -46,29 +20,29 @@ interface DashboardSidebarProps {
 }
 
 const mainNavItems: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "sales", label: "Sales", icon: FileText },
-  { id: "purchase", label: "Purchase", icon: ShoppingCart },
-  { id: "expenses", label: "Expenses", icon: CreditCard },
-  { id: "inventory", label: "Inventory", icon: Package },
-  { id: "parties", label: "Parties", icon: Users },
-  { id: "hr", label: "HR & Payroll", icon: UserCog },
-  { id: "crm", label: "CRM", icon: Target },
-  { id: "production", label: "Production", icon: Factory },
-  { id: "barcode", label: "Barcode", icon: Scan },
-  { id: "documents", label: "Documents", icon: FolderOpen },
-  { id: "payments", label: "Payments", icon: Wallet },
-  { id: "gst", label: "GST", icon: IndianRupee },
-  { id: "analytics", label: "Analytics", icon: TrendingUp },
-  { id: "reports", label: "Reports", icon: BarChart3 },
-  { id: "accounting", label: "Accounting", icon: BookOpen },
+  { id: "dashboard", label: "Dashboard", iconName: "space_dashboard" },
+  { id: "sales", label: "Sales", iconName: "request_quote" },
+  { id: "purchase", label: "Purchase", iconName: "shopping_cart" },
+  { id: "expenses", label: "Expenses", iconName: "account_balance_wallet" },
+  { id: "inventory", label: "Inventory", iconName: "inventory_2" },
+  { id: "parties", label: "Parties", iconName: "groups" },
+  { id: "hr", label: "HR & Payroll", iconName: "manage_accounts" },
+  { id: "crm", label: "CRM", iconName: "track_changes" },
+  { id: "production", label: "Production", iconName: "factory" },
+  { id: "barcode", label: "Barcode", iconName: "qr_code_scanner" },
+  { id: "documents", label: "Documents", iconName: "folder_open" },
+  { id: "banking", label: "Banking", iconName: "account_balance" },
+  { id: "gst", label: "GST", iconName: "currency_rupee" },
+  { id: "analytics", label: "Analytics", iconName: "trending_up" },
+  { id: "reports", label: "Reports", iconName: "bar_chart" },
+  { id: "accounting", label: "Accounting", iconName: "menu_book" },
 ];
 
 const bottomNavItems: NavItem[] = [
-  { id: "notifications", label: "Notifications", icon: Bell, badge: 8 },
+  { id: "notifications", label: "Notifications", iconName: "notifications", badge: 8 },
   // NOTE: Messages module hidden for launch - uncomment when ready
-  // { id: "messages", label: "Messages", icon: MessageSquare, badge: 3 },
-  { id: "settings", label: "Settings", icon: Settings },
+  // { id: "messages", label: "Messages", iconName: "chat", badge: 3 },
+  { id: "settings", label: "Settings", iconName: "settings" },
 ];
 
 export function DashboardSidebar({ activeModule, onModuleChange, onLogout }: DashboardSidebarProps) {
@@ -80,37 +54,42 @@ export function DashboardSidebar({ activeModule, onModuleChange, onLogout }: Das
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
+  const MIcon = ({ name, className }: { name: string; className?: string }) => (
+    <span className={cn("material-icons-outlined", className)} style={{ fontSize: '24px' }}>
+      {name}
+    </span>
+  );
+
   return (
     <div
       className={cn(
         "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
-        isCollapsed ? "w-20" : "w-64"
+        isCollapsed ? "w-[72px]" : "w-[256px]"
       )}
     >
       {/* Header */}
-      <div className="p-4 flex items-center justify-between h-16 border-b border-sidebar-border">
+      <div className="p-[16px] flex items-center justify-between h-[64px]">
         {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-primary to-primary/80 p-2 rounded-xl shadow-sm">
-              <Zap className="size-5 text-primary-foreground" />
+          <div className="flex items-center gap-[12px] cursor-pointer" onClick={() => onModuleChange("dashboard")}>
+            <div className="bg-primary/10 p-[8px] rounded-[8px] shadow-sm flex items-center justify-center">
+              <MIcon name="bolt" className="text-primary text-[20px]" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-sidebar-foreground">BharatFlow</h2>
-              <p className="text-xs text-muted-foreground">MSME OS</p>
+              <h2 className="text-body font-bold text-foreground leading-tight">BharatFlow</h2>
+              <p className="text-caption text-muted-foreground mt-[2px]">MSME OS</p>
             </div>
           </div>
         )}
         {isCollapsed && (
-          <div className="bg-gradient-to-br from-primary to-primary/80 p-2 rounded-xl shadow-sm mx-auto">
-            <Zap className="size-5 text-primary-foreground" />
+          <div className="bg-primary/10 p-[8px] rounded-[8px] shadow-sm flex items-center justify-center mx-auto cursor-pointer" onClick={() => onModuleChange("dashboard")}>
+            <MIcon name="bolt" className="text-primary text-[20px]" />
           </div>
         )}
       </div>
 
       {/* Main Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <div className="flex-1 px-[16px] py-[16px] space-y-[8px] overflow-y-auto no-scrollbar">
         {mainNavItems.filter(item => hasPermission(user as any, item.id)).map((item) => {
-          const Icon = item.icon;
           const isActive = activeModule === item.id;
 
           return (
@@ -118,108 +97,104 @@ export function DashboardSidebar({ activeModule, onModuleChange, onLogout }: Das
               key={item.id}
               onClick={() => onModuleChange(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium",
+                "w-full flex items-center gap-[12px] px-[12px] h-[48px] rounded-[8px] transition-all duration-200 text-body font-medium relative group",
                 isActive
-                  ? "bg-primary/10 text-primary shadow-sm"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isCollapsed && "justify-center px-2"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-muted dark:hover:text-slate-100",
+                isCollapsed && "justify-center px-0"
               )}
+              title={isCollapsed ? item.label : undefined}
             >
-              <Icon className={cn("size-5 flex-shrink-0 transition-colors", isActive ? "text-primary" : "")} />
+              {/* Active Indicator Line (Left) */}
+              {isActive && !isCollapsed && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[24px] bg-primary rounded-r-[4px]" />
+              )}
+
+              <MIcon name={item.iconName} className={cn("shrink-0 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-muted-foreground")} />
+
               {!isCollapsed && (
                 <span className="flex-1 text-left">{item.label}</span>
               )}
+
               {!isCollapsed && item.badge && (
-                <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-0.5 rounded-full">
+                <div className="bg-primary/10 text-primary text-[10px] font-bold px-[6px] py-[2px] rounded-[16px] flex items-center justify-center">
                   {item.badge}
-                </span>
+                </div>
+              )}
+
+              {/* Collapsed Badge Indicator */}
+              {isCollapsed && item.badge && (
+                <div className="absolute top-[8px] right-[8px] size-[8px] bg-primary rounded-full border-2 border-sidebar" />
               )}
             </button>
           );
         })}
-      </nav>
+      </div>
 
-      <Separator className="bg-sidebar-border" />
+      {/* Sidebar Footer Area */}
+      <div className="p-[16px] space-y-[16px]">
+        {/* Bottom Navigation Items */}
+        <div className="space-y-[8px]">
+          {bottomNavItems.map((item) => {
+            const isActive = activeModule === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={item.id === 'settings' ? () => onModuleChange('settings') : undefined}
+                className={cn(
+                  "w-full flex items-center gap-[12px] px-[12px] h-[48px] rounded-[8px] transition-all duration-200 text-body font-medium relative group",
+                  isActive
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-muted dark:hover:text-slate-100",
+                  isCollapsed && "justify-center px-0"
+                )}
+                title={isCollapsed ? item.label : undefined}
+              >
+                <MIcon name={item.iconName} className={cn("shrink-0 transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground dark:group-hover:text-muted-foreground")} />
+                {!isCollapsed && (
+                  <span className="flex-1 text-left">{item.label}</span>
+                )}
+                {!isCollapsed && item.badge && (
+                  <div className="bg-primary/10 text-primary text-[10px] font-bold px-[6px] py-[2px] rounded-[16px] flex items-center justify-center">
+                    {item.badge}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
-      {/* Bottom Navigation */}
-      <div className="px-3 py-4 space-y-1">
-        {bottomNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeModule === item.id;
+        <Separator className="bg-slate-200 dark:bg-card" />
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => onModuleChange(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium relative",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                isCollapsed && "justify-center px-2"
-              )}
-            >
-              <Icon className={cn("size-5 flex-shrink-0", isActive ? "text-primary" : "")} />
-              {!isCollapsed && (
-                <span className="flex-1 text-left">{item.label}</span>
-              )}
-              {item.badge && (
-                <span className={cn(
-                  "bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full",
-                  isCollapsed && "absolute -top-1 -right-1 size-4 flex items-center justify-center p-0 text-[10px]"
-                )}>
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
+        {/* Bottom Actions */}
+        <div className="space-y-[8px]">
+          {/* Collapse Toggle */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className={cn(
+              "w-full flex items-center gap-[12px] px-[12px] h-[48px] rounded-[8px] transition-all duration-200 text-body font-medium text-muted-foreground hover:bg-muted hover:text-foreground dark:hover:bg-muted dark:hover:text-slate-100",
+              isCollapsed && "justify-center px-0"
+            )}
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            <MIcon name={isCollapsed ? "last_page" : "first_page"} className="shrink-0" />
+            {!isCollapsed && <span className="flex-1 text-left">Collapse</span>}
+          </button>
 
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium",
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isCollapsed && "justify-center px-2"
-          )}
-        >
-          {resolvedTheme === 'dark' ? (
-            <Sun className="size-5 flex-shrink-0" />
-          ) : (
-            <Moon className="size-5 flex-shrink-0" />
-          )}
-          {!isCollapsed && (
-            <span className="flex-1 text-left">
-              {resolvedTheme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          )}
-        </button>
-
-        {/* Collapse Toggle */}
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isCollapsed && "justify-center px-2"
-          )}
-        >
-          {isCollapsed ? <ChevronRight className="size-5" /> : <ChevronLeft className="size-5" />}
-          {!isCollapsed && <span className="flex-1 text-left">Collapse</span>}
-        </button>
-
-        {/* Logout Button */}
-        <button
-          onClick={onLogout}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm font-medium",
-            "text-destructive hover:bg-destructive/10",
-            isCollapsed && "justify-center px-2"
-          )}
-        >
-          <LogOut className="size-5 flex-shrink-0" />
-          {!isCollapsed && <span className="flex-1 text-left">Logout</span>}
-        </button>
+          {/* Logout Button */}
+          <button
+            onClick={onLogout}
+            className={cn(
+              "w-full flex items-center gap-[12px] px-[12px] h-[48px] rounded-[8px] transition-all duration-200 text-body font-medium",
+              "text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20",
+              isCollapsed && "justify-center px-0"
+            )}
+            title={isCollapsed ? "Logout" : undefined}
+          >
+            <MIcon name="logout" className="shrink-0" />
+            {!isCollapsed && <span className="flex-1 text-left">Logout</span>}
+          </button>
+        </div>
       </div>
     </div>
   );

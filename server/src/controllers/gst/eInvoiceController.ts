@@ -189,7 +189,7 @@ export const updateEInvoiceStatus = async (req: AuthRequest, res: Response) => {
         if (errorMessage) updateData.errorMessage = errorMessage;
 
         const eInvoice = await prisma.eInvoice.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: updateData,
         });
 
@@ -237,7 +237,7 @@ export const cancelEInvoice = async (req: AuthRequest, res: Response) => {
 
         // In production, this would call the NIC API to cancel
         const eInvoice = await prisma.eInvoice.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: {
                 status: 'cancelled',
                 errorMessage: reason || 'Cancelled by user',
@@ -286,7 +286,7 @@ export const deleteEInvoice = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.eInvoice.delete({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
         });
 
         return res.json({

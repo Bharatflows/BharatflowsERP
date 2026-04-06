@@ -131,7 +131,7 @@ export function InviteAcceptPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+            <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
                     <p className="text-muted-foreground">Verifying invite...</p>
@@ -142,7 +142,7 @@ export function InviteAcceptPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
+            <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
                 <Card className="w-full max-w-md">
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
@@ -164,7 +164,7 @@ export function InviteAcceptPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
             <Card className="w-full max-w-lg">
                 <CardHeader className="text-center">
                     {invite.company?.logo ? (
@@ -311,7 +311,7 @@ export function InviteAcceptPage() {
 
                         {/* Module Access Preview for Employee */}
                         {invite.type === 'EMPLOYEE' && invite.moduleAccess && Object.keys(invite.moduleAccess).length > 0 && (
-                            <div className="p-3 bg-muted/50 rounded-lg">
+                            <div className="p-3 bg-muted rounded-lg">
                                 <p className="text-sm text-muted-foreground mb-2">Access will be granted to:</p>
                                 <div className="flex flex-wrap gap-2">
                                     {Object.entries(invite.moduleAccess)

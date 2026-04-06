@@ -1,7 +1,8 @@
 import { Plus, Eye, Edit, Trash2, FileText, TrendingUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import type { Quotation } from "./QuotationModule";
+import { ModuleHeader } from "../ui/module-header";
+import type { Quotation } from "../../types";
 
 interface QuotationListProps {
   quotations: Quotation[];
@@ -43,51 +44,51 @@ export function QuotationList({
     accepted: quotations.filter((q) => q.status === "Accepted").length,
     converted: quotations.filter((q) => q.status === "Converted").length,
     pending: quotations.filter((q) => q.status === "Sent" || q.status === "Viewed").length,
-    totalValue: quotations.reduce((sum, q) => sum + q.total, 0),
+    totalValue: quotations.reduce((sum, q) => sum + (Number(q.totalAmount) || 0), 0),
   };
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-foreground mb-1">Quotations</h1>
-          <p className="text-muted-foreground">
-            Create and manage sales quotations
-          </p>
-        </div>
-        <Button onClick={onCreateNew} className="bg-[#3b82f6] hover:bg-[#2563eb] w-full sm:w-auto">
-          <Plus className="size-4 mr-2" />
-          New Quotation
-        </Button>
-      </div>
+      <ModuleHeader
+        title="Quotations"
+        description="Create and manage sales quotations"
+        showBackButton={true}
+        backTo="/dashboard"
+        icon={<FileText className="size-5 text-primary" />}
+        actions={
+          <Button onClick={onCreateNew} className="bg-primary hover:bg-primary/90">
+            <Plus className="size-4 mr-2" />
+            New Quotation
+          </Button>
+        }
+      />
 
       {/* Stats Cards - Mobile Optimized */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        <div className="bg-white p-4 rounded-lg border border-border">
+        <div className="card-base p-4">
           <div className="flex items-center gap-2 mb-2">
-            <FileText className="size-4 text-[#3b82f6]" />
+            <FileText className="size-4 text-primary" />
             <p className="text-muted-foreground">Total</p>
           </div>
           <p className="text-foreground">{stats.total}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-border">
+        <div className="card-base p-4">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="size-4 text-[#10b981]" />
+            <TrendingUp className="size-4 text-success" />
             <p className="text-muted-foreground">Accepted</p>
           </div>
           <p className="text-foreground">{stats.accepted}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-border">
+        <div className="card-base p-4">
           <div className="flex items-center gap-2 mb-2">
-            <FileText className="size-4 text-[#10b981]" />
+            <FileText className="size-4 text-success" />
             <p className="text-muted-foreground">Converted</p>
           </div>
           <p className="text-foreground">{stats.converted}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-border">
+        <div className="card-base p-4">
           <div className="flex items-center gap-2 mb-2">
-            <FileText className="size-4 text-[#f59e0b]" />
+            <FileText className="size-4 text-warning" />
             <p className="text-muted-foreground">Pending</p>
           </div>
           <p className="text-foreground">{stats.pending}</p>
@@ -101,11 +102,11 @@ export function QuotationList({
       </div>
 
       {/* Quotations List - Mobile Optimized */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
+      <div className="card-base overflow-hidden">
         {/* Desktop Table View */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#f8fafc] border-b border-border">
+            <thead className="bg-background border-b border-border">
               <tr>
                 <th className="text-left p-4 text-muted-foreground">Quotation #</th>
                 <th className="text-left p-4 text-muted-foreground">Date</th>
@@ -118,7 +119,7 @@ export function QuotationList({
             </thead>
             <tbody>
               {quotations.map((quotation) => (
-                <tr key={quotation.id} className="border-b border-border hover:bg-[#f8fafc]">
+                <tr key={quotation.id} className="border-b border-border hover:bg-background">
                   <td className="p-4">
                     <p className="text-foreground">{quotation.quotationNumber}</p>
                   </td>
@@ -126,14 +127,14 @@ export function QuotationList({
                     {new Date(quotation.date).toLocaleDateString("en-IN")}
                   </td>
                   <td className="p-4">
-                    <p className="text-foreground">{quotation.partyName}</p>
-                    <p className="text-muted-foreground">{quotation.partyGSTIN}</p>
+                    <p className="text-foreground">{quotation.customer?.name || "N/A"}</p>
+                    <p className="text-muted-foreground">{quotation.customer?.gstin || "No GSTIN"}</p>
                   </td>
                   <td className="p-4 text-muted-foreground">
                     {new Date(quotation.validUntil).toLocaleDateString("en-IN")}
                   </td>
                   <td className="p-4 text-right text-foreground">
-                    ₹{quotation.total.toLocaleString("en-IN")}
+                    ₹{Number(quotation.totalAmount).toLocaleString("en-IN")}
                   </td>
                   <td className="p-4">
                     <Badge className={getStatusColor(quotation.status)}>
@@ -168,7 +169,7 @@ export function QuotationList({
                         onClick={() => onDelete(quotation.id)}
                         disabled={quotation.status === "Converted"}
                       >
-                        <Trash2 className="size-4 text-[#ef4444]" />
+                        <Trash2 className="size-4 text-destructive" />
                       </Button>
                     </div>
                   </td>
@@ -194,8 +195,8 @@ export function QuotationList({
                 </Badge>
               </div>
               <div>
-                <p className="text-foreground">{quotation.partyName}</p>
-                <p className="text-muted-foreground">{quotation.partyGSTIN}</p>
+                <p className="text-foreground">{quotation.customer?.name || "N/A"}</p>
+                <p className="text-muted-foreground">{quotation.customer?.gstin || "No GSTIN"}</p>
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -207,7 +208,7 @@ export function QuotationList({
                 <div className="text-right">
                   <p className="text-muted-foreground">Amount</p>
                   <p className="text-foreground">
-                    ₹{quotation.total.toLocaleString("en-IN")}
+                    ₹{Number(quotation.totalAmount).toLocaleString("en-IN")}
                   </p>
                 </div>
               </div>
@@ -242,7 +243,7 @@ export function QuotationList({
                   onClick={() => onDelete(quotation.id)}
                   disabled={quotation.status === "Converted"}
                 >
-                  <Trash2 className="size-4 text-[#ef4444]" />
+                  <Trash2 className="size-4 text-error" />
                 </Button>
               </div>
             </div>
@@ -256,7 +257,7 @@ export function QuotationList({
             <p className="text-muted-foreground mb-4">
               Create your first quotation to get started
             </p>
-            <Button onClick={onCreateNew} className="bg-[#3b82f6] hover:bg-[#2563eb]">
+            <Button onClick={onCreateNew} className="bg-primary hover:bg-primary/90">
               <Plus className="size-4 mr-2" />
               Create Quotation
             </Button>

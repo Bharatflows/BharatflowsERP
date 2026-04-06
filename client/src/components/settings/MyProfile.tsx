@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -21,14 +21,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "../ui/separator";
+import { profileService } from "../../services/modules.service";
+import { TwoFactorSetup } from "./TwoFactorSetup";
 
 export function MyProfile() {
+  const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState({
-    name: "Rajesh Kumar",
-    email: "rajesh@sharmaenterprises.com",
-    phone: "+91 98765 43210",
-    role: "Admin",
-    department: "Management",
+    name: "",
+    email: "",
+    phone: "",
+    role: "",
+    department: "",
+    designation: "",
+    bio: "",
     language: "English",
     timezone: "Asia/Kolkata",
     dateFormat: "DD/MM/YYYY",
@@ -57,31 +62,137 @@ export function MyProfile() {
     confirm: "",
   });
 
-  const handleSaveProfile = () => {
-    toast.success("Profile updated successfully");
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setLoading(true);
+      const res = await profileService.getProfile();
+      if (res.success && res.data) {
+        const data = res.data;
+        setProfile({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          role: data.role,
+          department: data.companyName, // Using Company Name as Dept/Org for now or separate field
+          designation: data.designation || "",
+          bio: data.bio || "",
+          language: data.preferences?.language || "English",
+          timezone: data.preferences?.timezone || "Asia/Kolkata",
+          dateFormat: data.preferences?.dateFormat || "DD/MM/YYYY",
+          numberFormat: "Indian", // Not in schema yet?
+          theme: data.preferences?.theme || "Light",
+        });
+        if (data.notificationSettings) {
+          setNotifications({ ...notifications, ...data.notificationSettings });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching profile", error);
+      toast.error("Failed to load profile");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveNotifications = () => {
-    toast.success("Notification preferences saved");
+  const handleSaveProfile = async () => {
+    try {
+      const payload = {
+        name: profile.name,
+        phone: profile.phone,
+        designation: profile.designation,
+        bio: profile.bio,
+        preferences: {
+          language: profile.language,
+          timezone: profile.timezone,
+          dateFormat: profile.dateFormat,
+          theme: profile.theme
+        },
+        notificationSettings: notifications
+      };
+
+      await profileService.updateProfile(payload);
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.error("Error updating profile", error);
+      toast.error("Failed to update profile");
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleSaveNotifications = async () => {
+    try {
+      await profileService.updateNotificationSettings(notifications);
+      toast.success("Notification settings saved");
+    } catch (error: any) {
+      console.error("Error saving notifications", error);
+      toast.error(error?.response?.data?.message || "Failed to save notification settings");
+    }
+  };
+
+  const handleChangePassword = async () => {
+    // Client-side validation
+    if (!password.current) {
+      toast.error("Please enter your current password");
+      return;
+    }
+    if (password.new.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
     if (password.new !== password.confirm) {
       toast.error("New passwords do not match");
       return;
     }
-    toast.success("Password changed successfully");
-    setPassword({ current: "", new: "", confirm: "" });
+
+    try {
+      await profileService.changePassword({
+        currentPassword: password.current,
+        newPassword: password.new,
+        confirmPassword: password.confirm
+      });
+      toast.success("Password changed successfully");
+      setPassword({ current: "", new: "", confirm: "" });
+    } catch (error: any) {
+      console.error("Error changing password", error);
+      const errorMessage = error?.response?.data?.errors?.currentPassword
+        || error?.response?.data?.message
+        || "Failed to change password";
+      toast.error(errorMessage);
+    }
   };
 
   return (
     <div className="p-6">
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+        {/* Underline-style tabs instead of filled */}
+        <TabsList className="bg-transparent border-b w-full justify-start rounded-none h-auto p-0 gap-0">
+          <TabsTrigger
+            value="profile"
+            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 text-muted-foreground data-[state=active]:text-primary"
+          >
+            Profile
+          </TabsTrigger>
+          <TabsTrigger
+            value="preferences"
+            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 text-muted-foreground data-[state=active]:text-primary"
+          >
+            Preferences
+          </TabsTrigger>
+          <TabsTrigger
+            value="notifications"
+            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 text-muted-foreground data-[state=active]:text-primary"
+          >
+            Notifications
+          </TabsTrigger>
+          <TabsTrigger
+            value="security"
+            className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 text-muted-foreground data-[state=active]:text-primary"
+          >
+            Security
+          </TabsTrigger>
         </TabsList>
 
         {/* Profile Tab */}
@@ -92,15 +203,16 @@ export function MyProfile() {
               <CardDescription>Update your profile details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Profile Picture */}
+              {/* Profile Picture - Using primary color instead of purple */}
               <div className="flex items-center gap-6">
                 <div className="relative">
-                  <div className="h-24 w-24 rounded-full bg-purple flex items-center justify-center text-white">
-                    <span className="text-3xl">RK</span>
+                  <div className="h-24 w-24 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                    <span className="text-3xl font-medium">{profile.name ? profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'RK'}</span>
                   </div>
                   <Button
                     size="sm"
                     className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0"
+                    aria-label="Change profile photo"
                   >
                     <Camera className="h-4 w-4" />
                   </Button>
@@ -140,10 +252,14 @@ export function MyProfile() {
                       id="email"
                       type="email"
                       value={profile.email}
-                      onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                      className="pl-10"
+                      disabled
+                      className="pl-10 bg-muted cursor-not-allowed"
+                      title="Email cannot be changed. Contact support if needed."
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed. Contact support if needed.
+                  </p>
                 </div>
               </div>
 
@@ -492,9 +608,9 @@ export function MyProfile() {
               {/* WhatsApp Notifications */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-[#10b981]" />
+                  <Bell className="h-5 w-5 text-success" />
                   <h3 className="text-foreground">WhatsApp Notifications</h3>
-                  <Badge variant="outline" className="bg-[#10b981]/10 text-[#10b981]">
+                  <Badge variant="outline" className="bg-success/10 text-success">
                     Premium
                   </Badge>
                 </div>
@@ -591,30 +707,9 @@ export function MyProfile() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Two-Factor Authentication</CardTitle>
-              <CardDescription>
-                Add an extra layer of security to your account
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <p className="text-foreground">
-                    Two-Factor Authentication (2FA)
-                  </p>
-                  <p className="text-muted-foreground">
-                    Currently disabled. Enable for enhanced security.
-                  </p>
-                </div>
-                <Button>Enable 2FA</Button>
-              </div>
-            </CardContent>
-          </Card>
+          <TwoFactorSetup />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-

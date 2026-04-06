@@ -25,7 +25,8 @@ const errorHandler = (err, req, res, next) => {
         stack: err.stack,
         url: req.originalUrl,
         method: req.method,
-        ip: req.ip
+        ip: req.ip,
+        correlationId: req.correlationId // H7: Request Correlation ID
     });
     // Mongoose bad ObjectId
     if (err.name === 'CastError') {
@@ -57,6 +58,7 @@ const errorHandler = (err, req, res, next) => {
     res.status(error.statusCode || 500).json({
         success: false,
         message: error.message || 'Server Error',
+        correlationId: req.correlationId, // H7: Request Correlation ID
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 };

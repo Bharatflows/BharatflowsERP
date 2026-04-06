@@ -72,8 +72,8 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
       setLoading(true);
       const response = await messagingService.getConversations({ limit: 10 });
 
-      if (response.data?.data) {
-        const convs = response.data.data;
+      if (response.success && response.data) {
+        const convs = response.data;
         setConversations(convs);
 
         // Calculate stats from conversations
@@ -197,7 +197,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
               {statsDisplay.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
-                  <Card key={index} className="border border-border/50 shadow-sm bg-card">
+                  <Card key={index} className="border border-border shadow-sm bg-card">
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -209,10 +209,10 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
                             <Badge
                               variant="secondary"
                               className={`text-xs px-1.5 py-0 ${stat.change === "Live"
-                                  ? "bg-green-50 text-green-700"
-                                  : stat.change === "New"
-                                    ? "bg-orange-50 text-orange-700"
-                                    : "bg-muted"
+                                ? "bg-green-50 text-green-700"
+                                : stat.change === "New"
+                                  ? "bg-orange-50 text-orange-700"
+                                  : "bg-muted"
                                 }`}
                             >
                               {stat.change}
@@ -231,7 +231,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recent Chats */}
-              <Card className="lg:col-span-2 border border-border/50 shadow-sm bg-card">
+              <Card className="lg:col-span-2 border border-border shadow-sm bg-card">
                 <CardHeader className="border-b border-border/50 pb-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -265,11 +265,11 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
                       return (
                         <div
                           key={conv.id}
-                          className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border/50"
+                          className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors border border-transparent hover:border-border/50"
                           onClick={() => onNavigate("chats")}
                         >
                           <div className="relative">
-                            <Avatar className="h-12 w-12 border border-border/50">
+                            <Avatar className="h-12 w-12 border border-border">
                               <AvatarFallback className="bg-primary/10 text-primary font-medium">
                                 {getInitials(name)}
                               </AvatarFallback>
@@ -286,7 +286,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 overflow-hidden">
-                                <Badge variant="outline" className="text-xs shrink-0 bg-muted/50">
+                                <Badge variant="outline" className="text-xs shrink-0 bg-muted">
                                   {conv.type === "GROUP" ? "Group" : "Direct"}
                                 </Badge>
                                 <p className="text-muted-foreground text-sm truncate">
@@ -309,7 +309,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
 
               {/* Quick Actions */}
               <div className="space-y-6">
-                <Card className="border border-border/50 shadow-sm bg-card">
+                <Card className="border border-border shadow-sm bg-card">
                   <CardHeader className="border-b border-border/50 pb-4">
                     <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
                     <CardDescription>Frequently used features</CardDescription>
@@ -321,7 +321,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
                         <Button
                           key={index}
                           variant="outline"
-                          className="w-full justify-start gap-3 h-auto p-4 hover:bg-muted/50 hover:border-primary/50 transition-all group"
+                          className="w-full justify-start gap-3 h-auto p-4 hover:bg-muted hover:border-primary/50 transition-all group"
                           onClick={() => onNavigate(action.action as "chats" | "groups" | "contacts")}
                         >
                           <div
@@ -340,7 +340,7 @@ export function MessagesDashboard({ onNavigate }: MessagesDashboardProps) {
                 </Card>
 
                 {/* Message Stats */}
-                <Card className="border border-border/50 shadow-sm bg-card">
+                <Card className="border border-border shadow-sm bg-card">
                   <CardHeader className="border-b border-border/50 pb-4">
                     <CardTitle className="text-lg font-semibold">Connection Status</CardTitle>
                   </CardHeader>

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -9,11 +10,9 @@ import {
   Mail,
   Calendar,
   ArrowRight,
-  CheckCircle,
+  Loader2,
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
   PieChart,
@@ -26,28 +25,62 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { toast } from "sonner";
+import { crmService } from "@/services/modules.service";
+import { chartColors, CHART_PALETTE } from "@/lib/chartColors";
 
 interface CRMDashboardProps {
   onViewLeads: () => void;
+  hideStats?: boolean;
 }
 
-const conversionData = [
-  { month: "Apr", leads: 45, converted: 12 },
-  { month: "May", leads: 52, converted: 15 },
-  { month: "Jun", leads: 48, converted: 14 },
-  { month: "Jul", leads: 60, converted: 18 },
-  { month: "Aug", leads: 55, converted: 20 },
-  { month: "Sep", leads: 68, converted: 25 },
-];
+interface DashboardData {
+  kpis: {
+    totalLeads: number;
+    newLeads: number;
+    qualifiedLeads: number;
+    wonLeads: number;
+    lostLeads: number;
+    conversionRate: number;
+    todayFollowups: number;
+    recentActivities: number;
+  };
+  statusBreakdown: Record<string, number>;
+  sourceBreakdown: { name: string; value: number }[];
+  recentActivities: {
+    id: string;
+    type: string;
+    subject: string;
+    leadName: string;
+    date: string;
+  }[];
+}
 
-const sourceData = [
-  { name: "Website", value: 35, color: "#2563eb" },
-  { name: "Referral", value: 28, color: "#10b981" },
-  { name: "Social Media", value: 22, color: "#f97316" },
-  { name: "Direct", value: 15, color: "#8b5cf6" },
-];
+const COLORS = CHART_PALETTE;
 
-export function CRMDashboard({ onViewLeads }: CRMDashboardProps) {
+export function CRMDashboard({ onViewLeads, hideStats = false }: CRMDashboardProps) {
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(null);
+
+  const fetchDashboard = async () => {
+    setLoading(true);
+    try {
+      const response = await crmService.getDashboard();
+      if (response.success && response.data) {
+        setData(response.data);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load CRM dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
   // Custom tooltip for theme-aware styling
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -67,90 +100,142 @@ export function CRMDashboard({ onViewLeads }: CRMDashboardProps) {
     return null;
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const kpis = data?.kpis || {
+    totalLeads: 0,
+    newLeads: 0,
+    qualifiedLeads: 0,
+    wonLeads: 0,
+    lostLeads: 0,
+    conversionRate: 0,
+    todayFollowups: 0,
+    recentActivities: 0,
+  };
+
+  // Build conversion data from status breakdown
+  const conversionData = [
+    { name: "New", leads: kpis.newLeads },
+    { name: "Qualified", leads: kpis.qualifiedLeads },
+    { name: "Won", leads: kpis.wonLeads },
+  ];
+
+  const sourceData = (data?.sourceBreakdown || []).map((s, i) => ({
+    ...s,
+    color: COLORS[i % COLORS.length]
+  }));
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "CALL": return Phone;
+      case "EMAIL": return Mail;
+      case "MEETING": return Calendar;
+      default: return Calendar;
+    }
+  };
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case "CALL": return chartColors.brand;
+      case "EMAIL": return chartColors.success;
+      case "MEETING": return chartColors.orange;
+      default: return chartColors.purple;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Total Leads</CardDescription>
-              <div className="bg-[#2563eb]/10 p-2 rounded-lg">
-                <Users className="size-4 text-[#2563eb]" />
+      {!hideStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription>Total Leads</CardDescription>
+                <div className="bg-primary/10 p-2 rounded-lg">
+                  <Users className="size-4 text-primary" />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground">68</p>
-            <Button variant="link" className="p-0 h-auto mt-2" onClick={onViewLeads}>
-              View All <ArrowRight className="ml-1 size-3" />
-            </Button>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-2xl font-bold">{kpis.totalLeads}</p>
+              <Button variant="link" className="p-0 h-auto mt-2" onClick={onViewLeads}>
+                View All <ArrowRight className="ml-1 size-3" />
+              </Button>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Opportunities</CardDescription>
-              <div className="bg-[#10b981]/10 p-2 rounded-lg">
-                <Target className="size-4 text-[#10b981]" />
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription>Won Deals</CardDescription>
+                <div className="bg-success/10 p-2 rounded-lg">
+                  <Target className="size-4 text-success" />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground">₹15.2L</p>
-            <p className="text-muted-foreground mt-2">25 active deals</p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-2xl font-bold">{kpis.wonLeads}</p>
+              <p className="text-muted-foreground mt-2">{kpis.qualifiedLeads} qualified</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Conversion Rate</CardDescription>
-              <div className="bg-[#f97316]/10 p-2 rounded-lg">
-                <TrendingUp className="size-4 text-[#f97316]" />
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription>Conversion Rate</CardDescription>
+                <div className="bg-warning/10 p-2 rounded-lg">
+                  <TrendingUp className="size-4 text-warning" />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground">36.8%</p>
-            <p className="text-muted-foreground mt-2">+5% vs last month</p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-2xl font-bold">{kpis.conversionRate}%</p>
+              <p className="text-muted-foreground mt-2">
+                {kpis.conversionRate >= 30 ? "Above average" : "Below average"}
+              </p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Follow-ups Today</CardDescription>
-              <div className="bg-[#8b5cf6]/10 p-2 rounded-lg">
-                <Calendar className="size-4 text-[#8b5cf6]" />
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardDescription>Follow-ups Today</CardDescription>
+                <div className="bg-chart-4/10 p-2 rounded-lg">
+                  <Calendar className="size-4 text-chart-4" />
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground">12</p>
-            <p className="text-muted-foreground mt-2">Pending activities</p>
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-foreground text-2xl font-bold">{kpis.todayFollowups}</p>
+              <p className="text-muted-foreground mt-2">Pending activities</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Lead Conversion Trend</CardTitle>
-            <CardDescription>Monthly leads vs conversions</CardDescription>
+            <CardTitle>Lead Status Overview</CardTitle>
+            <CardDescription>Current lead distribution</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={conversionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
+                <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" />
                 <YAxis stroke="hsl(var(--muted-foreground))" />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line type="monotone" dataKey="leads" stroke="#2563eb" strokeWidth={2} name="Leads" />
-                <Line type="monotone" dataKey="converted" stroke="#10b981" strokeWidth={2} name="Converted" />
+                <Line type="monotone" dataKey="leads" stroke={chartColors.brand} strokeWidth={2} name="Lead Count" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -184,7 +269,7 @@ export function CRMDashboard({ onViewLeads }: CRMDashboardProps) {
         </Card>
       </div>
 
-      {/* Recent Activities & Hot Leads */}
+      {/* Recent Activities & Status Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -193,55 +278,79 @@ export function CRMDashboard({ onViewLeads }: CRMDashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { type: "call", lead: "ABC Corp", activity: "Called regarding quotation", time: "2 hours ago", icon: Phone },
-                { type: "email", lead: "XYZ Ltd", activity: "Sent proposal email", time: "4 hours ago", icon: Mail },
-                { type: "meeting", lead: "PQR Industries", activity: "Product demo completed", time: "1 day ago", icon: Calendar },
-                { type: "call", lead: "LMN Traders", activity: "Follow-up call scheduled", time: "2 days ago", icon: Phone },
-              ].map((activity, idx) => (
-                <div key={idx} className="flex items-start gap-3 p-3 border rounded-lg">
-                  <div className={`p-2 rounded-lg ${activity.type === "call" ? "bg-[#2563eb]/10" :
-                      activity.type === "email" ? "bg-[#10b981]/10" : "bg-[#f97316]/10"
-                    }`}>
-                    <activity.icon className={`size-4 ${activity.type === "call" ? "text-[#2563eb]" :
-                        activity.type === "email" ? "text-[#10b981]" : "text-[#f97316]"
-                      }`} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-foreground">{activity.lead}</p>
-                    <p className="text-muted-foreground">{activity.activity}</p>
-                    <span className="text-muted-foreground">{activity.time}</span>
-                  </div>
-                </div>
-              ))}
+              {(data?.recentActivities || []).length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No recent activities</p>
+              ) : (
+                data?.recentActivities.slice(0, 4).map((activity) => {
+                  const Icon = getActivityIcon(activity.type);
+                  const color = getActivityColor(activity.type);
+                  return (
+                    <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: `${color}15` }}>
+                        <Icon className="size-4" style={{ color }} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-foreground font-medium">{activity.leadName}</p>
+                        <p className="text-muted-foreground text-sm">{activity.subject}</p>
+                        <span className="text-muted-foreground text-xs">
+                          {new Date(activity.date).toLocaleDateString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Hot Leads</CardTitle>
-            <CardDescription>High-priority opportunities</CardDescription>
+            <CardTitle>Lead Status Summary</CardTitle>
+            <CardDescription>Current pipeline status</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { company: "ABC Corp", contact: "Rajesh Kumar", value: 250000, stage: "Negotiation", score: 95 },
-                { company: "XYZ Ltd", contact: "Priya Sharma", value: 180000, stage: "Proposal", score: 85 },
-                { company: "PQR Industries", contact: "Amit Patel", value: 320000, stage: "Demo", score: 80 },
-              ].map((lead, idx) => (
-                <div key={idx} className="p-4 border rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-foreground">{lead.company}</p>
-                    <Badge className="bg-[#10b981] text-white">{lead.score}%</Badge>
-                  </div>
-                  <p className="text-muted-foreground">{lead.contact}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">₹{lead.value.toLocaleString("en-IN")}</span>
-                    <Badge variant="outline">{lead.stage}</Badge>
-                  </div>
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-foreground font-medium">New Leads</p>
+                  <Badge className="bg-blue-100 text-blue-800">{kpis.newLeads}</Badge>
                 </div>
-              ))}
+                <div className="w-full bg-accent rounded-full h-2">
+                  <div className="bg-blue-500 h-2 rounded-full"
+                    style={{ width: `${kpis.totalLeads > 0 ? (kpis.newLeads / kpis.totalLeads) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-foreground font-medium">Qualified</p>
+                  <Badge className="bg-purple-100 text-purple-800">{kpis.qualifiedLeads}</Badge>
+                </div>
+                <div className="w-full bg-accent rounded-full h-2">
+                  <div className="bg-purple-500 h-2 rounded-full"
+                    style={{ width: `${kpis.totalLeads > 0 ? (kpis.qualifiedLeads / kpis.totalLeads) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-foreground font-medium">Won</p>
+                  <Badge className="bg-green-100 text-green-800">{kpis.wonLeads}</Badge>
+                </div>
+                <div className="w-full bg-accent rounded-full h-2">
+                  <div className="bg-green-500 h-2 rounded-full"
+                    style={{ width: `${kpis.totalLeads > 0 ? (kpis.wonLeads / kpis.totalLeads) * 100 : 0}%` }} />
+                </div>
+              </div>
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-foreground font-medium">Lost</p>
+                  <Badge className="bg-red-100 text-red-800">{kpis.lostLeads}</Badge>
+                </div>
+                <div className="w-full bg-accent rounded-full h-2">
+                  <div className="bg-red-500 h-2 rounded-full"
+                    style={{ width: `${kpis.totalLeads > 0 ? (kpis.lostLeads / kpis.totalLeads) * 100 : 0}%` }} />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

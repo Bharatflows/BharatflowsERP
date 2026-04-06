@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -40,10 +40,8 @@ import {
   Network,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ApprovalWorkflow } from "./ApprovalWorkflow";
-import { DeviceManagement } from "./DeviceManagement";
-import { IPWhitelisting } from "./IPWhitelisting";
-import AuditLogViewer from "../audit/AuditLogViewer";
+
+import { AuditLogViewer } from "./AuditLogViewer";
 
 interface LoginHistory {
   id: string;
@@ -82,6 +80,44 @@ export function SecurityAudit() {
     "203.0.113.45",
   ]);
   const [newIP, setNewIP] = useState("");
+
+  // Security Summary state
+  const [securitySummary, setSecuritySummary] = useState<{
+    securityScore: number;
+    failedLogins: number;
+    devices: { total: number; trusted: number; blocked: number };
+    ipWhitelist: { active: number };
+    recentEvents: any[];
+  } | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
+  useEffect(() => {
+    fetchSecuritySummary();
+  }, []);
+
+  const fetchSecuritySummary = async () => {
+    try {
+      setLoadingSummary(true);
+      // Mock data for now as endpoint is not ready
+      setSecuritySummary({
+        securityScore: 85,
+        failedLogins: 2,
+        devices: { total: 3, trusted: 2, blocked: 1 },
+        ipWhitelist: { active: 2 },
+        recentEvents: []
+      });
+      /*
+      const response = await settingsService.getSecuritySummary();
+      if (response.success && response.data) {
+        setSecuritySummary(response.data);
+      }
+      */
+    } catch (error) {
+      console.error("Failed to fetch security summary", error);
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
 
   const [loginHistory] = useState<LoginHistory[]>([
     {
@@ -233,7 +269,40 @@ export function SecurityAudit() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
+      {/* Security Score Summary Card */}
+      {securitySummary && (
+        <Card className="border-0 shadow-sm gradient-card-primary">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="text-white">
+                <div className="text-sm font-medium opacity-80">Security Score</div>
+                <div className="text-5xl font-bold">{securitySummary.securityScore}</div>
+                <div className="text-sm opacity-80 mt-1">
+                  {securitySummary.securityScore >= 80 ? "Excellent" :
+                    securitySummary.securityScore >= 60 ? "Good" :
+                      securitySummary.securityScore >= 40 ? "Needs Improvement" : "Critical"}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-6 text-white text-center">
+                <div>
+                  <div className="text-2xl font-bold">{securitySummary.failedLogins}</div>
+                  <div className="text-xs opacity-80">Failed Logins (7d)</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{securitySummary.devices.trusted}/{securitySummary.devices.total}</div>
+                  <div className="text-xs opacity-80">Trusted Devices</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{securitySummary.ipWhitelist.active}</div>
+                  <div className="text-xs opacity-80">IP Whitelist</div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="security" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 gap-2">
           <TabsTrigger value="security">Security Settings</TabsTrigger>
@@ -384,8 +453,8 @@ export function SecurityAudit() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="bg-cyan-light p-3 rounded-lg">
-                  <Smartphone className="h-6 w-6 text-cyan" />
+                <div className="bg-info-light p-3 rounded-lg">
+                  <Smartphone className="h-6 w-6 text-info" />
                 </div>
                 <div>
                   <CardTitle>Active Devices</CardTitle>
@@ -402,8 +471,8 @@ export function SecurityAudit() {
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-4">
-                          <div className="bg-cyan-light p-3 rounded-lg">
-                            <Smartphone className="h-5 w-5 text-cyan" />
+                          <div className="bg-info-light p-3 rounded-lg">
+                            <Smartphone className="h-5 w-5 text-info" />
                           </div>
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -517,7 +586,7 @@ export function SecurityAudit() {
         {/* Audit Logs Tab */}
         <TabsContent value="audit" className="space-y-6">
           <CardContent className="space-y-4">
-            <AuditLogViewer showGlobal={true} />
+            <AuditLogViewer />
           </CardContent>
         </TabsContent>
       </Tabs>

@@ -1,7 +1,7 @@
 import { useCreateParty, useUpdateParty } from "../../hooks/useParties";
-import { partiesService } from "../../services/modules.service";
+import { partiesService, settingsService } from "../../services/modules.service";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, CreditCard, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, ArrowLeft, Save, User, Building2, Phone, Mail, MapPin, CreditCard, FileText, CheckCircle2, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -48,6 +48,8 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
     status: "active",
   });
 
+  const [fetchingGst, setFetchingGst] = useState(false);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -90,6 +92,51 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleFetchGSTIN = async () => {
+    if (!formData.gstin) {
+      setErrors(prev => ({ ...prev, gstin: "Please enter a GSTIN first" }));
+      return;
+    }
+
+    const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    if (!gstinRegex.test(formData.gstin)) {
+      setErrors(prev => ({ ...prev, gstin: "Invalid GSTIN format" }));
+      return;
+    }
+
+    setFetchingGst(true);
+    try {
+      const response = await settingsService.getGSTINDetails(formData.gstin);
+      if (response.success && response.data) {
+        const data = response.data;
+
+        // Construct address
+        const addressParts = [];
+        if (data.address?.building) addressParts.push(data.address.building);
+        if (data.address?.street) addressParts.push(data.address.street);
+        const fullAddress = addressParts.join(', ');
+
+        setFormData(prev => ({
+          ...prev,
+          businessName: data.tradeName || data.legalName || prev.businessName,
+          // If name is empty, use legal name as contact person for now
+          name: !prev.name ? (data.legalName || "") : prev.name,
+          address: fullAddress || prev.address,
+          city: data.address?.city || prev.city,
+          state: data.stateName || prev.state,
+          pincode: data.address?.pincode || prev.pincode
+        }));
+
+        toast.success("Customer details fetched successfully");
+      }
+    } catch (error: any) {
+      console.error("GST fetch error:", error);
+      toast.error("Failed to fetch GST details");
+    } finally {
+      setFetchingGst(false);
     }
   };
 
@@ -175,9 +222,9 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
           <ArrowLeft className="size-4" />
           Back to Customers
         </Button>
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-8 py-6 rounded-2xl shadow-lg shadow-indigo-500/20">
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-8 py-6 rounded-2xl shadow-lg shadow-primary/20">
           <h2 className="text-2xl font-bold">{customerId ? "Edit Customer" : "Add New Customer"}</h2>
-          <p className="text-indigo-100 mt-1">
+          <p className="text-primary-foreground/80 mt-1">
             {customerId ? "Update customer details and information" : "Enter customer details to add them to your business"}
           </p>
         </div>
@@ -189,7 +236,7 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
           {/* Progress Line */}
           <div className="absolute top-6 left-0 right-0 h-0.5 bg-slate-200">
             <div
-              className="h-full bg-indigo-500 transition-all duration-500"
+              className="h-full bg-primary transition-all duration-500"
               style={{ width: `${((currentStep - 1) / (PARTY_FORM_STEPS.length - 1)) * 100}%` }}
             />
           </div>
@@ -202,8 +249,8 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
                   currentStep > step.id
                     ? "bg-emerald-500 text-white"
                     : currentStep === step.id
-                      ? "bg-indigo-600 text-white ring-4 ring-indigo-100"
-                      : "bg-white text-slate-400 border-2 border-slate-200"
+                      ? "bg-primary text-white ring-4 ring-primary/20"
+                      : "bg-white text-muted-foreground border-2 border-slate-200"
                 )}
               >
                 {currentStep > step.id ? (
@@ -232,8 +279,8 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
         {currentStep === 1 && (
           <div className="space-y-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-                <User className="size-5 text-indigo-600" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <User className="size-5 text-primary" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Basic Information</h3>
@@ -305,16 +352,33 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
 
               <div className="space-y-2">
                 <Label htmlFor="gstin" className="text-foreground font-medium">GSTIN</Label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    id="gstin"
-                    value={formData.gstin}
-                    onChange={(e) => handleChange("gstin", e.target.value.toUpperCase())}
-                    placeholder="27AABCU9603R1ZM"
-                    maxLength={15}
-                    className={cn("h-11 rounded-xl pl-10 uppercase", errors.gstin && "border-rose-500")}
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <Input
+                      id="gstin"
+                      value={formData.gstin}
+                      onChange={(e) => handleChange("gstin", e.target.value.toUpperCase())}
+                      placeholder="27AABCU9603R1ZM"
+                      maxLength={15}
+                      className={cn("h-11 rounded-xl pl-10 uppercase", errors.gstin && "border-rose-500")}
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleFetchGSTIN}
+                    disabled={fetchingGst || !formData.gstin}
+                    className="h-11 w-11 shrink-0 rounded-xl border-primary/20 hover:bg-primary/5 hover:text-primary"
+                    title="Fetch details from GSTIN"
+                    type="button"
+                  >
+                    {fetchingGst ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="size-4" />
+                    )}
+                  </Button>
                 </div>
                 {errors.gstin && <p className="text-sm text-rose-500">{errors.gstin}</p>}
                 <p className="text-xs text-muted-foreground">15-character GSTIN number</p>
@@ -498,7 +562,7 @@ export function AddEditCustomer({ customerId, onSave, onCancel }: AddEditCustome
           </Button>
 
           {currentStep < 3 ? (
-            <Button onClick={handleNext} className="gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700">
+            <Button onClick={handleNext} className="gap-2 rounded-xl bg-primary hover:bg-primary/90">
               Next Step
               <ArrowLeft className="size-4 rotate-180" />
             </Button>

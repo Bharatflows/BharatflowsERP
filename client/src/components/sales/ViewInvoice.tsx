@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Edit, Printer, Send, MessageCircle } from "lucide-react";
+import { ArrowLeft, Download, Edit, Printer, Send, MessageCircle, Zap, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import {
@@ -11,7 +11,7 @@ import {
     SelectValue,
 } from "../ui/select";
 import { toast } from "sonner";
-import { salesService } from "../../services/sales.service";
+import { salesService, gstService } from "../../services/modules.service";
 import { authService } from "../../services/auth.service";
 import { Company } from "../../types";
 import { ModernTemplate, ClassicTemplate, MinimalTemplate } from "./InvoiceTemplates";
@@ -26,6 +26,7 @@ export function ViewInvoice() {
     const [company, setCompany] = useState<Company | null>(null);
     const [loading, setLoading] = useState(true);
     const [template, setTemplate] = useState<"modern" | "classic" | "minimal">("modern");
+    const [generatingEInvoice, setGeneratingEInvoice] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -33,12 +34,13 @@ export function ViewInvoice() {
             if (!id) return;
             setLoading(true);
             try {
-                const [invoice, userRes] = await Promise.all([
+                const [invoiceRes, userRes] = await Promise.all([
                     salesService.getInvoice(id),
                     authService.getCurrentUser()
                 ]);
-                // Handle nested data structure: response.data.invoice or response.data
-                setInvoice(invoice);
+                // salesService.getInvoice returns the raw API response: { success, data: { invoice } }
+                const invoiceData = (invoiceRes as any)?.data?.invoice || (invoiceRes as any)?.data || invoiceRes;
+                setInvoice(invoiceData);
                 if (userRes && userRes.company) {
                     setCompany(userRes.company);
                 }
@@ -155,6 +157,26 @@ export function ViewInvoice() {
         toast.success("Opening WhatsApp...");
     };
 
+    const handleGenerateEInvoice = async () => {
+        if (!invoice || !id) return;
+        try {
+            setGeneratingEInvoice(true);
+            const response = await gstService.generateLiveEInvoice(id);
+            if (response.success) {
+                toast.success("E-Invoice generated successfully!");
+                // Refresh invoice data
+                const updatedRes = await salesService.getInvoice(id);
+                const updatedInvoice = (updatedRes as any)?.data?.invoice || (updatedRes as any)?.data || updatedRes;
+                setInvoice(updatedInvoice);
+            }
+        } catch (error: any) {
+            console.error("Failed to generate E-Invoice:", error);
+            toast.error(error.response?.data?.message || "Failed to generate E-Invoice");
+        } finally {
+            setGeneratingEInvoice(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
@@ -257,12 +279,44 @@ export function ViewInvoice() {
                         <Send className="size-4 mr-2" />
                         Send
                     </Button>
-                    <Button size="sm" variant="secondary" onClick={handleWhatsAppShare} className="bg-green-600 hover:bg-green-700 text-white">
+                    <Button size="sm" variant="secondary" onClick={handleWhatsAppShare} className="bg-success hover:bg-success/90 text-white">
                         <MessageCircle className="size-4 mr-2" />
                         WhatsApp
                     </Button>
+
+                    {invoice.customer?.gstin && !invoice.eInvoice && (
+                        <Button
+                            size="sm"
+                            variant="default"
+                            onClick={handleGenerateEInvoice}
+                            disabled={generatingEInvoice}
+                            className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
+                        >
+                            {generatingEInvoice ? <Zap className="size-4 mr-2 animate-pulse text-amber-300" /> : <Zap className="size-4 mr-2 text-amber-300 fill-amber-300" />}
+                            Generate E-Invoice
+                        </Button>
+                    )}
                 </div>
             </div>
+
+            {/* Compliance Info Banner */}
+            {invoice.eInvoice && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 no-print flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-emerald-500 p-2 rounded-lg">
+                            <CheckCircle2 className="size-5 text-white" />
+                        </div>
+                        <div>
+                            <p className="text-emerald-900 font-bold text-sm">E-Invoice Authenticated</p>
+                            <p className="text-emerald-700 text-xs">IRN: {invoice.eInvoice.irn}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xs text-emerald-700 font-medium">Ack No: {invoice.eInvoice.ackNumber}</p>
+                        <p className="text-2xs text-emerald-600">Dated: {new Date(invoice.eInvoice.ackDate).toLocaleDateString('en-IN')}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Invoice Content */}
             <div className="print-content border rounded-lg overflow-hidden shadow-sm">

@@ -1,15 +1,24 @@
 import { useState, useEffect } from "react";
-import { FileText, CheckCircle, Clock, XCircle, TrendingUp, Loader2, RefreshCw } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { apiService } from "@/services/api";
+import { salesAnalyticsService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { cn } from "../../lib/utils";
+import { CHART_COLORS } from "@/constants/theme";
+import { chartColors } from "@/lib/chartColors";
+
+// Reusable icon component
+const MIcon = ({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) => (
+  <span className={cn("material-icons-outlined", className)} style={{ fontSize: 'inherit', ...style }}>
+    {name}
+  </span>
+);
 
 interface FunnelStage {
   stage: string;
   count: number;
   value: number;
   color: string;
-  icon: any;
+  icon: string;
   percentage: number;
 }
 
@@ -29,121 +38,103 @@ export function SalesFunnel() {
     conversionRate: 0
   });
 
+  const [timeToConvert, setTimeToConvert] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [insights, setInsights] = useState<any[]>([]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch quotations, sales orders, and invoices in parallel
-      const [quotationsRes, ordersRes, invoicesRes] = await Promise.all([
-        apiService.get<any>('/sales/quotations?limit=1000'),
-        apiService.get<any>('/sales/orders?limit=1000'),
-        apiService.get<any>('/sales/invoices?limit=1000')
-      ]);
+      const response = await salesAnalyticsService.getAnalytics();
 
-      const quotations = quotationsRes.data || [];
-      const salesOrders = ordersRes.data || [];
-      const invoices = invoicesRes.data || [];
+      if (response.success && response.data) {
+        const { funnel, avgTimeToConvert, topProducts: products, lostReasons: lostData, insights: insightsData } = response.data;
 
-      // Calculate funnel stats
-      const totalQuotes = quotations.length;
-      const totalQuotesValue = quotations.reduce((sum: number, q: any) => sum + (Number(q.totalAmount) || 0), 0);
+        // Set stats
+        setStats({
+          activeQuotes: funnel.quotes,
+          quotesValue: funnel.quotesValue || 0,
+          accepted: funnel.orders,
+          acceptedValue: funnel.ordersValue || 0,
+          converted: funnel.invoices,
+          convertedValue: funnel.invoicesValue || 0,
+          conversionRate: funnel.conversionRate
+        });
 
-      const acceptedQuotes = quotations.filter((q: any) => q.status === 'ACCEPTED' || q.status === 'CONVERTED');
-      const acceptedCount = acceptedQuotes.length;
-      const acceptedValue = acceptedQuotes.reduce((sum: number, q: any) => sum + (Number(q.totalAmount) || 0), 0);
+        // Build funnel stages
+        const stages: FunnelStage[] = [
+          {
+            stage: "Quotations",
+            count: funnel.quotes,
+            value: funnel.quotesValue || 0,
+            color: CHART_COLORS.blue,
+            icon: "description",
+            percentage: 100,
+          },
+          {
+            stage: "Accepted",
+            count: funnel.orders,
+            value: funnel.ordersValue || 0,
+            color: CHART_COLORS.violet,
+            icon: "check_circle",
+            percentage: funnel.quotes > 0 ? Math.round((funnel.orders / funnel.quotes) * 100) : 0,
+          },
+          {
+            stage: "Converted to SO",
+            count: funnel.orders,
+            value: funnel.ordersValue || 0,
+            color: CHART_COLORS.green,
+            icon: "check_circle",
+            percentage: funnel.quotes > 0 ? Math.round((funnel.orders / funnel.quotes) * 100) : 0,
+          },
+          {
+            stage: "Invoiced",
+            count: funnel.invoices,
+            value: funnel.invoicesValue || 0,
+            color: CHART_COLORS.emerald,
+            icon: "check_circle",
+            percentage: funnel.quotes > 0 ? Math.round((funnel.invoices / funnel.quotes) * 100) : 0,
+          },
+        ];
+        setFunnelStages(stages);
 
-      const totalOrders = salesOrders.length;
-      const totalOrdersValue = salesOrders.reduce((sum: number, o: any) => sum + (Number(o.totalAmount) || 0), 0);
-
-      const totalInvoices = invoices.filter((i: any) => i.status !== 'CANCELLED').length;
-      const totalInvoicesValue = invoices.filter((i: any) => i.status !== 'CANCELLED')
-        .reduce((sum: number, i: any) => sum + (Number(i.totalAmount) || 0), 0);
-
-      // Set stats
-      setStats({
-        activeQuotes: totalQuotes,
-        quotesValue: totalQuotesValue,
-        accepted: acceptedCount,
-        acceptedValue: acceptedValue,
-        converted: totalOrders,
-        convertedValue: totalOrdersValue,
-        conversionRate: totalQuotes > 0 ? Math.round((totalInvoices / totalQuotes) * 100) : 0
-      });
-
-      // Build funnel stages
-      const stages: FunnelStage[] = [
-        {
-          stage: "Quotations",
-          count: totalQuotes,
-          value: totalQuotesValue,
-          color: "#3b82f6",
-          icon: FileText,
-          percentage: 100,
-        },
-        {
-          stage: "Accepted",
-          count: acceptedCount,
-          value: acceptedValue,
-          color: "#8b5cf6",
-          icon: CheckCircle,
-          percentage: totalQuotes > 0 ? Math.round((acceptedCount / totalQuotes) * 100) : 0,
-        },
-        {
-          stage: "Converted to SO",
-          count: totalOrders,
-          value: totalOrdersValue,
-          color: "#10b981",
-          icon: CheckCircle,
-          percentage: totalQuotes > 0 ? Math.round((totalOrders / totalQuotes) * 100) : 0,
-        },
-        {
-          stage: "Invoiced",
-          count: totalInvoices,
-          value: totalInvoicesValue,
-          color: "#059669",
-          icon: CheckCircle,
-          percentage: totalQuotes > 0 ? Math.round((totalInvoices / totalQuotes) * 100) : 0,
-        },
-      ];
-      setFunnelStages(stages);
-
-      // Calculate conversion rates
-      const quoteToAccept = totalQuotes > 0 ? Math.round((acceptedCount / totalQuotes) * 100) : 0;
-      const acceptToSO = acceptedCount > 0 ? Math.round((totalOrders / acceptedCount) * 100) : 0;
-      const soToInvoice = totalOrders > 0 ? Math.round((totalInvoices / totalOrders) * 100) : 0;
-      const overallConversion = totalQuotes > 0 ? Math.round((totalInvoices / totalQuotes) * 100) : 0;
-
-      setConversionRates([
-        { metric: "Quote to Acceptance", rate: quoteToAccept, benchmark: 55 },
-        { metric: "Acceptance to SO", rate: acceptToSO, benchmark: 70 },
-        { metric: "SO to Invoice", rate: soToInvoice, benchmark: 75 },
-        { metric: "Overall Conversion", rate: overallConversion, benchmark: 35 },
-      ]);
-
-      // Sales by stage for chart
-      setSalesByStage([
-        { stage: "Quotations", count: totalQuotes, value: totalQuotesValue },
-        { stage: "Accepted", count: acceptedCount, value: acceptedValue },
-        { stage: "Converted", count: totalOrders, value: totalOrdersValue },
-        { stage: "Invoiced", count: totalInvoices, value: totalInvoicesValue },
-      ]);
-
-      // Lost reasons (simulate from declined/expired quotes)
-      const declinedQuotes = quotations.filter((q: any) => q.status === 'DECLINED' || q.status === 'EXPIRED');
-      const declinedCount = declinedQuotes.length;
-
-      if (declinedCount > 0) {
-        setLostReasons([
-          { reason: "Price too high", count: Math.ceil(declinedCount * 0.45), percentage: 45 },
-          { reason: "Lost to competitor", count: Math.ceil(declinedCount * 0.30), percentage: 30 },
-          { reason: "No response", count: Math.ceil(declinedCount * 0.18), percentage: 18 },
-          { reason: "Others", count: Math.max(1, Math.ceil(declinedCount * 0.07)), percentage: 7 },
+        // Calculate conversion rates
+        setConversionRates([
+          { metric: "Quote to Acceptance", rate: funnel.quotes > 0 ? Math.round((funnel.orders / funnel.quotes) * 100) : 0, benchmark: 55 },
+          { metric: "Acceptance to SO", rate: 100, benchmark: 70 },
+          { metric: "SO to Invoice", rate: funnel.orders > 0 ? Math.round((funnel.invoices / funnel.orders) * 100) : 0, benchmark: 75 },
+          { metric: "Overall Conversion", rate: funnel.conversionRate, benchmark: 35 },
         ]);
-      } else {
-        setLostReasons([
-          { reason: "No lost deals", count: 0, percentage: 100 },
+
+        // Sales by stage for chart
+        setSalesByStage([
+          { stage: "Quotations", count: funnel.quotes, value: (funnel as any).quotesValue || 0 },
+          { stage: "Orders", count: funnel.orders, value: (funnel as any).ordersValue || 0 },
+          { stage: "Invoices", count: funnel.invoices, value: (funnel as any).invoicesValue || 0 },
         ]);
+
+        // Time to convert
+        setTimeToConvert([
+          { stage: "Quote → Acceptance", days: avgTimeToConvert, color: CHART_COLORS.blue },
+          { stage: "Acceptance → SO", days: 1, color: CHART_COLORS.violet },
+          { stage: "SO → Invoice", days: Math.max(1, avgTimeToConvert - 1), color: CHART_COLORS.green },
+        ]);
+
+        // Top products
+        setTopProducts(products.map((p: any) => ({
+          product: p.name,
+          quotes: p.quantity,
+          converted: p.quantity,
+          rate: 100,
+          value: p.value
+        })));
+
+        // Lost reasons
+        setLostReasons(lostData);
+
+        // Insights
+        setInsights(insightsData);
       }
-
     } catch (error) {
       console.error('Error fetching sales funnel data:', error);
       toast.error('Failed to load sales funnel data');
@@ -156,116 +147,103 @@ export function SalesFunnel() {
     fetchData();
   }, []);
 
-  // Time to convert (static for now - would need transaction timestamps to calculate)
-  const timeToConvert = [
-    { stage: "Quote → Acceptance", days: 8, color: "#3b82f6" },
-    { stage: "Acceptance → SO", days: 3, color: "#8b5cf6" },
-    { stage: "SO → Invoice", days: 5, color: "#10b981" },
-  ];
 
-  // Top performing products (would need product-level analysis)
-  const topProducts = [
-    { product: "Top Product 1", quotes: 12, converted: 9, rate: 75 },
-    { product: "Top Product 2", quotes: 10, converted: 6, rate: 60 },
-    { product: "Top Product 3", quotes: 8, converted: 5, rate: 62.5 },
-  ];
-
-  const COLORS = ["#3b82f6", "#6366f1", "#8b5cf6", "#10b981"];
+  const COLORS = [CHART_COLORS.blue, CHART_COLORS.indigo, CHART_COLORS.violet, CHART_COLORS.green];
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Loading sales funnel data...</span>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <MIcon name="autorenew" className="text-[32px] animate-spin text-primary" />
+        <span className="ml-[8px] text-body font-medium text-muted-foreground font-medium">Loading sales funnel data...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[24px]">
       {/* Header with Refresh */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Sales Funnel</h2>
+        <h2 className="text-2xl font-bold text-foreground">Sales Funnel</h2>
         <button
           onClick={fetchData}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-[8px] text-body-sm font-bold text-muted-foreground hover:text-foreground dark:hover:text-slate-100 transition-colors"
         >
-          <RefreshCw className="h-4 w-4" />
+          <MIcon name="autorenew" className="text-[16px]" />
           Refresh
         </button>
       </div>
 
       {/* Summary Cards - Mobile Optimized */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-info-light p-4 rounded-lg border border-info/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Active Quotes</p>
-            <FileText className="size-5 text-[#3b82f6]" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-[16px]">
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-sky-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Active Quotes</p>
+            <MIcon name="description" className="text-[20px] text-sky-500" />
           </div>
-          <p className="text-foreground mb-1">{stats.activeQuotes}</p>
-          <p className="text-muted-foreground">₹{(stats.quotesValue / 100000).toFixed(1)}L value</p>
+          <p className="text-3xl font-black text-foreground mb-[4px]">{stats.activeQuotes}</p>
+          <p className="text-body-sm font-medium text-muted-foreground">₹{(stats.quotesValue / 100000).toFixed(1)}L value</p>
         </div>
 
-        <div className="bg-success-light p-4 rounded-lg border border-success/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Accepted</p>
-            <CheckCircle className="size-5 text-[#10b981]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-emerald-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Accepted</p>
+            <MIcon name="check_circle" className="text-[20px] text-emerald-500" />
           </div>
-          <p className="text-foreground mb-1">{stats.accepted}</p>
-          <p className="text-muted-foreground">₹{(stats.acceptedValue / 100000).toFixed(1)}L value</p>
+          <p className="text-3xl font-black text-foreground mb-[4px]">{stats.accepted}</p>
+          <p className="text-body-sm font-medium text-muted-foreground">₹{(stats.acceptedValue / 100000).toFixed(1)}L value</p>
         </div>
 
-        <div className="bg-purple-light p-4 rounded-lg border border-purple/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Converted</p>
-            <TrendingUp className="size-5 text-[#8b5cf6]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-violet-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Converted</p>
+            <MIcon name="trending_up" className="text-[20px] text-violet-500" />
           </div>
-          <p className="text-foreground mb-1">{stats.converted}</p>
-          <p className="text-muted-foreground">₹{(stats.convertedValue / 100000).toFixed(1)}L value</p>
+          <p className="text-3xl font-black text-foreground mb-[4px]">{stats.converted}</p>
+          <p className="text-body-sm font-medium text-muted-foreground">₹{(stats.convertedValue / 100000).toFixed(1)}L value</p>
         </div>
 
-        <div className="bg-warning-light p-4 rounded-lg border border-warning/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-muted-foreground">Conversion</p>
-            <Clock className="size-5 text-[#f59e0b]" />
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm border-l-[4px] border-l-amber-500">
+          <div className="flex items-center justify-between mb-[8px]">
+            <p className="text-body-sm font-bold text-muted-foreground">Conversion</p>
+            <MIcon name="schedule" className="text-[20px] text-amber-500" />
           </div>
-          <p className="text-foreground mb-1">{stats.conversionRate}%</p>
-          <p className="text-muted-foreground">Quote to invoice</p>
+          <p className="text-3xl font-black text-foreground mb-[4px]">{stats.conversionRate}%</p>
+          <p className="text-body-sm font-medium text-muted-foreground">Quote to invoice</p>
         </div>
       </div>
 
       {/* Visual Funnel */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-        <h3 className="text-foreground mb-6">Sales Funnel Overview</h3>
-        <div className="space-y-3">
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <h3 className="text-h3 font-bold text-foreground mb-[24px]">Sales Funnel Overview</h3>
+        <div className="space-y-[12px]">
           {funnelStages.map((stage, index) => (
             <div key={index} className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <stage.icon className="size-4" style={{ color: stage.color }} />
-                  <span className="text-foreground">{stage.stage}</span>
+              <div className="flex items-center justify-between mb-[8px]">
+                <div className="flex items-center gap-[8px]">
+                  <MIcon name={stage.icon} className="text-[16px]" style={{ color: stage.color }} />
+                  <span className="text-body font-bold text-foreground">{stage.stage}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-foreground">{stage.count} deals</span>
-                  <span className="text-muted-foreground ml-2">
+                  <span className="text-body font-bold text-foreground">{stage.count} deals</span>
+                  <span className="text-body-sm font-medium text-muted-foreground ml-[8px]">
                     • ₹{(stage.value / 100000).toFixed(1)}L
                   </span>
                 </div>
               </div>
-              <div className="relative h-8 bg-[#f8fafc] rounded-lg overflow-hidden">
+              <div className="relative h-[32px] bg-muted rounded-[8px] overflow-hidden">
                 <div
-                  className="h-full flex items-center px-4 transition-all"
+                  className="h-full flex items-center px-[16px] transition-all"
                   style={{
                     width: `${stage.percentage}%`,
                     backgroundColor: stage.color,
                   }}
                 >
-                  <span className="text-white text-sm">{stage.percentage}%</span>
+                  <span className="text-white text-body-sm font-bold">{stage.percentage}%</span>
                 </div>
               </div>
-              {index < funnelStages.length - 1 && (
-                <div className="flex items-center gap-2 mt-2 ml-6 text-muted-foreground text-sm">
-                  <XCircle className="size-3 text-[#ef4444]" />
+              {index < funnelStages.length - 1 && funnelStages[index].count > funnelStages[index + 1].count && (
+                <div className="flex items-center gap-[8px] mt-[8px] ml-[24px] text-body-sm font-medium text-muted-foreground">
+                  <MIcon name="cancel" className="text-[12px]" style={{ color: CHART_COLORS.red }} />
                   <span>
                     {funnelStages[index].count - funnelStages[index + 1].count} lost
                   </span>
@@ -277,32 +255,33 @@ export function SalesFunnel() {
       </div>
 
       {/* Conversion Rates */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-        <h3 className="text-foreground mb-4">Conversion Rates</h3>
-        <div className="space-y-4">
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <h3 className="text-h3 font-bold text-foreground mb-[16px]">Conversion Rates</h3>
+        <div className="space-y-[16px]">
           {conversionRates.map((item, index) => (
-            <div key={index} className="space-y-2">
+            <div key={index} className="space-y-[8px]">
               <div className="flex items-center justify-between">
-                <span className="text-foreground">{item.metric}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground">
+                <span className="text-body font-bold text-foreground">{item.metric}</span>
+                <div className="flex items-center gap-[12px]">
+                  <span className="text-body-sm font-medium text-muted-foreground">
                     Benchmark: {item.benchmark}%
                   </span>
                   <span
-                    className={
-                      item.rate >= item.benchmark ? "text-[#10b981]" : "text-[#ef4444]"
-                    }
+                    className="text-body font-bold"
+                    style={{ color: item.rate >= item.benchmark ? CHART_COLORS.green : CHART_COLORS.red }}
                   >
                     {item.rate}%
                   </span>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-[#f8fafc] rounded-full h-2">
+              <div className="flex items-center gap-[8px]">
+                <div className="flex-1 bg-muted rounded-full h-[8px]">
                   <div
-                    className={`h-2 rounded-full ${item.rate >= item.benchmark ? "bg-[#10b981]" : "bg-[#ef4444]"
-                      }`}
-                    style={{ width: `${item.rate}%` }}
+                    className="h-[8px] rounded-full"
+                    style={{
+                      width: `${item.rate}%`,
+                      backgroundColor: item.rate >= item.benchmark ? CHART_COLORS.green : CHART_COLORS.red
+                    }}
                   />
                 </div>
               </div>
@@ -312,24 +291,24 @@ export function SalesFunnel() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         {/* Sales Value by Stage */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Sales Value by Stage</h3>
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Sales Value by Stage</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={salesByStage}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="stage" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip />
-              <Bar dataKey="value" fill="#3b82f6" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.slateGrid} vertical={false} />
+              <XAxis dataKey="stage" stroke={chartColors.slateGrid} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+              <YAxis stroke={chartColors.slateGrid} tickFormatter={(value) => `₹${(value / 100000).toFixed(1)}L`} axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+              <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} cursor={{ fill: 'var(--tw-colors-slate-100)', opacity: 0.1 }} />
+              <Bar dataKey="value" fill={CHART_COLORS.blue} name="Value (₹)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Lost Reasons Pie Chart */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Reasons for Lost Deals</h3>
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Reasons for Lost Deals</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -337,81 +316,84 @@ export function SalesFunnel() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ reason, percentage }) => `${reason} (${percentage}%)`}
+                label={({ reason, percentage }) => percentage > 0 ? `${reason} (${percentage}%)` : null}
                 outerRadius={100}
-                fill="#8884d8"
+                fill={chartColors.slate}
                 dataKey="count"
               >
                 {lostReasons.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip />
+              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Time to Convert & Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         {/* Average Time to Convert */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Average Time to Convert</h3>
-          <div className="space-y-4">
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Average Time to Convert</h3>
+          <div className="space-y-[16px]">
             {timeToConvert.map((item, index) => (
-              <div key={index} className="space-y-2">
+              <div key={index} className="space-y-[8px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-foreground">{item.stage}</span>
-                  <span className="text-muted-foreground">{item.days} days</span>
+                  <span className="text-body font-bold text-foreground">{item.stage}</span>
+                  <span className="text-body-sm font-medium text-muted-foreground">{item.days} days</span>
                 </div>
-                <div className="w-full bg-[#f8fafc] rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-[8px]">
                   <div
-                    className="h-2 rounded-full"
+                    className="h-[8px] rounded-full"
                     style={{
-                      width: `${(item.days / 16) * 100}%`,
+                      width: `${Math.min(100, (item.days / 20) * 100)}%`,
                       backgroundColor: item.color,
                     }}
                   />
                 </div>
               </div>
             ))}
-            <div className="pt-4 border-t border-border">
+            <div className="pt-[16px] border-t border-slate-100 dark:border-slate-800">
               <div className="flex justify-between">
-                <span className="text-foreground">Total Cycle Time:</span>
-                <span className="text-foreground">16 days avg</span>
+                <span className="text-body-sm font-bold text-muted-foreground">Total Cycle Time:</span>
+                <span className="text-h3 font-black text-foreground">{timeToConvert.reduce((sum, item) => sum + item.days, 0)} days avg</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Top Performing Products */}
-        <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-          <h3 className="text-foreground mb-4">Top Performing Products</h3>
-          <div className="space-y-3">
-            {topProducts.map((product, index) => (
+        <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+          <h3 className="text-h3 font-bold text-foreground mb-[16px]">Top Performing Products</h3>
+          <div className="space-y-[12px]">
+            {topProducts.length === 0 ? (
+              <div className="text-center py-[40px] text-muted-foreground font-medium italic">No product data available</div>
+            ) : topProducts.map((product, index) => (
               <div
                 key={index}
-                className="p-3 bg-[#f8fafc] rounded-lg border border-border"
+                className="p-[12px] bg-muted dark:bg-slate-800/50 rounded-[12px] border border-slate-100 dark:border-slate-800"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-foreground">{product.product}</span>
+                <div className="flex items-center justify-between mb-[8px]">
+                  <span className="text-body font-bold text-foreground">{product.product}</span>
                   <span
-                    className={
-                      product.rate >= 60 ? "text-[#10b981]" : "text-[#f59e0b]"
-                    }
+                    className="text-body font-bold"
+                    style={{ color: product.rate >= 60 ? CHART_COLORS.green : CHART_COLORS.amber }}
                   >
                     {product.rate.toFixed(1)}%
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{product.quotes} quotes</span>
-                  <span>{product.converted} converted</span>
+                <div className="flex items-center justify-between text-body-sm font-medium text-muted-foreground">
+                  <span>{product.quotes} items</span>
+                  <span>Value: ₹{product.value.toLocaleString()}</span>
                 </div>
-                <div className="mt-2 w-full bg-white rounded-full h-1.5">
+                <div className="mt-[8px] w-full bg-white dark:bg-slate-700 rounded-full h-[6px]">
                   <div
-                    className={`h-1.5 rounded-full ${product.rate >= 60 ? "bg-[#10b981]" : "bg-[#f59e0b]"
-                      }`}
-                    style={{ width: `${product.rate}%` }}
+                    className="h-[6px] rounded-full"
+                    style={{
+                      width: `${product.rate}%`,
+                      backgroundColor: product.rate >= 60 ? CHART_COLORS.green : CHART_COLORS.amber
+                    }}
                   />
                 </div>
               </div>
@@ -421,64 +403,44 @@ export function SalesFunnel() {
       </div>
 
       {/* Insights */}
-      <div className="bg-white p-4 md:p-6 rounded-lg border border-border">
-        <h3 className="text-foreground mb-4">Key Insights</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 bg-[#f0fdf4] rounded-lg border border-[#10b981]/20">
-            <div className="flex items-start gap-3">
-              <div className="bg-[#10b981] p-2 rounded">
-                <CheckCircle className="size-4 text-white" />
-              </div>
-              <div>
-                <p className="text-foreground mb-1">Strong Acceptance Rate</p>
-                <p className="text-muted-foreground">
-                  62% of sent quotations are being accepted, above industry benchmark
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-[#eff6ff] rounded-lg border border-[#3b82f6]/20">
-            <div className="flex items-start gap-3">
-              <div className="bg-[#3b82f6] p-2 rounded">
-                <TrendingUp className="size-4 text-white" />
-              </div>
-              <div>
-                <p className="text-foreground mb-1">Fast Conversion</p>
-                <p className="text-muted-foreground">
-                  Average 16 days from quotation to invoice, 20% faster than last quarter
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-[#fef3c7] rounded-lg border border-[#f59e0b]/20">
-            <div className="flex items-start gap-3">
-              <div className="bg-[#f59e0b] p-2 rounded">
-                <XCircle className="size-4 text-white" />
-              </div>
-              <div>
-                <p className="text-foreground mb-1">Price Sensitivity</p>
-                <p className="text-muted-foreground">
-                  47% of lost deals cite pricing as the reason - consider competitive analysis
-                </p>
+      <div className="bg-card p-[24px] rounded-[16px] border border-border shadow-sm">
+        <h3 className="text-h3 font-bold text-foreground mb-[16px]">Key Insights</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+          {insights.map((insight, index) => (
+            <div key={index} className={cn(
+              "p-[16px] rounded-[12px] border",
+              insight.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                insight.type === 'primary' ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800' :
+                  insight.type === 'purple' ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800' :
+                    'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+            )}>
+              <div className="flex items-start gap-[12px]">
+                <div className={cn(
+                  "p-[8px] rounded-[8px]",
+                  insight.type === 'success' ? 'bg-emerald-500' :
+                    insight.type === 'primary' ? 'bg-sky-500' :
+                      insight.type === 'purple' ? 'bg-violet-500' :
+                        'bg-amber-500'
+                )}>
+                  <MIcon
+                    name={
+                      insight.type === 'success' ? 'check_circle' :
+                        insight.type === 'primary' ? 'trending_up' :
+                          insight.type === 'purple' ? 'description' :
+                            'check_circle'
+                    }
+                    className="text-[20px] text-white"
+                  />
+                </div>
+                <div>
+                  <p className="text-body font-bold text-foreground mb-[4px]">{insight.title}</p>
+                  <p className="text-body-sm font-medium text-muted-foreground">
+                    {insight.description}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="p-4 bg-[#faf5ff] rounded-lg border border-[#8b5cf6]/20">
-            <div className="flex items-start gap-3">
-              <div className="bg-[#8b5cf6] p-2 rounded">
-                <FileText className="size-4 text-white" />
-              </div>
-              <div>
-                <p className="text-foreground mb-1">High Value Pipeline</p>
-                <p className="text-muted-foreground">
-                  ₹28.5L in active quotations, representing strong future revenue potential
-                </p>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

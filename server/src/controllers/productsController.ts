@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { AuditService } from '../services/auditService';
+import eventBus, { EventTypes } from '../services/eventBus';  // P0: Domain events
+import logger from '../config/logger';
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
     try {
@@ -72,12 +74,36 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
             'INVENTORY'
         );
 
+        // P0: Emit domain event for cross-domain processing
+        try {
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PRODUCT_CREATED,
+                aggregateType: 'Product',
+                aggregateId: product.id,
+                payload: {
+                    productId: product.id,
+                    name: product.name,
+                    code: product.code,
+                    currentStock: product.currentStock,
+                    sellingPrice: Number(product.sellingPrice),
+                    purchasePrice: Number(product.purchasePrice)
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
+                }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit PRODUCT_CREATED event:', eventError);
+        }
+
         res.status(201).json({
             success: true,
             data: product
         });
     } catch (error: any) {
-        console.error('Create product error:', error);
+        logger.error('Create product error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error creating product'
@@ -104,7 +130,7 @@ export const getProducts = async (req: AuthRequest, res: Response) => {
             data: products
         });
     } catch (error: any) {
-        console.error('Get products error:', error);
+        logger.error('Get products error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching products'
@@ -137,7 +163,7 @@ export const getProductById = async (req: AuthRequest, res: Response) => {
             data: product
         });
     } catch (error: any) {
-        console.error('Get product error:', error);
+        logger.error('Get product error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error fetching product'
@@ -225,7 +251,7 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
         else if (salePrice !== undefined) updateData.sellingPrice = parseFloat(salePrice);
 
         const updatedProduct = await prisma.product.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: updateData
         });
 
@@ -243,15 +269,74 @@ export const updateProduct = async (req: AuthRequest, res: Response) => {
             'INVENTORY'
         );
 
+        // P0: Emit domain event for cross-domain processing
+        try {
+            await eventBus.emit({
+                companyId,
+                eventType: EventTypes.PRODUCT_UPDATED,
+                aggregateType: 'Product',
+                aggregateId: id,
+                payload: {
+                    productId: id,
+                    name: updatedProduct.name,
+                    code: updatedProduct.code,
+                    currentStock: updatedProduct.currentStock,
+                    sellingPrice: Number(updatedProduct.sellingPrice),
+                    purchasePrice: Number(updatedProduct.purchasePrice),
+                    changes: Object.keys(updateData)
+                },
+                metadata: {
+                    userId: req.user.id,
+                    source: 'api'
+                }
+            });
+        } catch (eventError) {
+            logger.warn('Failed to emit PRODUCT_UPDATED event:', eventError);
+        }
+
         res.json({
             success: true,
             data: updatedProduct
         });
     } catch (error: any) {
-        console.error('Update product error:', error);
+        logger.error('Update product error:', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Error updating product'
+        });
+    }
+};
+
+export const getProductByBarcode = async (req: AuthRequest, res: Response) => {
+    try {
+        const { barcode } = req.params;
+        const companyId = req.user.companyId;
+
+        const product = await prisma.product.findFirst({
+            where: {
+                barcode,
+                companyId,
+                isActive: true
+            }
+        });
+
+        if (!product) {
+            res.status(404).json({
+                success: false,
+                message: 'Product with this barcode not found'
+            });
+            return;
+        }
+
+        res.json({
+            success: true,
+            data: product
+        });
+    } catch (error: any) {
+        logger.error('Get product by barcode error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Error fetching product'
         });
     }
 };

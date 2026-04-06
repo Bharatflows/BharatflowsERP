@@ -77,13 +77,13 @@ export function InventoryReports() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'In Stock':
-        return 'bg-green-100 text-green-700';
+        return 'badge-paid';
       case 'Low Stock':
-        return 'bg-orange-100 text-orange-700';
+        return 'badge-partial';
       case 'Out of Stock':
-        return 'bg-red-100 text-red-700';
+        return 'badge-overdue';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'badge-draft';
     }
   };
 
@@ -101,9 +101,9 @@ export function InventoryReports() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-border shadow-sm">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold">Inventory Reports</h2>
-          <div className="flex items-center gap-2 bg-slate-100 rounded-lg px-3 py-1.5">
-            <Package className="size-4 text-slate-500" />
-            <span className="text-sm font-medium text-slate-700">{filter}</span>
+          <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-1.5">
+            <Package className="size-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">{filter}</span>
           </div>
         </div>
         <div className="flex gap-2">
@@ -135,7 +135,7 @@ export function InventoryReports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Low Stock Items</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{summary.lowStockCount}</div>
+            <div className="text-2xl font-bold text-amber-600">{summary.lowStockCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Items below reorder level</p>
           </CardContent>
         </Card>
@@ -144,7 +144,7 @@ export function InventoryReports() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Out of Stock</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{summary.outOfStockCount}</div>
+            <div className="text-2xl font-bold text-destructive">{summary.outOfStockCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Needs immediate attention</p>
           </CardContent>
         </Card>

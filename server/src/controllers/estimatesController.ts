@@ -3,7 +3,7 @@ import prisma from '../config/prisma';
 import logger from '../config/logger';
 import { AuthRequest } from '../middleware/auth';
 import { getNextNumber, decrementSequence } from '../services/sequenceService';
-
+import { eventBus, EventTypes } from '../services/eventBus';
 // @desc    Get all estimates
 // @route   GET /api/v1/sales/estimates
 // @access  Private
@@ -22,7 +22,7 @@ export const getEstimates = async (req: AuthRequest, res: Response) => {
 
         if (search) {
             where.OR = [
-                { estimateNumber: { contains: search as string, mode: 'insensitive' } },
+                { estimateNumber: { contains: search as string } },
             ];
         }
 
@@ -70,7 +70,7 @@ export const getEstimate = async (req: AuthRequest, res: Response) => {
         const estimate = await prisma.estimate.findUnique({
             where: {
                 id: req.params.id
-            },
+            , companyId: req.user.companyId },
             include: {
                 customer: true,
                 items: {
@@ -158,6 +158,16 @@ export const createEstimate = async (req: AuthRequest, res: Response) => {
             }
         });
 
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.ESTIMATE_CREATED,
+            aggregateType: 'Estimate',
+            aggregateId: estimate.id,
+            payload: estimate,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
         return res.status(201).json({
             success: true,
             message: 'Estimate created successfully',
@@ -182,7 +192,7 @@ export const updateEstimate = async (req: AuthRequest, res: Response) => {
         const { status, notes, items, date, validUntil } = req.body;
 
         const existingEstimate = await prisma.estimate.findUnique({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         if (!existingEstimate || existingEstimate.companyId !== req.user.companyId) {
@@ -236,12 +246,22 @@ export const updateEstimate = async (req: AuthRequest, res: Response) => {
         }
 
         const estimate = await prisma.estimate.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: updateData,
             include: {
                 items: true,
                 customer: true
             }
+        });
+
+        // Emit domain event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.ESTIMATE_UPDATED,
+            aggregateType: 'Estimate',
+            aggregateId: estimate.id,
+            payload: estimate,
+            metadata: { userId: req.user.id, source: 'api' }
         });
 
         return res.status(200).json({
@@ -267,7 +287,7 @@ export const deleteEstimate = async (req: AuthRequest, res: Response) => {
         const { id } = req.params;
 
         const existingEstimate = await prisma.estimate.findUnique({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         if (!existingEstimate || existingEstimate.companyId !== req.user.companyId) {
@@ -278,7 +298,7 @@ export const deleteEstimate = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.estimate.delete({
-            where: { id }
+            where: { id , companyId: req.user.companyId }
         });
 
         // Decrement the sequence number to reuse the freed number
@@ -307,7 +327,7 @@ export const convertEstimateToInvoice = async (req: AuthRequest, res: Response) 
 
         // Get the estimate with all items
         const estimate = await prisma.estimate.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: {
                 items: true
             }
@@ -370,12 +390,32 @@ export const convertEstimateToInvoice = async (req: AuthRequest, res: Response) 
             }),
             // Update estimate status to CONVERTED
             prisma.estimate.update({
-                where: { id },
+                where: { id , companyId: req.user.companyId },
                 data: { status: 'CONVERTED' }
             })
         ]);
 
         logger.info(`Estimate ${estimate.estimateNumber} converted to Invoice ${invoice.invoiceNumber} by ${req.user.email}`);
+
+        // Emit INVOICE_CREATED event
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.INVOICE_CREATED,
+            aggregateType: 'Invoice',
+            aggregateId: invoice.id,
+            payload: invoice,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+
+        // Emit ESTIMATE_UPDATED event (status change)
+        await eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: EventTypes.ESTIMATE_UPDATED,
+            aggregateType: 'Estimate',
+            aggregateId: updatedEstimate.id,
+            payload: updatedEstimate,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
 
         return res.status(201).json({
             success: true,

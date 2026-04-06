@@ -19,26 +19,37 @@ import type {
   PaginatedResponse,
   QueryParams,
   Estimate,
+  Quotation,
   SalesOrder,
+  StockAdjustment,
 } from '../types';
 
 // ============ PARTIES ============
 export const partiesService = createExtendedCrudService<Party, {
   getLedger: (id: string, params?: QueryParams) => Promise<ApiResponse<any>>;
+  getTrustScore: (id: string) => Promise<ApiResponse<{ score: number; history: any[] }>>;
+  verifyBusiness: (gstin: string) => Promise<ApiResponse<any>>;
 }>('parties', (endpoint) => ({
   getLedger: (id: string, params?: QueryParams) =>
     apiService.get<ApiResponse<any>>(`/${endpoint}/${id}/ledger?${new URLSearchParams(params as any)}`),
+  getTrustScore: (id: string) =>
+    apiService.get<ApiResponse<{ score: number; history: any[] }>>(`/${endpoint}/${id}/trust-score`),
+  verifyBusiness: (gstin: string) =>
+    apiService.post<ApiResponse<any>>(`/${endpoint}/verify-business`, { gstin }),
 }));
 
 // ============ PRODUCTS ============
 export const productsService = createExtendedCrudService<Product, {
   adjustStock: (id: string, data: { quantity: number; reason: string }) => Promise<ApiResponse<Product>>;
   getLowStock: () => Promise<ApiResponse<Product[]>>;
+  getByBarcode: (barcode: string) => Promise<ApiResponse<Product>>;
 }>('inventory/products', (endpoint) => ({
   adjustStock: (id: string, data: { quantity: number; reason: string }) =>
     apiService.post<ApiResponse<Product>>(`/${endpoint}/${id}/adjust-stock`, data),
   getLowStock: () =>
     apiService.get<ApiResponse<Product[]>>('/inventory/low-stock'),
+  getByBarcode: (barcode: string) =>
+    apiService.get<ApiResponse<Product>>(`/${endpoint}/barcode/${barcode}`),
 }));
 
 // ============ INVENTORY MANAGEMENT ============
@@ -113,10 +124,52 @@ export const inventoryService = {
     apiService.post<ApiResponse<any>>('/inventory/stock/batches', data),
   getBatches: (productId: string) =>
     apiService.get<ApiResponse<any>>(`/inventory/stock/batches/${productId}`),
+
+  // Unit Conversions
+  getUnitConversions: () => apiService.get<ApiResponse<any[]>>('/inventory/unit-conversions'),
+  createUnitConversion: (data: any) => apiService.post<ApiResponse<any>>('/inventory/unit-conversions', data),
+  deleteUnitConversion: (id: string) => apiService.delete<ApiResponse<void>>(`/inventory/unit-conversions/${id}`),
+
+  // Serial Numbers
+  getSerialNumbers: (params?: { productId?: string; status?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/inventory/serial-numbers${query}`);
+  },
+  updateSerialNumber: (id: string, data: any) =>
+    apiService.put<ApiResponse<any>>(`/inventory/serial-numbers/${id}`, data),
+
+  // Stock Adjustment Documents
+  getStockAdjustments: (params?: QueryParams) =>
+    apiService.get<PaginatedResponse<StockAdjustment>>(`/inventory/stock-adjustments?${new URLSearchParams(params as any)}`),
+
+  getStockAdjustmentById: (id: string) =>
+    apiService.get<ApiResponse<StockAdjustment>>(`/inventory/stock-adjustments/${id}`),
+
+  createStockAdjustment: (data: any) =>
+    apiService.post<ApiResponse<StockAdjustment>>('/inventory/stock-adjustments', data),
+
+  deleteStockAdjustment: (id: string) =>
+    apiService.delete<ApiResponse<void>>(`/inventory/stock-adjustments/${id}`),
+};
+
+// ============ WASTAGE TRACKING ============
+export const wastageService = {
+  getSummary: () =>
+    apiService.get<ApiResponse<any>>('/wastage/summary'),
+
+  getAll: (params?: QueryParams) =>
+    apiService.get<PaginatedResponse<any>>(`/wastage?${new URLSearchParams(params as any)}`),
+
+  getById: (id: string) =>
+    apiService.get<ApiResponse<any>>(`/wastage/${id}`),
+
+  create: (data: any) =>
+    apiService.post<ApiResponse<any>>('/wastage', data),
 };
 
 // ============ SALES/INVOICES ============
-export const salesService = createExtendedCrudService<Invoice, {
+// Base service with CRUD operations
+const baseSalesService = createExtendedCrudService<Invoice, {
   recordPayment: (id: string, data: { amount: number; paymentMode: string; date: string }) => Promise<ApiResponse<Invoice>>;
   downloadPDF: (id: string) => Promise<Blob>;
   sendEmail: (id: string, email: string) => Promise<ApiResponse<void>>;
@@ -129,11 +182,103 @@ export const salesService = createExtendedCrudService<Invoice, {
     apiService.post<ApiResponse<void>>(`/${endpoint}/${id}/send`, { email }),
 }));
 
+// Extended salesService with backward-compatible methods for legacy API
+export const salesService = {
+  ...baseSalesService,
+
+  // Backward-compatible invoice methods
+  getInvoice: (id: string) => baseSalesService.getById(id),
+  getInvoices: (params?: QueryParams) => baseSalesService.getAll(params),
+  createInvoice: (data: Partial<Invoice>) => baseSalesService.create(data),
+  updateInvoice: (id: string, data: Partial<Invoice>) => baseSalesService.update(id, data),
+  deleteInvoice: (id: string) => baseSalesService.delete(id),
+
+  // Backward-compatible estimate methods (delegates to estimatesService)
+  getEstimate: (id: string) => apiService.get<ApiResponse<Estimate>>(`/sales/estimates/${id}`),
+  getEstimates: (params?: QueryParams) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<PaginatedResponse<Estimate>>(`/sales/estimates${query}`);
+  },
+  createEstimate: (data: any) => apiService.post<ApiResponse<Estimate>>('/sales/estimates', data),
+  updateEstimate: (id: string, data: any) => apiService.put<ApiResponse<Estimate>>(`/sales/estimates/${id}`, data),
+  deleteEstimate: (id: string) => apiService.delete<ApiResponse<void>>(`/sales/estimates/${id}`),
+  convertEstimateToInvoice: (id: string) => apiService.post<ApiResponse<Invoice>>(`/sales/estimates/${id}/convert`, {}),
+
+  // Backward-compatible quotation methods
+  getQuotation: (id: string) => apiService.get<ApiResponse<Quotation>>(`/sales/quotations/${id}`),
+  getQuotations: (params?: QueryParams) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<PaginatedResponse<Quotation>>(`/sales/quotations${query}`);
+  },
+  createQuotation: (data: any) => apiService.post<ApiResponse<Quotation>>('/sales/quotations', data),
+  updateQuotation: (id: string, data: any) => apiService.put<ApiResponse<Quotation>>(`/sales/quotations/${id}`, data),
+  deleteQuotation: (id: string) => apiService.delete<ApiResponse<void>>(`/sales/quotations/${id}`),
+
+  // Backward-compatible sales order methods
+  getSalesOrder: (id: string) => apiService.get<ApiResponse<SalesOrder>>(`/sales/orders/${id}`),
+  getSalesOrders: (params?: QueryParams) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<PaginatedResponse<SalesOrder>>(`/sales/orders${query}`);
+  },
+  createSalesOrder: (data: any) => apiService.post<ApiResponse<SalesOrder>>('/sales/orders', data),
+  updateSalesOrder: (id: string, data: any) => apiService.put<ApiResponse<SalesOrder>>(`/sales/orders/${id}`, data),
+  deleteSalesOrder: (id: string) => apiService.delete<ApiResponse<void>>(`/sales/orders/${id}`),
+  convertSalesOrderToInvoice: (id: string) => apiService.post<ApiResponse<Invoice>>(`/sales/orders/${id}/convert`, {}),
+
+  // OCR upload for invoice scanning
+  uploadInvoiceOCR: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiService.post<any>('/sales/invoices/ocr', formData);
+  },
+};
+
 // ============ ESTIMATES ============
-export const estimatesService = createCrudService<Estimate>('sales/estimates');
+export const estimatesService = createExtendedCrudService<Estimate, {
+  convert: (id: string) => Promise<ApiResponse<Invoice>>;
+}>('sales/estimates', (endpoint) => ({
+  convert: (id: string) =>
+    apiService.post<ApiResponse<Invoice>>(`/${endpoint}/${id}/convert`, {}),
+}));
 
 // ============ SALES ORDERS ============
-export const salesOrdersService = createCrudService<SalesOrder>('sales/orders');
+export const salesOrdersService = createExtendedCrudService<SalesOrder, {
+  convert: (id: string) => Promise<ApiResponse<Invoice>>;
+  convertToChallan: (id: string) => Promise<ApiResponse<any>>;
+}>('sales/orders', (endpoint) => ({
+  convert: (id: string) =>
+    apiService.post<ApiResponse<Invoice>>(`/${endpoint}/${id}/convert`, {}),
+  convertToChallan: (id: string) =>
+    apiService.post<ApiResponse<any>>(`/${endpoint}/${id}/challan`, {}),
+}));
+
+// ============ QUOTATIONS ============
+export const quotationsService = createExtendedCrudService<Quotation, {
+  convert: (id: string) => Promise<ApiResponse<SalesOrder>>;
+}>('sales/quotations', (endpoint) => ({
+  convert: (id: string) =>
+    apiService.post<ApiResponse<SalesOrder>>(`/${endpoint}/${id}/convert`, {}),
+}));
+
+// ============ SALES ANALYTICS ============
+export const salesAnalyticsService = {
+  getAnalytics: () =>
+    apiService.get<ApiResponse<{
+      funnel: {
+        quotes: number;
+        quotesValue?: number;
+        orders: number;
+        ordersValue?: number;
+        invoices: number;
+        invoicesValue?: number;
+        conversionRate: number;
+      };
+      avgTimeToConvert: number;
+      topProducts: { name: string; quantity: number; value: number }[];
+      lostReasons: { reason: string; count: number; percentage: number }[];
+      insights: { title: string; description: string; type: string }[];
+    }>>('/sales/analytics'),
+};
 
 // ============ DELIVERY CHALLANS ============
 export const deliveryChallansService = createExtendedCrudService<any, {
@@ -142,6 +287,9 @@ export const deliveryChallansService = createExtendedCrudService<any, {
   convert: (id: string) =>
     apiService.post<ApiResponse<Invoice>>(`/${endpoint}/${id}/convert`, {}),
 }));
+
+// ============ CREDIT NOTES ============
+export const creditNotesService = createCrudService<any>('sales/credit-notes');
 
 // ============ PURCHASE ORDERS ============
 export const purchaseService = createExtendedCrudService<PurchaseOrder, {
@@ -156,6 +304,10 @@ export const purchaseService = createExtendedCrudService<PurchaseOrder, {
   createGRN: (data: any) => Promise<ApiResponse<any>>;
   updateGRN: (id: string, data: any) => Promise<ApiResponse<any>>;
   deleteGRN: (id: string) => Promise<ApiResponse<void>>;
+  getDebitNotes: (params?: QueryParams) => Promise<PaginatedResponse<any>>;
+  getDebitNoteById: (id: string) => Promise<ApiResponse<any>>;
+  createDebitNote: (data: any) => Promise<ApiResponse<any>>;
+  deleteDebitNote: (id: string) => Promise<ApiResponse<void>>;
 }>('purchase', (endpoint) => ({
   updateStatus: (id: string, status: string) =>
     apiService.patch<ApiResponse<PurchaseOrder>>(`/${endpoint}/${id}/status`, { status }),
@@ -181,6 +333,15 @@ export const purchaseService = createExtendedCrudService<PurchaseOrder, {
     apiService.put<ApiResponse<any>>(`/${endpoint}/grn/${id}`, data),
   deleteGRN: (id: string) =>
     apiService.delete<ApiResponse<void>>(`/${endpoint}/grn/${id}`),
+  // Debit Notes
+  getDebitNotes: (params?: QueryParams) =>
+    apiService.get<PaginatedResponse<any>>(`/${endpoint}/debit-notes?${new URLSearchParams(params as any)}`),
+  getDebitNoteById: (id: string) =>
+    apiService.get<ApiResponse<any>>(`/${endpoint}/debit-notes/${id}`),
+  createDebitNote: (data: any) =>
+    apiService.post<ApiResponse<any>>(`/${endpoint}/debit-notes`, data),
+  deleteDebitNote: (id: string) =>
+    apiService.delete<ApiResponse<void>>(`/${endpoint}/debit-notes/${id}`),
 }));
 
 // ============ EXPENSES ============
@@ -227,20 +388,46 @@ export const expenseCategoriesService = createCrudService<{
   color: string;
   spent: number;
   count: number;
+  maxAmount?: number;
 }>('expense-categories');
 
-// ============ HR/EMPLOYEES ============
 export const hrService = createExtendedCrudService<Employee, {
   markAttendance: (id: string, data: { date: string; status: string }) => Promise<ApiResponse<void>>;
   processPayroll: (month: string) => Promise<ApiResponse<void>>;
   generatePayslip: (employeeId: string, month: string) => Promise<Blob>;
+  getDashboardStats: () => Promise<ApiResponse<any>>;
+  getAttendance: (params?: { date?: string; employeeId?: string }) => Promise<ApiResponse<any>>;
+  getDailyAttendance: (date?: string) => Promise<ApiResponse<any>>;
+  getLeaves: (params?: { status?: string; employeeId?: string }) => Promise<ApiResponse<any>>;
+  updateLeaveStatus: (id: string, status: string) => Promise<ApiResponse<any>>;
+  getPayrollRuns: (params?: { month?: string; employeeId?: string }) => Promise<ApiResponse<any>>;
 }>('hr/employees', (endpoint) => ({
-  markAttendance: (id: string, data: { date: string; status: string }) =>
-    apiService.post<ApiResponse<void>>(`/${endpoint}/${id}/attendance`, data),
+  markAttendance: (employeeId: string, data: { date: string; status: string }) =>
+    apiService.post<ApiResponse<void>>('/hr/attendance', { employeeId, ...data }),
   processPayroll: (month: string) =>
     apiService.post<ApiResponse<void>>('/hr/payroll/process', { month }),
   generatePayslip: (employeeId: string, month: string) =>
     apiService.get<Blob>(`/${endpoint}/${employeeId}/payslip/${month}`),
+  getDashboardStats: () =>
+    apiService.get<ApiResponse<any>>('/hr/dashboard/stats'),
+  getAttendance: (params?: { date?: string; employeeId?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any>>(`/hr/attendance${query}`);
+  },
+  getDailyAttendance: (date?: string) => {
+    const query = date ? `?date=${date}` : '';
+    return apiService.get<ApiResponse<any>>(`/hr/attendance/daily${query}`);
+  },
+  getLeaves: (params?: { status?: string; employeeId?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any>>(`/hr/leaves${query}`);
+  },
+  updateLeaveStatus: (id: string, status: string) =>
+    apiService.put<ApiResponse<any>>(`/hr/leaves/${id}/status`, { status }),
+  getPayrollRuns: (params?: { month?: string; employeeId?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any>>(`/hr/payroll${query}`);
+  },
 }));
 
 // ============ NOTIFICATIONS ============
@@ -259,14 +446,16 @@ export const notificationsService = {
 
 // ============ DASHBOARD/ANALYTICS ============
 export const dashboardService = {
+  getStats: () =>
+    apiService.get<ApiResponse<any>>('/dashboard/stats'),
   getKPIs: () =>
     apiService.get<ApiResponse<any>>('/dashboard/kpis'),
   getSalesChart: (params?: { period?: string; startDate?: string; endDate?: string }) =>
     apiService.get<ApiResponse<any>>(`/dashboard/sales-chart?${new URLSearchParams(params as any)}`),
-  getRecentTransactions: () =>
-    apiService.get<ApiResponse<any>>('/dashboard/recent-transactions'),
-  getStats: () =>
-    apiService.get<ApiResponse<any>>('/dashboard/stats'),
+  getTicker: () =>
+    apiService.get<any>('/dashboard/ticker'),
+  getCashFlow: () =>
+    apiService.get<any>('/dashboard/cash-flow'),
 };
 
 // ============ REPORTS ============
@@ -292,6 +481,8 @@ export const reportsService = {
     const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
     return apiService.get<ApiResponse<any>>(`/reports/balance-sheet${query}`);
   },
+  getProfitLossTrends: () =>
+    apiService.get<ApiResponse<any[]>>('/reports/profit-loss-trends'),
   getAgingReceivables: () =>
     apiService.get<ApiResponse<any>>('/reports/aging-receivables'),
   getAgingPayables: () =>
@@ -310,6 +501,10 @@ export const reportsService = {
     apiService.get<ApiResponse<any>>(`/reports/gst?${new URLSearchParams(params)}`),
   exportReport: (type: string, params: any) =>
     apiService.get<Blob>(`/reports/export/${type}?${new URLSearchParams(params)}`),
+  emailPartyStatement: (partyId: string, params: { startDate?: string; endDate?: string }) =>
+    apiService.post<ApiResponse<any>>(`/reports/party-statement/${partyId}/email`, params),
+  exportPartyStatement: (partyId: string, format: 'pdf' | 'excel', params: { startDate?: string; endDate?: string }) =>
+    apiService.get<any>(`/reports/party-statement/${partyId}/export?${new URLSearchParams({ ...params, format })}`, { responseType: 'blob' } as any),
 };
 
 // ============ BANKING ============
@@ -318,11 +513,14 @@ export const bankingService = createExtendedCrudService<any, {
   createTransaction: (data: any) => Promise<ApiResponse<any>>;
   deleteTransaction: (id: string) => Promise<ApiResponse<void>>;
   getDashboard: () => Promise<ApiResponse<any>>;
+  getCashFlowTrends: () => Promise<ApiResponse<any[]>>;
+  getCashFlowForecast: () => Promise<ApiResponse<any>>;
   getReminders: (params?: { type?: string; status?: string }) => Promise<ApiResponse<any>>;
   createReminder: (data: any) => Promise<ApiResponse<any>>;
   updateReminder: (id: string, data: any) => Promise<ApiResponse<any>>;
   deleteReminder: (id: string) => Promise<ApiResponse<void>>;
   sendReminder: (id: string) => Promise<ApiResponse<any>>;
+  syncAccount: (id: string) => Promise<ApiResponse<any>>;
 }>('banking/accounts', () => ({
   getTransactions: (accountId?: string, params?: QueryParams) => {
     const query = new URLSearchParams(params as any);
@@ -335,6 +533,10 @@ export const bankingService = createExtendedCrudService<any, {
     apiService.delete<ApiResponse<void>>(`/banking/transactions/${id}`),
   getDashboard: () =>
     apiService.get<ApiResponse<any>>('/banking/dashboard'),
+  getCashFlowTrends: () =>
+    apiService.get<ApiResponse<any[]>>('/banking/cash-flow-trends'),
+  getCashFlowForecast: () =>
+    apiService.get<ApiResponse<any>>('/banking/cash-flow-forecast'),
   getReminders: (params?: { type?: string; status?: string }) => {
     const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
     return apiService.get<ApiResponse<any>>(`/banking/reminders${query}`);
@@ -347,6 +549,8 @@ export const bankingService = createExtendedCrudService<any, {
     apiService.delete<ApiResponse<void>>(`/banking/reminders/${id}`),
   sendReminder: (id: string) =>
     apiService.post<ApiResponse<any>>(`/banking/reminders/${id}/send`, {}),
+  syncAccount: (id: string) =>
+    apiService.post<ApiResponse<any>>(`/banking/accounts/${id}/sync`, {}),
 }));
 
 // ============ GST COMPLIANCE ============
@@ -359,6 +563,8 @@ export const gstService = {
       upcomingDeadlines: any[];
       recentPayments: any[];
     }>>('/gst/dashboard'),
+  getGSTHistory: () =>
+    apiService.get<ApiResponse<any[]>>('/gst/history'),
   generateGSTR1: (params: { month: string; year: string }) =>
     apiService.get<ApiResponse<any>>(`/gst/gstr1?${new URLSearchParams(params)}`),
   generateGSTR3B: (params: { month: string; year: string }) =>
@@ -388,6 +594,28 @@ export const gstService = {
     year: string;
     data: any;
   }) => apiService.post<ApiResponse<any>>('/gst/file-return', data),
+
+  // PrimeSync+ (Live Portal Connectivity)
+  syncGSTR2B: (period: string) => apiService.post<ApiResponse<any>>('/gst/sync-gstr2b', { period }),
+  getLiveGSTR2BRecords: (params?: { period?: string; matchStatus?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/gst/gstr2b-records${query}`);
+  },
+  generateLiveEInvoice: (invoiceId: string) => apiService.post<ApiResponse<any>>(`/gst/invoices/${invoiceId}/einvoice`, {}),
+
+  // TDS/TCS & GSTR-2B
+  getTDSTCSEntries: () =>
+    apiService.get<ApiResponse<any[]>>('/gst/tds-tcs'),
+  createTDSTCSEntry: (data: any) =>
+    apiService.post<ApiResponse<any>>('/gst/tds-tcs', data),
+  getGSTR2BRecords: (params?: { returnPeriod?: string; matchStatus?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/gst/gstr-2b${query}`);
+  },
+  reconcileGSTR2B: (id: string, data: any) =>
+    apiService.put<ApiResponse<any>>(`/gst/gstr-2b/${id}/reconcile`, data),
+  uploadGSTR2B: (data: { records: any[]; returnPeriod: string }) =>
+    apiService.post<ApiResponse<any>>('/gst/gstr-2b/upload', data),
 
   // GST Payments
   getPayments: (params?: { status?: string; period?: string; page?: number; limit?: number }) => {
@@ -429,8 +657,14 @@ export const gstService = {
   deleteEWaybill: (id: string) => apiService.delete<ApiResponse<void>>(`/gst/e-waybills/${id}`),
 };
 
+
+
 // ============ SETTINGS ============
 export const settingsService = {
+  // Company Config
+  getCompany: () => apiService.get<ApiResponse<any>>('/settings/company'),
+  updateCompany: (data: any) => apiService.put<ApiResponse<any>>('/settings/company', data),
+
   // Sequences
   getNextSequenceNumber: (documentType: string) =>
     apiService.get<ApiResponse<{ nextNumber: string; sequence: any }>>(`/settings/sequences/${documentType}/next`),
@@ -481,6 +715,63 @@ export const settingsService = {
     if (amount !== undefined) params.append('amount', String(amount));
     return apiService.get<ApiResponse<{ requiresApproval: boolean; workflow: any }>>(`/settings/workflows/for-document?${params}`);
   },
+
+  // Company Profile
+  getCompanyDetails: () => apiService.get<ApiResponse<any>>('/settings/company'),
+  updateCompanyDetails: (data: any) => apiService.put<ApiResponse<any>>('/settings/company', data),
+
+  // Dashboard Stats
+  getDashboardStats: () => apiService.get<ApiResponse<any>>('/settings/dashboard/stats'),
+
+  // Integrity Check (enhanced with history)
+  checkIntegrity: (checkTypes?: string[]) => apiService.post<ApiResponse<any>>('/settings/integrity-check', { checkTypes }),
+  getIntegrityHistory: (params?: { limit?: number; offset?: number }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any>>(`/settings/integrity-check/history${query}`);
+  },
+  getIntegrityCheckDetails: (id: string) => apiService.get<ApiResponse<any>>(`/settings/integrity-check/${id}`),
+
+  // Security Summary
+  getSecuritySummary: () => apiService.get<ApiResponse<{
+    securityScore: number;
+    failedLogins: number;
+    devices: { total: number; trusted: number; blocked: number };
+    ipWhitelist: { active: number };
+    recentEvents: any[];
+  }>>('/settings/security/summary'),
+
+  // App Configuration
+  getAppConfig: () => apiService.get<ApiResponse<any>>('/settings/app-config'),
+  updateAppConfig: (data: {
+    enabledModules?: Record<string, boolean>;
+    features?: Record<string, boolean>;
+    fiscalYear?: string;
+    valuationMethod?: string;
+    sector?: string;
+  }) => apiService.put<ApiResponse<any>>('/settings/app-config', data),
+
+  // Apply Industry/Sector Defaults
+  applyIndustryDefaults: (data: { industry: string; sector?: string }) =>
+    apiService.post<ApiResponse<any>>('/settings/apply-industry-defaults', data),
+
+  // Bulk User Import
+  bulkImportUsers: (csvContent: string, sendInvites = false) =>
+    apiService.post<ApiResponse<{
+      imported: number;
+      failed: number;
+      errors: { row: number; email: string; error: string }[];
+      users: { id: string; email: string; name: string }[];
+    }>>('/settings/users/bulk-import', { csvContent, sendInvites }),
+  getImportTemplate: () => apiService.get<string>('/settings/users/import-template'),
+
+  // Settings Export/Import
+  exportSettings: () => apiService.get<any>('/settings/export'),
+  importSettings: (data: any) => apiService.post<ApiResponse<{
+    imported: { company: boolean; sequences: number; workflows: number; ipWhitelist: number; expenseCategories: number };
+    errors: string[];
+  }>>('/settings/import', data),
+  // GSTIN Lookup
+  getGSTINDetails: (gstin: string) => apiService.get<ApiResponse<any>>(`/gstin/${gstin}`),
 };
 
 // ============ CRM ============
@@ -498,6 +789,65 @@ export const crmService = {
     const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
     return apiService.get<ApiResponse<any[]>>(`/crm/activities${query}`);
   },
+  getDashboard: () =>
+    apiService.get<ApiResponse<any>>('/crm/dashboard'),
+  getSalesFunnel: () =>
+    apiService.get<ApiResponse<any[]>>('/crm/sales-funnel'),
+};
+
+// ============ CALENDAR & TASKS ============
+export const calendarService = {
+  getActivities: (params?: { start?: string; end?: string; type?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/calendar/activities${query}`);
+  },
+  createTask: (data: {
+    subject: string;
+    description?: string;
+    date: string;
+    priority?: string;
+    leadId?: string;
+    partyId?: string;
+  }) => apiService.post<ApiResponse<any>>('/calendar/tasks', data),
+  updateTask: (id: string, data: {
+    isCompleted?: boolean;
+    priority?: string;
+    subject?: string;
+    description?: string;
+    date?: string;
+  }) => apiService.put<ApiResponse<any>>(`/calendar/tasks/${id}`, data),
+  deleteTask: (id: string) => apiService.delete<ApiResponse<void>>(`/calendar/tasks/${id}`),
+};
+
+// ============ PRODUCTION ============
+export const productionService = {
+  // BOMs
+  getBOMs: () => apiService.get<ApiResponse<any[]>>('/production/boms'),
+  getBOM: (id: string) => apiService.get<ApiResponse<any>>(`/production/boms/${id}`),
+  createBOM: (data: any) => apiService.post<ApiResponse<any>>('/production/boms', data),
+  updateBOM: (id: string, data: any) => apiService.put<ApiResponse<any>>(`/production/boms/${id}`, data),
+  deleteBOM: (id: string) => apiService.delete<ApiResponse<void>>(`/production/boms/${id}`),
+
+  // Work Orders
+  getWorkOrders: (params?: { status?: string; bomId?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/production/work-orders${query}`);
+  },
+  getWorkOrder: (id: string) => apiService.get<ApiResponse<any>>(`/production/work-orders/${id}`),
+  createWorkOrder: (data: any) => apiService.post<ApiResponse<any>>('/production/work-orders', data),
+  updateWorkOrder: (id: string, data: any) => apiService.put<ApiResponse<any>>(`/production/work-orders/${id}`, data),
+  deleteWorkOrder: (id: string) => apiService.delete<ApiResponse<void>>(`/production/work-orders/${id}`),
+
+  // Dashboard
+  getDashboard: () => apiService.get<ApiResponse<any>>('/production/dashboard'),
+
+  // Planning
+  getProductionPlans: () => apiService.get<ApiResponse<any[]>>('/production/plans'),
+  createProductionPlan: (data: any) => apiService.post<ApiResponse<any>>('/production/plans', data),
+
+  // Quality Control
+  getInspections: () => apiService.get<ApiResponse<any[]>>('/production/inspections'),
+  createInspection: (data: any) => apiService.post<ApiResponse<any>>('/production/inspections', data),
 };
 
 // ============ POS ============
@@ -508,6 +858,14 @@ export const posService = {
     apiService.post<ApiResponse<any>>('/pos/sessions/close', { sessionId, closingCash }),
   createOrder: (data: any) =>
     apiService.post<ApiResponse<any>>('/pos/orders', data),
+};
+
+// ============ ESCROW ============
+export const escrowService = {
+  create: (data: any) =>
+    apiService.post<ApiResponse<any>>('/escrow', data),
+  release: (id: string) =>
+    apiService.post<ApiResponse<any>>(`/escrow/${id}/release`, {}),
 };
 
 // ============ INVITES ============
@@ -606,72 +964,313 @@ export const accountingService = {
     partyId?: string;
     bankAccountId?: string;
   }) => apiService.post<ApiResponse<any>>('/accounting/ledgers', data),
-  getLedgerBalance: (id: string, asOfDate?: string) =>
-    apiService.get<ApiResponse<{ debit: number; credit: number; balance: number; type: 'Dr' | 'Cr' }>>(
-      `/accounting/ledgers/${id}/balance${asOfDate ? `?asOfDate=${asOfDate}` : ''}`
-    ),
 
-  // Vouchers (Journal Entries)
-  getVouchers: (filters?: { type?: string; from?: string; to?: string }) => {
-    const params = new URLSearchParams();
-    if (filters?.type) params.append('type', filters.type);
-    if (filters?.from) params.append('from', filters.from);
-    if (filters?.to) params.append('to', filters.to);
-    const queryString = params.toString();
-    return apiService.get<ApiResponse<any[]>>(`/accounting/vouchers${queryString ? `?${queryString}` : ''}`);
+  getLedgerBalance: (id: string, asOfDate?: string) => {
+    const query = asOfDate ? `?asOfDate=${asOfDate}` : '';
+    return apiService.get<ApiResponse<{ debit: number; credit: number; balance: number; type: 'Dr' | 'Cr' }>>(`/accounting/ledgers/${id}/balance${query}`);
+  },
+
+  // Vouchers
+  getVouchers: (params?: { type?: string; startDate?: string; endDate?: string }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<any[]>>(`/accounting/vouchers${query}`);
   },
   getVoucher: (id: string) => apiService.get<ApiResponse<any>>(`/accounting/vouchers/${id}`),
-  createVoucher: (data: {
-    date: string;
-    type: 'SALES' | 'PURCHASE' | 'PAYMENT' | 'RECEIPT' | 'CONTRA' | 'JOURNAL';
-    narration?: string;
-    postings: {
-      ledgerId: string;
-      amount: number;
-      type: 'DEBIT' | 'CREDIT';
-      narration?: string;
-    }[];
-  }) => apiService.post<ApiResponse<any>>('/accounting/vouchers', data),
-
-  // Receipts
-  getReceipts: () => apiService.get<ApiResponse<any>>('/accounting/receipts'),
-  createReceipt: (data: {
-    partyId: string;
-    amount: number;
-    date: string;
-    mode: 'CASH' | 'BANK';
-    reference?: string;
-    notes?: string;
-    bankAccountId?: string;
-  }) => apiService.post<ApiResponse<any>>('/accounting/receipts', data),
+  createVoucher: (data: any) => apiService.post<ApiResponse<any>>('/accounting/vouchers', data),
+  cancelVoucher: (id: string, reason: string) => apiService.post<ApiResponse<void>>(`/accounting/vouchers/${id}/cancel`, { reason }),
 
   // Reports
-  getTrialBalance: (asOfDate?: string) =>
-    apiService.get<ApiResponse<{
-      entries: {
-        ledgerId: string;
-        ledgerName: string;
-        ledgerCode: string;
-        groupName: string;
-        groupType: string;
-        debit: number;
-        credit: number;
-      }[];
-      totals: { debit: number; credit: number };
-    }>>(`/accounting/trial-balance${asOfDate ? `?asOfDate=${asOfDate}` : ''}`),
+  getTrialBalance: (asOfDate?: string) => {
+    const query = asOfDate ? `?asOfDate=${asOfDate}` : '';
+    return apiService.get<ApiResponse<any>>(`/accounting/trial-balance${query}`);
+  },
 };
 
+// ============ FINANCIAL YEAR MANAGEMENT ============
+export const financialYearService = {
+  getAll: () => apiService.get<ApiResponse<any[]>>('/financial-years'),
+  getCurrent: () => apiService.get<ApiResponse<any>>('/financial-years/current'),
+  create: (data: any) => apiService.post<ApiResponse<any>>('/financial-years', data),
+  lock: (id: string, reason: string) => apiService.post<ApiResponse<any>>(`/financial-years/${id}/lock`, { reason }),
+  unlock: (id: string, overrideNote: string) => apiService.post<ApiResponse<any>>(`/financial-years/${id}/unlock`, { overrideNote }),
+  setCurrent: (id: string) => apiService.post<ApiResponse<any>>(`/financial-years/${id}/set-current`, {}),
+
+  // Period Management
+  getPeriods: (fyId: string) => apiService.get<ApiResponse<any[]>>(`/financial-years/${fyId}/periods`),
+  lockPeriod: (periodId: string, isLocked: boolean, reason?: string) =>
+    apiService.post<ApiResponse<any>>(`/financial-years/periods/${periodId}/lock`, { isLocked, reason }),
+};
 
 // ============ AUDIT LOGS ============
 export const auditService = {
   getEntityLogs: (entityType: string, entityId: string) =>
     apiService.get<ApiResponse<any[]>>(`/audit/entity/${entityType}/${entityId}`),
 
-  getGlobalLogs: (params?: QueryParams) => {
-    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
-    return apiService.get<PaginatedResponse<any>>(`/audit/global${query}`);
+  getGlobalLogs: (params?: {
+    page?: number;
+    limit?: number;
+    entityType?: string;
+    action?: string;
+    search?: string;
+  }) => {
+    const query = params ? `?${new URLSearchParams(params as any)}` : '';
+    return apiService.get<ApiResponse<any>>(`/audit/global${query}`);
   },
 
-  verifyIntegrity: () =>
-    apiService.post<ApiResponse<any>>('/audit/verify', {}),
+  verifyIntegrity: () => apiService.post<ApiResponse<any>>('/audit/verify', {}),
 };
+
+
+// ============ USER & ROLE MANAGEMENT ============
+export const roleService = createExtendedCrudService<any, {
+  getRoles: () => Promise<ApiResponse<any[]>>;
+  updateRole: (id: string, data: any) => Promise<ApiResponse<any>>;
+  deleteRole: (id: string) => Promise<ApiResponse<void>>;
+}>('settings/roles', (endpoint) => ({
+  getRoles: () => apiService.get<ApiResponse<any[]>>(`/${endpoint}`),
+  updateRole: (id: string, data: any) => apiService.put<ApiResponse<any>>(`/${endpoint}/${id}`, data),
+  deleteRole: (id: string) => apiService.delete<ApiResponse<void>>(`/${endpoint}/${id}`),
+}));
+
+export const userService = createExtendedCrudService<any, {
+  getUsers: () => Promise<ApiResponse<any[]>>;
+  inviteUser: (data: any) => Promise<ApiResponse<any>>;
+  updateUser: (id: string, data: any) => Promise<ApiResponse<any>>;
+  deleteUser: (id: string) => Promise<ApiResponse<void>>;
+}>('settings/users', (endpoint) => ({
+  getUsers: () => apiService.get<ApiResponse<any[]>>(`/${endpoint}`),
+  inviteUser: (data: any) => apiService.post<ApiResponse<any>>(`/${endpoint}`, data),
+  updateUser: (id: string, data: any) => apiService.put<ApiResponse<any>>(`/${endpoint}/${id}`, data),
+  deleteUser: (id: string) => apiService.delete<ApiResponse<void>>(`/${endpoint}/${id}`),
+}));
+
+// ============ PROFILE MANAGEMENT ============
+export const profileService = {
+  getProfile: () => apiService.get<ApiResponse<any>>('/settings/profile'),
+  updateProfile: (data: {
+    name?: string;
+    phone?: string;
+    designation?: string;
+    bio?: string;
+    avatar?: string;
+    signature?: string;
+    preferences?: {
+      language?: string;
+      timezone?: string;
+      dateFormat?: string;
+      numberFormat?: string;
+      theme?: string;
+      currency?: string;
+    };
+    notificationSettings?: Record<string, boolean>;
+  }) => apiService.put<ApiResponse<any>>('/settings/profile', data),
+
+  changePassword: (data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) => apiService.put<ApiResponse<{ success: boolean; message: string }>>('/settings/profile/password', data),
+
+  updatePreferences: (preferences: {
+    language?: string;
+    timezone?: string;
+    dateFormat?: string;
+    numberFormat?: string;
+    theme?: string;
+    currency?: string;
+  }) => apiService.put<ApiResponse<{ preferences: any }>>('/settings/profile/preferences', { preferences }),
+
+  updateNotificationSettings: (notificationSettings: {
+    emailInvoice?: boolean;
+    emailPayment?: boolean;
+    emailLowStock?: boolean;
+    emailGST?: boolean;
+    emailExpenseApproval?: boolean;
+    mobileInvoice?: boolean;
+    mobilePayment?: boolean;
+    mobileLowStock?: boolean;
+    whatsappInvoice?: boolean;
+    whatsappPayment?: boolean;
+    inAppEnabled?: boolean;
+    inAppSound?: boolean;
+  }) => apiService.put<ApiResponse<{ notificationSettings: any }>>('/settings/profile/notifications', { notificationSettings }),
+};
+
+// ============ GSTIN LOOKUP ============
+export const gstinService = {
+  // Lookup GSTIN and fetch party details from government database
+  lookup: (gstin: string) =>
+    apiService.get<ApiResponse<{
+      gstin: string;
+      legalName: string;
+      tradeName: string | null;
+      status: string;
+      registrationDate: string | null;
+      businessType: string | null;
+      stateCode: string;
+      stateName: string;
+      address: {
+        building: string;
+        street: string;
+        city: string;
+        state: string;
+        pincode: string;
+        country: string;
+      };
+    }>>(`/gstin/${gstin}`),
+
+  // Validate GSTIN format only (no API call to government)
+  validate: (gstin: string) =>
+    apiService.get<ApiResponse<{
+      gstin: string;
+      isValid: boolean;
+      stateCode: string | null;
+      stateName: string | null;
+      pan: string | null;
+    }>>(`/gstin/validate/${gstin}`),
+};
+
+// ============ HSN CODE MANAGEMENT ============
+interface HSNCode {
+  id: string;
+  code: string;
+  description: string;
+  gstRate: number;
+  cgstRate?: number;
+  sgstRate?: number;
+  igstRate?: number;
+  unit?: string;
+  category?: string;
+  chapter?: string;
+  isService: boolean;
+  isActive: boolean;
+  matchScore?: number;
+}
+
+export const hsnService = {
+  // Search HSN codes with fuzzy matching
+  search: (query: string, options?: { limit?: number; category?: string; isService?: boolean }) => {
+    const params = new URLSearchParams({ q: query });
+    if (options?.limit) params.set('limit', options.limit.toString());
+    if (options?.category) params.set('category', options.category);
+    if (options?.isService !== undefined) params.set('isService', options.isService.toString());
+    return apiService.get<ApiResponse<HSNCode[]>>(`/hsn/search?${params}`);
+  },
+
+  // Get HSN code suggestions for a product name (uses fuzzy matching)
+  suggest: (productName: string, limit = 5) =>
+    apiService.get<ApiResponse<HSNCode[]>>(`/hsn/suggest?q=${encodeURIComponent(productName)}&limit=${limit}`),
+
+  // Get single HSN by code
+  getByCode: (code: string) =>
+    apiService.get<ApiResponse<HSNCode>>(`/hsn/${code}`),
+
+  // Get all HSN codes (paginated)
+  getAll: (params?: { page?: number; limit?: number; category?: string; isService?: boolean; gstRate?: number }) => {
+    const query = params ? `?${new URLSearchParams(params as Record<string, string>)}` : '';
+    return apiService.get<ApiResponse<{ data: HSNCode[]; pagination: any }>>(`/hsn${query}`);
+  },
+
+  // Create or update HSN code
+  create: (data: Partial<HSNCode>) =>
+    apiService.post<ApiResponse<HSNCode>>('/hsn', data),
+
+  // Bulk import HSN codes
+  import: (codes: Partial<HSNCode>[]) =>
+    apiService.post<ApiResponse<{ imported: number; skipped: number; errors: string[] }>>('/hsn/import', { codes }),
+
+  // Delete (deactivate) HSN code
+  delete: (code: string) =>
+    apiService.delete<ApiResponse<HSNCode>>(`/hsn/${code}`),
+
+  // Get unique categories for filtering
+  getCategories: () =>
+    apiService.get<ApiResponse<string[]>>('/hsn/categories'),
+};
+
+// ============ SEARCH ============
+export const searchService = {
+  globalSearch: (query: string) =>
+    apiService.get<ApiResponse<any[]>>(`/search/global?query=${encodeURIComponent(query)}`),
+};
+
+// ============ SETTINGS AUDIT LOGS ============
+export const auditLogsService = {
+  getLogs: (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    settingType?: string;
+    action?: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page.toString());
+    if (params.limit) query.append('limit', params.limit.toString());
+    if (params.search) query.append('search', params.search);
+    if (params.settingType) query.append('settingType', params.settingType);
+    if (params.action) query.append('action', params.action);
+    if (params.userId) query.append('userId', params.userId);
+    if (params.startDate) query.append('startDate', params.startDate.toISOString());
+    if (params.endDate) query.append('endDate', params.endDate.toISOString());
+
+    return apiService.get<PaginatedResponse<any>>(`/settings/audit-logs?${query.toString()}`);
+  },
+
+  getLogDetail: (id: string) =>
+    apiService.get<ApiResponse<any>>(`/settings/audit-logs/${id}`),
+
+  getStats: (days: number = 30) =>
+    apiService.get<ApiResponse<any>>(`/settings/audit-logs/stats?days=${days}`),
+
+  exportLogs: (params: any) =>
+    apiService.getBlob(`/settings/audit-logs/export?${new URLSearchParams(params)}`),
+};
+
+// ============ SETTINGS APPROVAL WORKFLOW ============
+export const approvalService = {
+  createRequest: (data: { settingType: string; changeData: any; reason: string }) =>
+    apiService.post<ApiResponse<any>>('/settings/approvals/request', data),
+
+  getRequests: (params: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page.toString());
+    if (params.limit) query.append('limit', params.limit.toString());
+    if (params.status) query.append('status', params.status);
+    return apiService.get<PaginatedResponse<any>>(`/settings/approvals?${query.toString()}`);
+  },
+
+  getPendingCount: () =>
+    apiService.get<ApiResponse<{ count: number }>>('/settings/approvals/pending-count'),
+
+  approveRequest: (id: string) =>
+    apiService.post<ApiResponse<any>>(`/settings/approvals/${id}/approve`, {}),
+
+  rejectRequest: (id: string, reason: string) =>
+    apiService.post<ApiResponse<any>>(`/settings/approvals/${id}/reject`, { rejectionReason: reason }),
+};
+
+// ============ TWO-FACTOR AUTH (2FA) ============
+export const auth2faService = {
+  getStatus: () =>
+    apiService.get<ApiResponse<{ enabled: boolean; method?: string; backupCodesRemaining?: number }>>('/auth/2fa/status'),
+
+  setup: () =>
+    apiService.post<ApiResponse<{ secret: string; qrCode: string; manualEntryKey: string }>>('/auth/2fa/setup', {}),
+
+  verifySetup: (code: string) =>
+    apiService.post<ApiResponse<{ backupCodes: string[] }>>('/auth/2fa/verify-setup', { code }),
+
+  verify: (userId: string, code: string, isBackupCode?: boolean) =>
+    apiService.post<ApiResponse<any>>('/auth/2fa/verify', { userId, code, isBackupCode }),
+
+  disable: (password: string, code?: string) =>
+    apiService.post<ApiResponse<any>>('/auth/2fa/disable', { password, code }),
+
+  generateBackupCodes: (password: string) =>
+    apiService.post<ApiResponse<{ backupCodes: string[] }>>('/auth/2fa/backup-codes', { password }),
+};
+
+

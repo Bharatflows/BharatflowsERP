@@ -109,15 +109,15 @@ export function PayrollProcessing() {
     switch (status) {
       case "paid":
         return (
-          <Badge className="bg-[#10b981] text-white">
+          <Badge className="bg-success text-white">
             <CheckCircle className="size-3 mr-1" />
             Paid
           </Badge>
         );
       case "processed":
-        return <Badge className="bg-[#2563eb] text-white">Processed</Badge>;
+        return <Badge className="bg-primary text-white">Processed</Badge>;
       case "pending":
-        return <Badge className="bg-[#f97316] text-white">Pending</Badge>;
+        return <Badge className="bg-warning text-white">Pending</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -136,7 +136,7 @@ export function PayrollProcessing() {
                   ₹{totalGrossSalary.toLocaleString("en-IN")}
                 </p>
               </div>
-              <IndianRupee className="size-8 text-[#2563eb]" />
+              <IndianRupee className="size-8 text-primary" />
             </div>
           </CardContent>
         </Card>
@@ -145,11 +145,11 @@ export function PayrollProcessing() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-2">Total Deductions</p>
-                <p className="text-foreground text-[#ef4444]">
+                <p className="text-foreground text-error">
                   ₹{totalDeductions.toLocaleString("en-IN")}
                 </p>
               </div>
-              <IndianRupee className="size-8 text-[#ef4444]" />
+              <IndianRupee className="size-8 text-error" />
             </div>
           </CardContent>
         </Card>
@@ -158,11 +158,11 @@ export function PayrollProcessing() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-muted-foreground mb-2">Net Payable</p>
-                <p className="text-foreground text-[#10b981]">
+                <p className="text-foreground text-success">
                   ₹{totalNetSalary.toLocaleString("en-IN")}
                 </p>
               </div>
-              <IndianRupee className="size-8 text-[#10b981]" />
+              <IndianRupee className="size-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -173,7 +173,7 @@ export function PayrollProcessing() {
                 <p className="text-muted-foreground mb-2">Employees</p>
                 <p className="text-foreground">{payroll.length}</p>
               </div>
-              <CheckCircle className="size-8 text-[#10b981]" />
+              <CheckCircle className="size-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -246,10 +246,10 @@ export function PayrollProcessing() {
                     <TableCell className="text-right">
                       ₹{entry.grossSalary.toLocaleString("en-IN")}
                     </TableCell>
-                    <TableCell className="text-right text-[#ef4444] hidden lg:table-cell">
+                    <TableCell className="text-right text-error hidden lg:table-cell">
                       ₹{entry.deductions.toLocaleString("en-IN")}
                     </TableCell>
-                    <TableCell className="text-right text-[#10b981]">
+                    <TableCell className="text-right text-success">
                       ₹{entry.netSalary.toLocaleString("en-IN")}
                     </TableCell>
                     <TableCell>{getStatusBadge(entry.status)}</TableCell>
@@ -280,13 +280,13 @@ export function PayrollProcessing() {
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Total Deductions</p>
-                <p className="text-foreground text-[#ef4444]">
+                <p className="text-foreground text-error">
                   -₹{totalDeductions.toLocaleString("en-IN")}
                 </p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Total Net Payable</p>
-                <p className="text-foreground text-[#10b981]">
+                <p className="text-foreground text-success">
                   ₹{totalNetSalary.toLocaleString("en-IN")}
                 </p>
               </div>

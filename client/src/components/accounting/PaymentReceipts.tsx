@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { accountingService, partiesService } from '../../services/modules.service';
+import { accountingService, partiesService, bankingService } from '../../services/modules.service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Plus, RefreshCw, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { ModuleHeader } from "../ui/module-header";
+import { Receipt } from 'lucide-react';
 
-const PaymentReceipts = () => {
+export const PaymentReceipts = () => {
     const queryClient = useQueryClient();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -24,7 +26,8 @@ const PaymentReceipts = () => {
         date: new Date().toISOString().split('T')[0],
         mode: 'CASH',
         reference: '',
-        notes: ''
+        notes: '',
+        bankAccountId: ''
     });
 
     // Fetch Receipts
@@ -39,6 +42,11 @@ const PaymentReceipts = () => {
         queryFn: () => partiesService.getAll({ limit: 100 }) // Fetch top 100 or use search
     });
 
+    const { data: accountsResponse } = useQuery({
+        queryKey: ['bank-accounts'],
+        queryFn: () => bankingService.getAll()
+    });
+
     const createMutation = useMutation({
         mutationFn: (data: any) => accountingService.createReceipt(data),
         onSuccess: () => {
@@ -51,7 +59,8 @@ const PaymentReceipts = () => {
                 date: new Date().toISOString().split('T')[0],
                 mode: 'CASH',
                 reference: '',
-                notes: ''
+                notes: '',
+                bankAccountId: ''
             });
         },
         onError: (error: any) => {
@@ -73,128 +82,149 @@ const PaymentReceipts = () => {
 
     const receipts = receiptsResponse?.data?.receipts || [];
     const parties = partiesResponse?.data || [];
+    const accounts = accountsResponse?.data || [];
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-                        Payment Receipts
-                    </h1>
-                    <p className="text-muted-foreground mt-1">
-                        Manage received payments from parties
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isLoading}>
-                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                    </Button>
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="gap-2 shadow-lg hover:shadow-primary/20 transition-all">
-                                <Plus className="h-4 w-4" /> Create Receipt
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                                <DialogTitle>Create New Receipt</DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="date">Date</Label>
-                                        <Input
-                                            id="date"
-                                            type="date"
-                                            value={formData.date}
-                                            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                                            required
-                                        />
+            <ModuleHeader
+                title="Payment Receipts"
+                description="Manage and record incoming payments from parties"
+                showBackButton={true}
+                backTo="/accounting"
+                icon={<Receipt className="size-5 text-primary" />}
+                actions={
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+                            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
+                        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="gap-2 shadow-lg hover:shadow-primary/20 transition-all">
+                                    <Plus className="h-4 w-4" /> Create Receipt
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px]">
+                                <DialogHeader>
+                                    <DialogTitle>Create New Receipt</DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="date">Date</Label>
+                                            <Input
+                                                id="date"
+                                                type="date"
+                                                value={formData.date}
+                                                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="amount">Amount (₹)</Label>
+                                            <Input
+                                                id="amount"
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.amount}
+                                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                                                required
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="amount">Amount (₹)</Label>
-                                        <Input
-                                            id="amount"
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.amount}
-                                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                            required
-                                        />
-                                    </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="party">Received From</Label>
-                                    <Select
-                                        value={formData.partyId}
-                                        onValueChange={(val) => setFormData({ ...formData, partyId: val })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Party" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {parties.map((party: any) => (
-                                                <SelectItem key={party.id} value={party.id}>
-                                                    {party.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="mode">Payment Mode</Label>
+                                        <Label htmlFor="party">Received From</Label>
                                         <Select
-                                            value={formData.mode}
-                                            onValueChange={(val) => setFormData({ ...formData, mode: val })}
+                                            value={formData.partyId}
+                                            onValueChange={(val) => setFormData({ ...formData, partyId: val })}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue />
+                                                <SelectValue placeholder="Select Party" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="CASH">Cash</SelectItem>
-                                                <SelectItem value="BANK">Bank Transfer</SelectItem>
-                                                <SelectItem value="UPI">UPI</SelectItem>
+                                                {parties.map((party: any) => (
+                                                    <SelectItem key={party.id} value={party.id}>
+                                                        {party.name}
+                                                    </SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="mode">Payment Mode</Label>
+                                            <Select
+                                                value={formData.mode}
+                                                onValueChange={(val) => setFormData({ ...formData, mode: val })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="CASH">Cash</SelectItem>
+                                                    <SelectItem value="BANK">Bank Transfer</SelectItem>
+                                                    <SelectItem value="UPI">UPI</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {(formData.mode === 'BANK' || formData.mode === 'UPI') && (
+                                            <div className="space-y-2">
+                                                <Label htmlFor="bankAccount">Deposit To</Label>
+                                                <Select
+                                                    value={formData.bankAccountId}
+                                                    onValueChange={(val) => setFormData({ ...formData, bankAccountId: val })}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select Account" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {accounts.map((acc: any) => (
+                                                            <SelectItem key={acc.id} value={acc.id}>
+                                                                {acc.name} ({acc.bankName})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                        <div className="space-y-2">
+                                            <Label htmlFor="reference">Reference / Ref #</Label>
+                                            <Input
+                                                id="reference"
+                                                value={formData.reference}
+                                                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                                                placeholder="Cheque No / Transaction ID"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
-                                        <Label htmlFor="reference">Reference / Ref #</Label>
-                                        <Input
-                                            id="reference"
-                                            value={formData.reference}
-                                            onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                                            placeholder="Cheque No / Transaction ID"
+                                        <Label htmlFor="notes">Notes / Narration</Label>
+                                        <Textarea
+                                            id="notes"
+                                            value={formData.notes}
+                                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                            placeholder="Optional notes..."
                                         />
                                     </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="notes">Notes / Narration</Label>
-                                    <Textarea
-                                        id="notes"
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                        placeholder="Optional notes..."
-                                    />
-                                </div>
-
-                                <DialogFooter>
-                                    <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" disabled={createMutation.isPending}>
-                                        {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                        Create Receipt
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button type="submit" disabled={createMutation.isPending}>
+                                            {createMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                            Create Receipt
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                }
+            />
 
             <Card className="border-border/50 shadow-sm backdrop-blur-sm bg-card/50">
                 <CardContent className="p-0">
@@ -225,7 +255,7 @@ const PaymentReceipts = () => {
                                 </TableRow>
                             ) : (
                                 receipts.map((receipt: any) => (
-                                    <TableRow key={receipt.id} className="group hover:bg-muted/50 transition-colors">
+                                    <TableRow key={receipt.id} className="group hover:bg-muted transition-colors">
                                         <TableCell>{format(new Date(receipt.date), 'dd MMM yyyy')}</TableCell>
                                         <TableCell className="font-mono text-xs">{receipt.voucherNumber}</TableCell>
                                         <TableCell className="font-medium">{receipt.partyName}</TableCell>

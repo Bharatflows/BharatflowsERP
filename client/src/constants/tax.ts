@@ -41,6 +41,53 @@ export const calculateTax = (amount: number, gstRate: string, isInterState: bool
     return { igst: 0, cgst: taxAmount / 2, sgst: taxAmount / 2, total: taxAmount };
 };
 
+// ============================================
+// GST MODES - Inclusive / Exclusive
+// ============================================
+export const GST_MODES = [
+    { value: "exclusive", label: "GST Exclusive", description: "Tax added on top of price" },
+    { value: "inclusive", label: "GST Inclusive", description: "Price already includes tax" },
+] as const;
+
+export type GSTMode = "inclusive" | "exclusive";
+
+/**
+ * GST Exclusive: Price is base price, tax is added on top.
+ *   Base = price, Tax = price × rate / 100, Total = price + tax
+ *
+ * GST Inclusive: Price already includes tax, back-calculate base.
+ *   Base = price × 100 / (100 + rate), Tax = price - base, Total = price
+ */
+export const calculateGST = (
+    price: number,
+    gstRate: string,
+    isInterState: boolean,
+    mode: GSTMode = "exclusive"
+) => {
+    const rate = getGSTRate(gstRate);
+
+    let baseAmount: number;
+    let taxAmount: number;
+    let totalAmount: number;
+
+    if (mode === "inclusive") {
+        // Price already includes GST — back-calculate
+        baseAmount = (price * 100) / (100 + rate);
+        taxAmount = price - baseAmount;
+        totalAmount = price;
+    } else {
+        // Price is exclusive — add GST on top
+        baseAmount = price;
+        taxAmount = (price * rate) / 100;
+        totalAmount = price + taxAmount;
+    }
+
+    if (isInterState) {
+        return { baseAmount, igst: taxAmount, cgst: 0, sgst: 0, total: taxAmount, totalAmount };
+    }
+    return { baseAmount, igst: 0, cgst: taxAmount / 2, sgst: taxAmount / 2, total: taxAmount, totalAmount };
+};
+
 // Types
 export type GSTRate = (typeof GST_RATES)[number]["value"];
 export type TaxType = keyof typeof TAX_TYPES;

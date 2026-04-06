@@ -60,7 +60,7 @@ export function initializeSocket(httpServer: HttpServer): SocketIOServer {
             }
 
             socket.userId = user.id;
-            socket.companyId = user.companyId;
+            socket.companyId = user.companyId ?? undefined;  // P0-1: companyId is now optional
             socket.userName = user.name;
 
             next();
@@ -193,7 +193,6 @@ export function initializeSocket(httpServer: HttpServer): SocketIOServer {
                             messageId: msg.id,
                             userId,
                         })),
-                        skipDuplicates: true,
                     });
 
                     // Notify senders their messages were read
@@ -274,4 +273,23 @@ export function getOnlineUsersInCompany(userIds: string[]): string[] {
     return userIds.filter((id) => onlineUsers.has(id));
 }
 
-export default { initializeSocket, isUserOnline, getOnlineUsersInCompany };
+/**
+ * Send a real-time notification to a specific user
+ * Called by NotificationService after saving to database
+ */
+let ioInstance: SocketIOServer | null = null;
+
+export function setIOInstance(io: SocketIOServer) {
+    ioInstance = io;
+}
+
+export function sendNotificationToUser(userId: string, notification: any) {
+    if (ioInstance) {
+        ioInstance.to(`user:${userId}`).emit('notification:new', notification);
+        logger.info(`Socket notification sent to user ${userId}`);
+    } else {
+        logger.warn('Socket.IO instance not available for sending notification');
+    }
+}
+
+export default { initializeSocket, isUserOnline, getOnlineUsersInCompany, sendNotificationToUser };

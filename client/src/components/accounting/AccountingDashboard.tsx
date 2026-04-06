@@ -17,9 +17,12 @@ import {
     Receipt,
     PiggyBank,
     DollarSign,
+    CheckCircle,
 } from "lucide-react";
 import { accountingService } from "@/services/modules.service";
 import { toast } from "sonner";
+import { ModuleHeader } from "../ui/module-header";
+import { cn } from "@/lib/utils";
 
 interface TrialBalanceData {
     entries: {
@@ -47,7 +50,7 @@ interface Voucher {
     }[];
 }
 
-export function AccountingDashboard() {
+export function AccountingDashboard({ hideStats = false }: { hideStats?: boolean }) {
     const [trialBalance, setTrialBalance] = useState<TrialBalanceData | null>(null);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [loading, setLoading] = useState(true);
@@ -61,7 +64,7 @@ export function AccountingDashboard() {
                 accountingService.getVouchers(),
             ]);
 
-            if (tbRes.success) setTrialBalance(tbRes.data);
+            if (tbRes.success && tbRes.data) setTrialBalance(tbRes.data);
             if (vouchersRes.success) setVouchers(vouchersRes.data || []);
         } catch (error) {
             console.error(error);
@@ -113,17 +116,17 @@ export function AccountingDashboard() {
     const getVoucherTypeColor = (type: string) => {
         switch (type) {
             case "SALES":
-                return "bg-green-100 text-green-700";
+                return "badge-paid";
             case "PURCHASE":
-                return "bg-blue-100 text-blue-700";
+                return "badge-sent";
             case "RECEIPT":
-                return "bg-emerald-100 text-emerald-700";
+                return "badge-completed";
             case "PAYMENT":
-                return "bg-red-100 text-red-700";
+                return "badge-overdue";
             case "JOURNAL":
-                return "bg-purple-100 text-purple-700";
+                return "badge-active";
             default:
-                return "bg-gray-100 text-gray-700";
+                return "badge-draft";
         }
     };
 
@@ -142,113 +145,143 @@ export function AccountingDashboard() {
     return (
         <div className="space-y-6 p-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                        Accounting
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Double-entry ledger system with real-time financial insights
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={fetchData}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
-                    </Button>
-                    {!hasData && (
-                        <Button onClick={handleSeedDefaults} disabled={seeding}>
-                            {seeding ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                                <Plus className="h-4 w-4 mr-2" />
-                            )}
-                            Setup Chart of Accounts
+            <ModuleHeader
+                title="Accounting"
+                description="Double-entry ledger system with real-time financial insights"
+                showBackButton={true}
+                backTo="/dashboard"
+                icon={<BookOpen className="size-5 text-primary" />}
+                actions={
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={fetchData}>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Refresh
                         </Button>
-                    )}
-                </div>
-            </div>
+                        {!hasData && (
+                            <Button size="sm" onClick={handleSeedDefaults} disabled={seeding}>
+                                {seeding ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Plus className="h-4 w-4 mr-2" />
+                                )}
+                                Setup Chart of Accounts
+                            </Button>
+                        )}
+                    </div>
+                }
+            />
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {/* Assets */}
-                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="bg-blue-500 p-2 rounded-lg">
-                                <Building className="h-5 w-5 text-white" />
-                            </div>
-                            <TrendingUp className="h-4 w-4 text-blue-500" />
+            {!hideStats && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {/* Assets */}
+                    <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-primary to-primary/80 text-white group">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 transition-opacity group-hover:opacity-20">
+                            <Building className="size-16 rotate-12" />
                         </div>
-                        <p className="text-sm text-blue-600 mt-3 font-medium">Total Assets</p>
-                        <p className="text-2xl font-bold text-blue-700">{formatCurrency(assetTotal)}</p>
-                    </CardContent>
-                </Card>
+                        <CardContent className="p-6 relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <Building className="size-5 text-white" />
+                                </div>
+                                <span className="text-sm font-medium text-white/90">Total Assets</span>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(assetTotal)}</h3>
+                            <p className="text-xs text-white/70 mt-4 flex items-center gap-1">
+                                <TrendingUp className="size-3" />
+                                Current valuation
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                {/* Liabilities */}
-                <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="bg-red-500 p-2 rounded-lg">
-                                <Wallet className="h-5 w-5 text-white" />
-                            </div>
-                            <TrendingDown className="h-4 w-4 text-red-500" />
+                    {/* Liabilities */}
+                    <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-rose-500 to-red-600 text-white group">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 transition-opacity group-hover:opacity-20">
+                            <Wallet className="size-16 -rotate-12" />
                         </div>
-                        <p className="text-sm text-red-600 mt-3 font-medium">Total Liabilities</p>
-                        <p className="text-2xl font-bold text-red-700">{formatCurrency(liabilityTotal)}</p>
-                    </CardContent>
-                </Card>
+                        <CardContent className="p-6 relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <Wallet className="size-5 text-white" />
+                                </div>
+                                <span className="text-sm font-medium text-white/90">Total Liabilities</span>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(liabilityTotal)}</h3>
+                            <p className="text-xs text-white/70 mt-4 flex items-center gap-1">
+                                <TrendingDown className="size-3" />
+                                Outstanding debt
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                {/* Income */}
-                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="bg-green-500 p-2 rounded-lg">
-                                <TrendingUp className="h-5 w-5 text-white" />
-                            </div>
-                            <Receipt className="h-4 w-4 text-green-500" />
+                    {/* Income */}
+                    <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white group">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 transition-opacity group-hover:opacity-20">
+                            <Receipt className="size-16 rotate-6" />
                         </div>
-                        <p className="text-sm text-green-600 mt-3 font-medium">Total Income</p>
-                        <p className="text-2xl font-bold text-green-700">{formatCurrency(incomeTotal)}</p>
-                    </CardContent>
-                </Card>
+                        <CardContent className="p-6 relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <TrendingUp className="size-5 text-white" />
+                                </div>
+                                <span className="text-sm font-medium text-white/90">Total Income</span>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(incomeTotal)}</h3>
+                            <p className="text-xs text-white/70 mt-4 flex items-center gap-1">
+                                <CheckCircle className="size-3" />
+                                Revenue generated
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                {/* Expenses */}
-                <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="bg-orange-500 p-2 rounded-lg">
-                                <PiggyBank className="h-5 w-5 text-white" />
-                            </div>
-                            <TrendingDown className="h-4 w-4 text-orange-500" />
+                    {/* Expenses */}
+                    <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-orange-500 to-amber-600 text-white group">
+                        <div className="absolute top-0 right-0 p-3 opacity-10 transition-opacity group-hover:opacity-20">
+                            <PiggyBank className="size-16 -rotate-6" />
                         </div>
-                        <p className="text-sm text-orange-600 mt-3 font-medium">Total Expenses</p>
-                        <p className="text-2xl font-bold text-orange-700">{formatCurrency(expenseTotal)}</p>
-                    </CardContent>
-                </Card>
+                        <CardContent className="p-6 relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <TrendingDown className="size-5 text-white" />
+                                </div>
+                                <span className="text-sm font-medium text-white/90">Total Expenses</span>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(expenseTotal)}</h3>
+                            <p className="text-xs text-white/70 mt-4 flex items-center gap-1">
+                                <FileText className="size-3" />
+                                Operating costs
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                {/* Net Profit/Loss */}
-                <Card className={`bg-gradient-to-br ${netProfit >= 0 ? "from-emerald-50 to-emerald-100/50 border-emerald-200" : "from-rose-50 to-rose-100/50 border-rose-200"}`}>
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className={`${netProfit >= 0 ? "bg-emerald-500" : "bg-rose-500"} p-2 rounded-lg`}>
-                                <DollarSign className="h-5 w-5 text-white" />
-                            </div>
-                            {netProfit >= 0 ? (
-                                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                            ) : (
-                                <TrendingDown className="h-4 w-4 text-rose-500" />
-                            )}
+                    {/* Net Profit/Loss */}
+                    <Card className={cn(
+                        "relative overflow-hidden border-0 shadow-lg text-white group transition-all duration-300",
+                        netProfit >= 0
+                            ? "bg-gradient-to-br from-primary to-primary/80"
+                            : "bg-gradient-to-br from-red-600 to-orange-600"
+                    )}>
+                        <div className="absolute top-0 right-0 p-3 opacity-10 transition-opacity group-hover:opacity-20">
+                            <DollarSign className="size-16" />
                         </div>
-                        <p className={`text-sm mt-3 font-medium ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                            {netProfit >= 0 ? "Net Profit" : "Net Loss"}
-                        </p>
-                        <p className={`text-2xl font-bold ${netProfit >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                            {formatCurrency(netProfit)}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
+                        <CardContent className="p-6 relative">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <DollarSign className="size-5 text-white" />
+                                </div>
+                                <span className="text-sm font-medium text-white/90">
+                                    {netProfit >= 0 ? "Net Profit" : "Net Loss"}
+                                </span>
+                            </div>
+                            <h3 className="text-3xl font-bold tracking-tight">{formatCurrency(netProfit)}</h3>
+                            <p className="text-xs text-white/70 mt-4 flex items-center gap-1">
+                                {netProfit >= 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                                Current margin
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             {/* Quick Actions & Recent Vouchers */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -315,7 +348,7 @@ export function AccountingDashboard() {
                                 {vouchers.slice(0, 5).map((voucher) => (
                                     <div
                                         key={voucher.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted transition-colors"
                                     >
                                         <div className="flex items-center gap-3">
                                             <Badge className={getVoucherTypeColor(voucher.type)} variant="secondary">

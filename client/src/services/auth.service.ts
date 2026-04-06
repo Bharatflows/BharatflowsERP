@@ -12,6 +12,9 @@ export const authService = {
 
     if (response.data?.token) {
       apiService.setToken(response.data.token);
+      if (response.data.refreshToken) {
+        apiService.setRefreshToken(response.data.refreshToken);
+      }
     }
 
     return response.data as AuthResponse;
@@ -25,11 +28,23 @@ export const authService = {
     phone: string;
     companyName: string;
     gstin?: string;
+    // New optional fields for onboarding
+    legalType?: string;
+    yearEstablished?: string;
+    employeesCount?: string;
+    primaryCategoryId?: string;
+    industryIds?: string[];
+    activityIds?: string[];
+    capabilityIds?: string[];
+    productNames?: string[];
   }): Promise<AuthResponse> {
     const response = await apiService.post<ApiResponse<AuthResponse>>('/auth/register', data);
 
     if (response.data?.token) {
       apiService.setToken(response.data.token);
+      if (response.data.refreshToken) {
+        apiService.setRefreshToken(response.data.refreshToken);
+      }
     }
 
     return response.data as AuthResponse;
@@ -48,6 +63,25 @@ export const authService = {
 
     if (response.data?.token) {
       apiService.setToken(response.data.token);
+      if (response.data.refreshToken) {
+        apiService.setRefreshToken(response.data.refreshToken);
+      }
+    }
+
+    return response.data as AuthResponse;
+  },
+
+  // Google Login
+  async googleLogin(token: string): Promise<AuthResponse> {
+    const response = await apiService.post<ApiResponse<AuthResponse>>('/auth/google', {
+      token,
+    });
+
+    if (response.data?.token) {
+      apiService.setToken(response.data.token);
+      if (response.data.refreshToken) {
+        apiService.setRefreshToken(response.data.refreshToken);
+      }
     }
 
     return response.data as AuthResponse;
@@ -83,8 +117,24 @@ export const authService = {
 
     if (response.data?.token) {
       apiService.setToken(response.data.token);
+      if (response.data.refreshToken) {
+        apiService.setRefreshToken(response.data.refreshToken);
+      }
     }
 
     return response.data as AuthResponse;
+  },
+  // Update Profile
+  async updateProfile(data: { name?: string; phone?: string; preferences?: any }): Promise<{ user: User; message: string }> {
+    const response = await apiService.put<ApiResponse<{ user: User }>>('/auth/update-profile', data);
+    return {
+      user: response.data?.user as User,
+      message: response.message || 'Profile updated successfully'
+    };
+  },
+
+  // Public GSTIN Lookup (for registration)
+  async getPublicGSTINDetails(gstin: string): Promise<ApiResponse<any>> {
+    return await apiService.get<ApiResponse<any>>(`/gstin/public/${gstin}`);
   },
 };

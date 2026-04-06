@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.convertSalesOrderToInvoice = exports.deleteSalesOrder = exports.updateSalesOrder = exports.createSalesOrder = exports.getSalesOrder = exports.getSalesOrders = void 0;
+exports.convertSalesOrderToChallan = exports.convertSalesOrderToInvoice = exports.deleteSalesOrder = exports.updateSalesOrder = exports.createSalesOrder = exports.getSalesOrder = exports.getSalesOrders = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const logger_1 = __importDefault(require("../config/logger"));
 const sequenceService_1 = require("../services/sequenceService");
+const eventBus_1 = require("../services/eventBus");
 // @desc    Get all sales orders
 // @route   GET /api/v1/sales/orders
 // @access  Private
@@ -22,7 +23,7 @@ const getSalesOrders = async (req, res) => {
         }
         if (search) {
             where.OR = [
-                { orderNumber: { contains: search, mode: 'insensitive' } },
+                { orderNumber: { contains: search } },
             ];
         }
         const [orders, total] = await Promise.all([
@@ -149,6 +150,37 @@ const createSalesOrder = async (req, res) => {
                 customer: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.SALES_ORDER_CREATED,
+            aggregateType: 'SalesOrder',
+            aggregateId: order.id,
+            payload: order,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        // Auto-create a delivery task if expected date is provided
+        if (expectedDate && order.status !== 'CANCELLED') {
+            try {
+                await prisma_1.default.activity.create({
+                    data: {
+                        companyId: req.user.companyId,
+                        type: 'TASK',
+                        subject: `Delivery: ${orderNumber}`,
+                        description: `Scheduled delivery for order ${orderNumber} to ${order.customer?.name}`,
+                        date: new Date(expectedDate),
+                        priority: 'HIGH',
+                        isCompleted: false,
+                        partyId: customerId,
+                        createdBy: req.user.id
+                    }
+                });
+            }
+            catch (activityError) {
+                logger_1.default.error('Failed to auto-create delivery task:', activityError);
+                // Don't fail the whole order creation if activity fails
+            }
+        }
         return res.status(201).json({
             success: true,
             message: 'Sales order created successfully',
@@ -225,6 +257,15 @@ const updateSalesOrder = async (req, res) => {
                 customer: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.SALES_ORDER_UPDATED,
+            aggregateType: 'SalesOrder',
+            aggregateId: order.id,
+            payload: order,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         return res.status(200).json({
             success: true,
             message: 'Sales order updated successfully',
@@ -244,6 +285,7 @@ exports.updateSalesOrder = updateSalesOrder;
 // @desc    Delete sales order
 // @route   DELETE /api/v1/sales/orders/:id
 // @access  Private
+// H2: STRICT delete blocking - only DRAFT orders can be deleted
 const deleteSalesOrder = async (req, res) => {
     try {
         const { id } = req.params;
@@ -256,9 +298,29 @@ const deleteSalesOrder = async (req, res) => {
                 message: 'Sales order not found'
             });
         }
+        // H2: Block deletion of non-DRAFT orders
+        if (existingOrder.status !== 'DRAFT') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot delete ${existingOrder.status} sales order. Only DRAFT orders can be deleted. Use CANCEL flow instead.`,
+                code: 'INVALID_STATUS_FOR_DELETE'
+            });
+        }
         await prisma_1.default.salesOrder.delete({
             where: { id }
         });
+        // Decrement the sequence number to reuse the freed number
+        await (0, sequenceService_1.decrementSequence)(req.user.companyId, 'SALES_ORDER');
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.SALES_ORDER_DELETED,
+            aggregateType: 'SalesOrder',
+            aggregateId: existingOrder.id,
+            payload: existingOrder,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        logger_1.default.info(`[H2] Sales Order ${existingOrder.orderNumber} deleted (status was DRAFT)`);
         return res.status(200).json({
             success: true,
             message: 'Sales order deleted successfully'
@@ -327,6 +389,15 @@ const convertSalesOrderToInvoice = async (req, res) => {
                 items: true
             }
         });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.INVOICE_CREATED,
+            aggregateType: 'Invoice',
+            aggregateId: invoice.id,
+            payload: invoice,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
         // Optionally update order status
         await prisma_1.default.salesOrder.update({
             where: { id },
@@ -348,4 +419,80 @@ const convertSalesOrderToInvoice = async (req, res) => {
     }
 };
 exports.convertSalesOrderToInvoice = convertSalesOrderToInvoice;
+// @desc    Convert sales order to Delivery Challan
+// @route   POST /api/v1/sales/orders/:id/challan
+// @access  Private
+const convertSalesOrderToChallan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const order = await prisma_1.default.salesOrder.findUnique({
+            where: { id },
+            include: {
+                items: true
+            }
+        });
+        if (!order || order.companyId !== req.user.companyId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Sales order not found'
+            });
+        }
+        // Generate Challan number
+        const challanNumber = await (0, sequenceService_1.getNextNumber)(req.user.companyId, 'DELIVERY_CHALLAN');
+        // Create DC from order data
+        const challan = await prisma_1.default.deliveryChallan.create({
+            data: {
+                companyId: req.user.companyId,
+                customerId: order.customerId,
+                challanNumber,
+                challanDate: new Date(),
+                status: 'DRAFT',
+                subtotal: order.subtotal,
+                totalAmount: order.totalAmount, // DC usually doesn't have tax, but we populate for reference
+                notes: `Converted from Sales Order #${order.orderNumber}`,
+                salesOrderId: order.id,
+                items: {
+                    create: order.items.map(item => ({
+                        productId: item.productId,
+                        productName: item.productName || 'Unknown Product',
+                        quantity: item.quantity,
+                        rate: item.rate,
+                        total: item.total
+                    }))
+                }
+            },
+            include: {
+                items: true
+            }
+        });
+        // Emit domain event
+        await eventBus_1.eventBus.emit({
+            companyId: req.user.companyId,
+            eventType: eventBus_1.EventTypes.DELIVERY_CHALLAN_CREATED,
+            aggregateType: 'DeliveryChallan',
+            aggregateId: challan.id,
+            payload: challan,
+            metadata: { userId: req.user.id, source: 'api' }
+        });
+        // Update Sales Order relation/status?
+        await prisma_1.default.salesOrder.update({
+            where: { id },
+            data: { status: 'CONFIRMED' } // Assuming generating DC confirms the order
+        });
+        return res.status(200).json({
+            success: true,
+            message: 'Sales order converted to Delivery Challan successfully',
+            data: { challan }
+        });
+    }
+    catch (error) {
+        logger_1.default.error('Convert sales order to challan error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error converting sales order to challan',
+            error: error.message
+        });
+    }
+};
+exports.convertSalesOrderToChallan = convertSalesOrderToChallan;
 //# sourceMappingURL=salesOrdersController.js.map

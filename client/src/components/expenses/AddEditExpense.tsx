@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { expensesService } from "../../services/modules.service";
+import { expensesService, partiesService } from "../../services/modules.service";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -13,11 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { SearchableSelect } from "../ui/searchable-select";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { cn } from "../../lib/utils";
 import { CalendarIcon, Upload, X, ArrowLeft, Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Party } from "../../types";
 
 interface AddEditExpenseProps {
   expenseId?: string | null;
@@ -31,6 +33,7 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
   const [expenseNumber, setExpenseNumber] = useState<string | null>(null);
   const [expenseStatus, setExpenseStatus] = useState<string>("PENDING");
   const [canEdit, setCanEdit] = useState(true);
+  const [suppliers, setSuppliers] = useState<Party[]>([]);
 
   const [formData, setFormData] = useState({
     date: new Date(),
@@ -46,12 +49,24 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
 
   const [receipt, setReceipt] = useState<File | null>(null);
 
-  // Fetch expense data when in edit mode
+  // Fetch expense data and suppliers
   useEffect(() => {
+    fetchSuppliers();
     if (isEditMode && expenseId) {
       fetchExpenseData();
     }
   }, [expenseId, isEditMode]);
+
+  const fetchSuppliers = async () => {
+    try {
+      const response = await partiesService.getAll({ role: "SUPPLIER" });
+      if (response.success && response.data) {
+        setSuppliers(response.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch suppliers:", error);
+    }
+  };
 
   const fetchExpenseData = async () => {
     if (!expenseId) return;
@@ -59,7 +74,7 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
     try {
       const response = await expensesService.getById(expenseId);
       if (response.success && response.data) {
-        const exp = response.data;
+        const exp = response.data as any;
         setFormData({
           date: new Date(exp.date),
           description: exp.description || "",
@@ -183,6 +198,23 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
     );
   }
 
+  // Transform suppliers for SearchableSelect
+  const supplierOptions = suppliers.map((supplier) => ({
+    value: supplier.name, // Using name as the value since the backend expects a string vendor name, not ID, currently. Or maybe it should be ID?
+    // Looking at the formData.vendor = exp.vendor || "", it seems to be a string name.
+    // However, usually we want to link by ID.
+    // The current backend likely stores `vendor` as a string.
+    // To match the existing behavior while improving UX, I will use supplier.name as the value.
+    label: supplier.name,
+    description: supplier.gstin ? `GSTIN: ${supplier.gstin}` : undefined
+  }));
+
+  // Setup options for categories
+  const categoryOptions = categories.map((cat) => ({
+    value: cat,
+    label: cat
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -261,23 +293,12 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
-                  <Select
+                  <SearchableSelect
+                    options={categoryOptions}
                     value={formData.category}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, category: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onValueChange={(val) => setFormData({ ...formData, category: val })}
+                    placeholder="Select category"
+                  />
                 </div>
               </div>
 
@@ -298,14 +319,40 @@ export function AddEditExpense({ expenseId, onBack }: AddEditExpenseProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="vendor">Vendor/Payee</Label>
-                  <Input
-                    id="vendor"
-                    placeholder="e.g., ABC Properties"
+                  <SearchableSelect
+                    options={supplierOptions}
                     value={formData.vendor}
-                    onChange={(e) =>
-                      setFormData({ ...formData, vendor: e.target.value })
-                    }
+                    onValueChange={(val) => setFormData({ ...formData, vendor: val })}
+                    placeholder="Select or search vendor"
+                    emptyMessage="No vendor found."
+                    className="w-full"
                   />
+                  {/* Keep the input as fallback or alternative if user wants to type a name not in list? 
+                      The requirement is to use searchable select. 
+                      However, valid expenses might be to one-off vendors not in the system.
+                      SearchableSelect usually forces selection from list.
+                      But we can add a "creatable" logic or just use the Select.
+                      If I strictly follow the prompt "Refactoring Dropdowns To Comboboxes", I should use the Combobox.
+                      If the user needs to add a new vendor, they should probably add it to the system or I might need to allow free text.
+                      For now, I will stick to the SearchableSelect populated with suppliers as requested.
+                      If free text is needed, the `SearchableSelect` component might need an update or I just use it as is for now.
+                      Wait, the previous code was a simple Input. Now I am making it a Select.
+                      This limits the user to existing suppliers.
+                      Is this desired?
+                      The prompt says "replacing the existing Select components...". But here it was an Input.
+                      "Identifying and refactoring similar dropdowns in other modules...".
+                      Technically, `Expenses` didn't have a dropdown for vendor, it had an Input.
+                      But usually you want to select a vendor.
+                      Let's assume the user wants to standardize on selecting registered vendors.
+                      However, if I assume too much, I might break the 'adhoc vendor' flow.
+                      But given the task "Expenses (Vendor)" in task.md, and "Refactoring Dropdowns", maybe I should check if there WAS a dropdown. 
+                      There WAS NOT a dropdown for vendor in the code I just read (it was `<Input id="vendor" ... />`).
+                      However, often `Category` IS a dropdown. I am definitely changing Category.
+                      For Vendor, if I change it to a Select, I am enhancing it.
+                      I will also keep the standard Input if the user wants to type something else? 
+                      No, `SearchableSelect` doesn't currently support free text entry if not in options.
+                      I will proceed with `SearchableSelect` for Vendor as well, assuming the user wants to link expenses to system vendors for better tracking (Vendor Payments tab relies on vendors). 
+                   */}
                 </div>
 
                 <div className="space-y-2">

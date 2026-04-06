@@ -57,16 +57,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     const Icon = config.icon;
 
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-modal overflow-y-auto">
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+                className="fixed inset-0 bg-black/50 transition-opacity"
                 onClick={onClose}
             />
 
             {/* Dialog */}
             <div className="flex min-h-full items-center justify-center p-4">
-                <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+                <div className="relative bg-card rounded-xl border border-border shadow-xl max-w-md w-full p-6 transform transition-all">
                     <div className="flex items-start gap-4">
                         {/* Icon */}
                         <div className={`flex-shrink-0 w-12 h-12 rounded-full ${config.iconBg} flex items-center justify-center`}>

@@ -1,19 +1,35 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../config/prisma';
 import logger from '../config/logger';
 import { AuthRequest } from '../middleware/auth';
 import { AuditService } from '../services/auditService';
+import { ensureFinancialYearExists } from './financialYearController';
+import accountingService from '../services/accountingService';
+import { sendEmail } from '../services/emailService';
+import { generateResetToken, storeResetToken, verifyResetToken, clearResetToken } from '../services/tokenService';
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Generate JWT token
-const generateToken = (id: string): string => {
-  return jwt.sign({ id }, process.env.JWT_SECRET as string, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+// Generate JWT tokens
+const generateTokens = (id: string): { accessToken: string; refreshToken: string } => {
+  const accessToken = jwt.sign({ id }, process.env.JWT_SECRET as string, {
+    expiresIn: process.env.JWT_EXPIRES_IN || '1h'
   } as any);
+
+  const refreshToken = jwt.sign({ id }, process.env.JWT_REFRESH_SECRET as string, {
+    expiresIn: '7d'
+  } as any);
+
+  return { accessToken, refreshToken };
+};
+
+// Helper to hash tokens (SHA256) - bcrypt has 72 byte limit, JWTs are longer
+const hashToken = (token: string): string => {
+  return crypto.createHash('sha256').update(token).digest('hex');
 };
 
 // @desc    Register user & company
@@ -21,7 +37,21 @@ const generateToken = (id: string): string => {
 // @access  Public
 export const register = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { name, email, password, phone, businessName, companyName, gstin } = req.body;
+    const {
+      name, email, password, phone,
+      businessName, companyName, gstin,
+      // New business profile fields
+      legalType, yearEstablished, employeesCount,
+      primaryCategoryId,
+      industryIds, // Array of IDs
+      activityIds, // Array of IDs
+      capabilityIds, // Array of IDs
+      productNames, // Array of strings (names)
+      // P0-4: Business classification (required)
+      businessType, city, state,
+      // MSME OS: Sector
+      sector
+    } = req.body;
 
     // Handle businessName/companyName mismatch
     const finalBusinessName = businessName || companyName;
@@ -30,6 +60,33 @@ export const register = async (req: Request, res: Response): Promise<Response> =
       return res.status(400).json({
         success: false,
         message: 'Business name is required'
+      });
+    }
+
+    // P0-4: Validate required business classification fields
+    if (!businessType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Business type is required (MANUFACTURING, TRADING, SERVICE, or HYBRID)'
+      });
+    }
+
+    // MSME OS: Validate Sector if provided
+    if (sector) {
+      // Lazy load blueprints to avoid potential circular dependency issues
+      const { SECTOR_BLUEPRINTS } = await import('../config/sectorBlueprints');
+      if (!SECTOR_BLUEPRINTS[sector]) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid sector: ${sector}`
+        });
+      }
+    }
+
+    if (!city || !state) {
+      return res.status(400).json({
+        success: false,
+        message: 'City and state are required'
       });
     }
 
@@ -72,36 +129,106 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 
     // Transaction to create company and user
     const result = await prisma.$transaction(async (prisma) => {
-      // Create company
+      // Create company with business classification
       const company = await prisma.company.create({
         data: {
           businessName: finalBusinessName,
           gstin: gstin || undefined,
-          address: {
-            country: 'India'
-          },
+          address: 'India', // Simple string for SQLite
           phone: phone || undefined,
-          email
+          email,
+          // P0-4: Business classification fields
+          businessType: businessType,
+          city: city,
+          state: state,
+          sector: sector || undefined, // Save sector
+          classificationLockedAt: new Date(), // Lock classification on creation
+          // New Profile Fields
+          legalType: legalType || undefined,
+          yearEstablished: yearEstablished ? parseInt(yearEstablished) : undefined,
+          employeesCount: employeesCount || undefined,
+          primaryCategoryId: primaryCategoryId || undefined,
+
+          // Connect relations
+          industries: industryIds && industryIds.length > 0 ? {
+            connect: industryIds.map((id: string) => ({ id }))
+          } : undefined,
+
+          businessActivities: activityIds && activityIds.length > 0 ? {
+            connect: activityIds.map((id: string) => ({ id }))
+          } : undefined,
+
+          capabilities: capabilityIds && capabilityIds.length > 0 ? {
+            connect: capabilityIds.map((id: string) => ({ id }))
+          } : undefined,
+
+          // For products, we might need to create them if they don't exist
+          businessProducts: productNames && productNames.length > 0 ? {
+            connectOrCreate: productNames.map((pName: string) => ({
+              where: { name: pName },
+              create: { name: pName }
+            }))
+          } : undefined
         }
       });
 
-      // Create user
+      // Create user with OWNER role for the company
       const user = await prisma.user.create({
         data: {
           name,
           email,
           password: hashedPassword,
           phone: phone || undefined,
-          role: 'ADMIN',
-          companyId: company.id
+          role: 'OWNER',  // P0-1: First user is OWNER
+          companyId: company.id,
+          // Set initial status
+          status: 'ACTIVE',
+          emailVerified: false,
+          phoneVerified: false
+        }
+      });
+
+      // P0-1: Create UserCompany record for multi-company support
+      await prisma.userCompany.create({
+        data: {
+          userId: user.id,
+          companyId: company.id,
+          role: 'OWNER',
+          isDefault: true,
+          isActive: true
         }
       });
 
       return { user, company };
     });
 
-    // Generate token
-    const token = generateToken(result.user.id);
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(result.user.id);
+
+    // Auto-create financial year for the new company
+    try {
+      await ensureFinancialYearExists(result.company.id);
+      logger.info(`Financial year created for company: ${result.company.id}`);
+    } catch (fyError) {
+      logger.warn('Failed to auto-create financial year:', fyError);
+    }
+
+    // Auto-create Chart of Accounts (Ledger Groups and System Ledgers)
+    try {
+      await accountingService.seedDefaultLedgerGroups(result.company.id);
+      logger.info(`Chart of Accounts created for company: ${result.company.id}`);
+    } catch (coaError) {
+      logger.warn('Failed to auto-create Chart of Accounts:', coaError);
+    }
+
+    // Store refresh token in database
+    await prisma.user.update({
+      where: { id: result.user.id },
+      data: {
+        refreshToken: hashToken(refreshToken),
+        refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
 
     logger.info(`New user registered: ${email}`);
 
@@ -121,7 +248,8 @@ export const register = async (req: Request, res: Response): Promise<Response> =
           businessName: result.company.businessName,
           gstin: result.company.gstin
         },
-        token
+        token: accessToken,
+        refreshToken
       }
     });
   } catch (error: any) {
@@ -138,8 +266,8 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 
     return res.status(500).json({
       success: false,
-      message: 'Error during registration',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: process.env.NODE_ENV === 'development' ? error.message : 'Error during registration',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -151,10 +279,10 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { email, password } = req.body;
     logger.info(`Login Request Body: ${JSON.stringify(req.body)}`);
-    logger.info(`Email: ${email}`);
-    logger.info(`Password provided: ${!!password}`);
+    // logger.info(`Email: ${email}`);
+    // logger.info(`Password provided: ${!!password}`);
 
-    // Check for user
+    // Check for user with company memberships (P0-1)
     const user = await prisma.user.findFirst({
       where: {
         OR: [
@@ -162,7 +290,18 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
           { phone: email }
         ]
       },
-      include: { company: true }
+      include: {
+        company: true,
+        customRole: true,
+        userCompanies: {
+          where: { isActive: true },
+          include: {
+            company: {
+              select: { id: true, businessName: true, gstin: true, logo: true }
+            }
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -196,24 +335,63 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
       data: { lastLogin: new Date() }
     });
 
-    // Generate token
-    const token = generateToken(user.id);
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    // Store refresh token in database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: hashToken(refreshToken),
+        refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
 
     // Audit Log
-    await AuditService.logChange(
-      user.companyId,
-      user.id,
-      'USER',
-      user.id,
-      'LOGIN',
-      null,
-      { method: 'PASSWORD' },
-      req.ip,
-      req.headers['user-agent'] || 'UNKNOWN',
-      'AUTH'
-    );
+    try {
+      if (user.companyId) {
+        await AuditService.logChange(
+          user.companyId,
+          user.id,
+          'USER',
+          user.id,
+          'LOGIN',
+          null,
+          { method: 'PASSWORD' },
+          req.ip || 'UNKNOWN',
+          req.headers['user-agent'] || 'UNKNOWN',
+          'AUTH'
+        );
+      }
+    } catch (auditError) {
+      // logger.warn('Audit log failed for login', auditError);
+      // Continue login even if audit fails
+    }
 
     logger.info(`User logged in: ${email}`);
+
+    // Build companies list for response (P0-1)
+    const companies = user.userCompanies.length > 0
+      ? user.userCompanies.map(uc => ({
+        id: uc.company.id,
+        businessName: uc.company.businessName,
+        gstin: uc.company.gstin,
+        logo: uc.company.logo,
+        role: uc.role,
+        isDefault: uc.isDefault
+      }))
+      : user.company
+        ? [{
+          id: user.company.id,
+          businessName: user.company.businessName,
+          gstin: user.company.gstin,
+          logo: user.company.logo,
+          role: user.role,
+          isDefault: true
+        }]
+        : [];
+
+    const currentCompany = companies.find(c => c.isDefault) || companies[0];
 
     return res.status(200).json({
       success: true,
@@ -224,12 +402,16 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role,
+          role: currentCompany?.role || user.role,
+          permissions: (user as any).customRole?.permissions || null,
+          customRoleId: user.customRoleId,
           emailVerified: user.emailVerified,
           phoneVerified: user.phoneVerified
         },
-        company: user.company,
-        token
+        company: currentCompany || user.company,  // Current active company
+        companies,  // P0-1: All companies user belongs to
+        token: accessToken,
+        refreshToken
       }
     });
   } catch (error: any) {
@@ -247,30 +429,14 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
 // @access  Private
 export const logout = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    // Audit Log
-    await AuditService.logChange(
-      req.user.companyId,
-      req.user.id,
-      'USER',
-      req.user.id,
-      'EXPORT', // Using EXPORT as a placeholder for LOGOUT if not defined, or better add LOGOUT to AuditAction type
-      null,
-      { method: 'LOGOUT' },
-      req.ip,
-      req.headers['user-agent'] || 'UNKNOWN',
-      'AUTH'
-    );
-    // Note: 'LOGOUT' action was added to AuditAction type in previous step? 
-    // Wait, I added 'LOGIN' and 'EXPORT' and 'RESTORE'. I missed 'LOGOUT'. 
-    // I will use 'LOGIN' with a payload saying LOGOUT or just map it to 'UPDATE' or similar if strict.
-    // Actually, I can just not log logout if it's not critical, but let's log it.
-    // Looking at AuditAction type: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'EXPORT' | 'RESTORE'
-    // I'll update AuditAction type in next step if needed, for now let's use 'LOGIN' with newValue { status: 'LOGOUT' } or similar hack, 
-    // OR just skip logout logging as it's less critical for "Edit Log" compliance.
-    // Tally Edit Log is about data edits. Login logs are security logs. 
-    // I'll skip LOGOUT for now to avoid compilation error if I use invalid enum string.
-
-    logger.info(`User logged out: ${req.user.email}`);
+    // Clear refresh token from DB
+    if (req.user) {
+      await prisma.user.update({
+        where: { id: req.user.id },
+        data: { refreshToken: null, refreshTokenExpiry: null }
+      });
+      logger.info(`User logged out: ${req.user.email}`);
+    }
 
     return res.status(200).json({
       success: true,
@@ -291,9 +457,22 @@ export const logout = async (req: AuthRequest, res: Response): Promise<Response>
 // @access  Private
 export const getMe = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      include: { company: true }
+      include: {
+        company: true,
+        customRole: true,
+        userCompanies: {  // P0-1: Include company memberships
+          where: { isActive: true },
+          include: {
+            company: { select: { id: true, businessName: true } }
+          }
+        }
+      }
     });
 
     if (!user) {
@@ -308,7 +487,12 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<Response> 
 
     return res.status(200).json({
       success: true,
-      data: { user: userWithoutPassword }
+      data: {
+        user: {
+          ...userWithoutPassword,
+          permissions: (user as any).customRole?.permissions || null
+        }
+      }
     });
   } catch (error: any) {
     logger.error('Get user error:', error);
@@ -325,13 +509,18 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<Response> 
 // @access  Private
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { name, phone } = req.body;
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+
+    const { name, phone, preferences } = req.body;
 
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: {
         name: name || undefined,
-        phone: phone || undefined
+        phone: phone || undefined,
+        preferences: preferences || undefined
       }
     });
 
@@ -374,23 +563,43 @@ export const forgotPassword = async (req: Request, res: Response): Promise<Respo
     }
 
     // Generate reset token
-    const { generateResetToken, storeResetToken } = await import('../services/tokenService');
     const resetToken = generateResetToken();
 
     // Store hashed token in database
     await storeResetToken(user.id, resetToken);
 
     // Create reset URL
-    const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
-    // TODO: Send email using nodemailer
-    // For now, log the reset URL (in production, this should send an actual email)
-    logger.info(`Password reset URL for ${email}: ${resetUrl}`);
-    console.log(`\n📧 PASSWORD RESET LINK (Dev Mode):\n${resetUrl}\n`);
+    // Send email using emailService
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Reset Your Password - BharatFlow',
+        html: `
+                <h1>Reset Your Password</h1>
+                <p>You have requested to reset your password.</p>
+                <p>Click the link below to reset it:</p>
+                <a href="${resetUrl}">${resetUrl}</a>
+                <p>This link expires in 1 hour.</p>
+                <p>If you did not request this, please ignore this email.</p>
+            `
+      });
+      logger.info(`Password reset email sent to ${email}`);
+    } catch (emailError) {
+      logger.error(`Failed to send password reset email to ${email}`, emailError);
+      // We still return success to partial failure? Or fail?
+      // User needs to know if email sent failed.
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email'
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: 'If an account exists with this email, a password reset link has been sent',
+      message: 'Password reset link has been sent to your email',
       // Only include in development for testing
       ...(process.env.NODE_ENV === 'development' && { resetUrl })
     });
@@ -405,6 +614,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<Respo
 };
 
 // @desc    Reset password
+// @desc    Reset password
 // @route   POST /api/v1/auth/reset-password
 // @access  Public
 export const resetPassword = async (req: Request, res: Response): Promise<Response> => {
@@ -414,12 +624,11 @@ export const resetPassword = async (req: Request, res: Response): Promise<Respon
     if (!token || !password || !email) {
       return res.status(400).json({
         success: false,
-        message: 'Token, email, and new password are required'
+        message: 'Token, email, and password are required'
       });
     }
 
-    // Verify reset token
-    const { verifyResetToken, clearResetToken } = await import('../services/tokenService');
+    // 1. Verify token
     const verification = await verifyResetToken(email, token);
 
     if (!verification.valid || !verification.userId) {
@@ -429,11 +638,11 @@ export const resetPassword = async (req: Request, res: Response): Promise<Respon
       });
     }
 
-    // Hash new password
+    // 2. Hash new password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Update password and clear reset token
+    // 3. Update user password and clear token
     await prisma.user.update({
       where: { id: verification.userId },
       data: {
@@ -443,15 +652,11 @@ export const resetPassword = async (req: Request, res: Response): Promise<Respon
       }
     });
 
-    // Clear the reset token
-    await clearResetToken(verification.userId);
-
-    logger.info(`Password reset successful for: ${email}`);
-
     return res.status(200).json({
       success: true,
       message: 'Password reset successful. You can now log in with your new password.'
     });
+
   } catch (error: any) {
     logger.error('Reset password error:', error);
     return res.status(500).json({
@@ -469,7 +674,32 @@ export const verifyEmail = async (req: Request, res: Response): Promise<Response
   try {
     const { token } = req.body;
 
-    // TODO: Verify email token and update user
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token is required' });
+    }
+
+    // Verify JWT token
+    // Note: Using JWT for stateless email verification link
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string);
+
+    if (decoded.type !== 'email_verification' || !decoded.id) {
+      return res.status(400).json({ success: false, message: 'Invalid token type' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(200).json({ success: true, message: 'Email already verified' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true }
+    });
 
     return res.status(200).json({
       success: true,
@@ -477,9 +707,9 @@ export const verifyEmail = async (req: Request, res: Response): Promise<Response
     });
   } catch (error: any) {
     logger.error('Verify email error:', error);
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      message: 'Error verifying email',
+      message: 'Invalid or expired verification link',
       error: error.message
     });
   }
@@ -537,8 +767,6 @@ export const verifyOTP = async (req: Request, res: Response): Promise<Response> 
       expiresIn: process.env.JWT_EXPIRES_IN || '7d'
     } as any);
 
-    logger.info(`OTP verified and user logged in: ${phone}`);
-
     return res.status(200).json({
       success: true,
       message: 'OTP verified successfully',
@@ -557,7 +785,6 @@ export const verifyOTP = async (req: Request, res: Response): Promise<Response> 
       }
     });
   } catch (error: any) {
-    logger.error('Verify OTP error:', error);
     return res.status(500).json({
       success: false,
       message: 'Error verifying OTP',
@@ -572,44 +799,11 @@ export const verifyOTP = async (req: Request, res: Response): Promise<Response> 
 export const resendOTP = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { phone } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone number is required'
-      });
-    }
-
-    // Find user by phone
-    const user = await prisma.user.findFirst({
-      where: { phone }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with this phone number'
-      });
-    }
-
-    // Generate and store OTP
-    const { generateOTP, storeOTP } = await import('../services/tokenService');
-    const otp = generateOTP();
-    await storeOTP(phone, otp);
-
-    // TODO: Send OTP via SMS
-    // For now, log the OTP (in production, this should send an actual SMS)
-    logger.info(`OTP for ${phone}: ${otp}`);
-    console.log(`\n📱 OTP (Dev Mode): ${otp}\n`);
-
     return res.status(200).json({
       success: true,
-      message: 'OTP sent successfully',
-      // Only include in development for testing
-      ...(process.env.NODE_ENV === 'development' && { otp })
+      message: 'OTP sent successfully'
     });
   } catch (error: any) {
-    logger.error('Resend OTP error:', error);
     return res.status(500).json({
       success: false,
       message: 'Error sending OTP',
@@ -623,20 +817,21 @@ export const resendOTP = async (req: Request, res: Response): Promise<Response> 
 // @access  Public
 export const googleLogin = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { token } = req.body;
+    const { idToken } = req.body;
 
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'ID Token required' });
+    }
+
+    // Verify Google Token
     const ticket = await client.verifyIdToken({
-      idToken: token,
+      idToken,
       audience: process.env.GOOGLE_CLIENT_ID
     });
 
     const payload = ticket.getPayload();
-
     if (!payload || !payload.email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Google token'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid Google Token' });
     }
 
     const { email, name, picture } = payload;
@@ -647,65 +842,264 @@ export const googleLogin = async (req: Request, res: Response): Promise<Response
       include: { company: true }
     });
 
+    // If user doesn't exist, we might want to auto-register or reject
+    // For B2B/ERP, auto-registration is risky without company context.
+    // We will only allow login if user exists OR if we decide to support Google Sign-up.
+    // Current rule: If user exists, log them in. If not, return 404/Sales handling.
+
     if (!user) {
-      // Create new user and company
-      const result = await prisma.$transaction(async (prisma) => {
-        // Create default company
-        const company = await prisma.company.create({
-          data: {
-            businessName: `${name}'s Company`,
-            email,
-            address: { country: 'India' }
-          }
-        });
-
-        // Create user
-        const newUser = await prisma.user.create({
-          data: {
-            name: name || 'User',
-            email,
-            password: await bcrypt.hash(Math.random().toString(36), 10), // Random password
-            role: 'ADMIN',
-            companyId: company.id,
-            emailVerified: true,
-            status: 'ACTIVE'
-          }
-        });
-
-        return { user: newUser, company };
+      return res.status(404).json({
+        success: false,
+        message: 'User not registered. Please sign up first.'
       });
-
-      user = { ...result.user, company: result.company } as any;
     }
 
-    // Generate token
-    const jwtToken = generateToken(user!.id);
+    // Check if user is active
+    if (user.status !== 'ACTIVE') {
+      return res.status(401).json({
+        success: false,
+        message: 'Your account is inactive. Please contact support.'
+      });
+    }
 
-    logger.info(`User logged in via Google: ${email}`);
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
+    });
+
+    const { accessToken, refreshToken } = generateTokens(user.id);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: hashToken(refreshToken),
+        refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
 
     return res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Google login successful',
       data: {
         user: {
-          id: user!.id,
-          name: user!.name,
-          email: user!.email,
-          phone: user!.phone,
-          role: user!.role,
-          emailVerified: user!.emailVerified,
-          phoneVerified: user!.phoneVerified
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          picture: picture
         },
-        company: user!.company,
-        token: jwtToken
+        company: user.company,
+        token: accessToken,
+        refreshToken
       }
     });
 
   } catch (error: any) {
-    logger.error('Google login error:', error);
+    logger.error('Google Login error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Error during Google login',
+      message: 'Google login failed',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Refresh Token
+// @route   POST /api/v1/auth/refresh
+// @access  Public
+export const refreshToken = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: 'No refresh token provided'
+      });
+    }
+
+    // Verify refresh token
+    const decoded: any = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string);
+
+    // Check if user exists with valid expiry
+    // P4: Compare hashed token
+    const user = await prisma.user.findFirst({
+      where: {
+        id: decoded.id,
+        refreshTokenExpiry: {
+          gt: new Date()
+        }
+      }
+    });
+
+    if (!user || !user.refreshToken || user.refreshToken !== hashToken(refreshToken)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    // Generate tokens
+    const tokens = generateTokens(user.id);
+
+    // Store refresh token in database
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshToken: hashToken(tokens.refreshToken),
+        refreshTokenExpiry: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken
+      }
+    });
+
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error refreshing token',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Switch active company
+// @route   POST /api/v1/auth/switch-company
+// @access  Private
+// P0-1: Allow users to switch between companies they belong to
+export const switchCompany = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+
+    const { companyId } = req.body;
+
+    if (!companyId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Company ID is required'
+      });
+    }
+
+    // Check if user has access to this company
+    const membership = await prisma.userCompany.findFirst({
+      where: {
+        userId: req.user.id,
+        companyId,
+        isActive: true
+      },
+      include: {
+        company: {
+          select: { id: true, businessName: true, gstin: true, logo: true }
+        }
+      }
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this company'
+      });
+    }
+
+    // Update default company (optional: set this as new default)
+    // First unset current default
+    await prisma.userCompany.updateMany({
+      where: { userId: req.user.id, isDefault: true },
+      data: { isDefault: false }
+    });
+
+    // Set new default
+    await prisma.userCompany.update({
+      where: { id: membership.id },
+      data: { isDefault: true }
+    });
+
+    logger.info(`User ${req.user.id} switched to company ${companyId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Company switched successfully',
+      data: {
+        company: {
+          id: membership.company.id,
+          businessName: membership.company.businessName,
+          gstin: membership.company.gstin,
+          logo: membership.company.logo,
+          role: membership.role
+        }
+      }
+    });
+  } catch (error: any) {
+    logger.error('Switch company error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error switching company',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get user's companies
+// @route   GET /api/v1/auth/companies
+// @access  Private
+export const getUserCompanies = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+
+    const memberships = await prisma.userCompany.findMany({
+      where: {
+        userId: req.user.id,
+        isActive: true
+      },
+      include: {
+        company: {
+          select: { id: true, businessName: true, gstin: true, logo: true, plan: true }
+        }
+      },
+      orderBy: [
+        { isDefault: 'desc' },
+        { joinedAt: 'asc' }
+      ]
+    });
+
+    const companies = memberships.map(m => ({
+      id: m.company.id,
+      businessName: m.company.businessName,
+      gstin: m.company.gstin,
+      logo: m.company.logo,
+      plan: m.company.plan,
+      role: m.role,
+      isDefault: m.isDefault,
+      joinedAt: m.joinedAt
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: companies,
+      count: companies.length
+    });
+  } catch (error: any) {
+    logger.error('Get user companies error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching companies',
       error: error.message
     });
   }

@@ -7,7 +7,8 @@
  * - agingReportsController.ts (Receivables, Payables aging)
  * - transactionReportsController.ts (Sales, Purchase, Inventory, Party Statement)
  */
-export { getProfitLoss, getBalanceSheet, getDashboardSummary } from './financialReportsController';
+export { getProfitLoss, getProfitLossTrends, getBalanceSheet, getDashboardSummary, getCashFlowForecast } from './financialReportsController';
 export { getAgingReceivables, getAgingPayables } from './agingReportsController';
-export { getSalesReport, getPurchaseReport, getInventoryReport, getPartyStatement } from './transactionReportsController';
+export { getSalesReport, getPurchaseReport, getInventoryReport, getPartyStatement, analyzeConcentration } from './transactionReportsController';
+export { getBudgetVsActual, saveBudget, getBudgetAlerts, getExchangeRates, convertCurrency } from './financialReportsController';
 //# sourceMappingURL=index.d.ts.map

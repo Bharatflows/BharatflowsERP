@@ -8,7 +8,7 @@
  * - warehouseController.ts (CRUD)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteWarehouse = exports.updateWarehouse = exports.getWarehouses = exports.createWarehouse = exports.getInventoryValuation = exports.getStockMovements = exports.getStockHistory = exports.transferStock = exports.getLowStock = exports.adjustStock = void 0;
+exports.deleteWarehouse = exports.updateWarehouse = exports.getWarehouses = exports.createWarehouse = exports.getBatches = exports.createBatch = exports.getInventoryValuation = exports.getStockMovements = exports.getStockHistory = exports.transferStock = exports.getLowStock = exports.adjustStock = void 0;
 // Stock Operations
 var stockController_1 = require("./stockController");
 Object.defineProperty(exports, "adjustStock", { enumerable: true, get: function () { return stockController_1.adjustStock; } });
@@ -17,6 +17,8 @@ Object.defineProperty(exports, "transferStock", { enumerable: true, get: functio
 Object.defineProperty(exports, "getStockHistory", { enumerable: true, get: function () { return stockController_1.getStockHistory; } });
 Object.defineProperty(exports, "getStockMovements", { enumerable: true, get: function () { return stockController_1.getStockMovements; } });
 Object.defineProperty(exports, "getInventoryValuation", { enumerable: true, get: function () { return stockController_1.getInventoryValuation; } });
+Object.defineProperty(exports, "createBatch", { enumerable: true, get: function () { return stockController_1.createBatch; } });
+Object.defineProperty(exports, "getBatches", { enumerable: true, get: function () { return stockController_1.getBatches; } });
 // Warehouse CRUD
 var warehouseController_1 = require("./warehouseController");
 Object.defineProperty(exports, "createWarehouse", { enumerable: true, get: function () { return warehouseController_1.createWarehouse; } });

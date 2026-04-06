@@ -31,6 +31,7 @@ import { toast } from "sonner";
 import { cn } from "../../lib/utils";
 
 interface VendorPayment {
+  id: string;
   vendor: string;
   totalDue: number;
   paid: number;
@@ -38,6 +39,7 @@ interface VendorPayment {
   lastPayment: string;
   status: "current" | "overdue" | "paid";
   expenseIds?: string[];
+  paymentTerms?: string;
 }
 
 export function VendorPayments() {
@@ -154,7 +156,7 @@ export function VendorPayments() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex items-start gap-4">
           <div className="bg-primary/10 p-3 rounded-xl">
             <CreditCard className="size-6 text-primary" />
@@ -170,7 +172,7 @@ export function VendorPayments() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -182,7 +184,7 @@ export function VendorPayments() {
           <p className="text-xs text-muted-foreground mt-1">{vendors.length} vendors</p>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-emerald-50 p-2.5 rounded-lg">
@@ -196,7 +198,7 @@ export function VendorPayments() {
           </p>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-amber-50 p-2.5 rounded-lg">
@@ -212,7 +214,7 @@ export function VendorPayments() {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -237,7 +239,7 @@ export function VendorPayments() {
       </div>
 
       {/* Vendor Payments Table */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-muted/30 border-b border-border/50">
@@ -268,7 +270,7 @@ export function VendorPayments() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="bg-muted/50 font-normal">{vendor.paymentTerms}</Badge>
+                    <Badge variant="outline" className="bg-muted font-normal">{vendor.paymentTerms}</Badge>
                   </TableCell>
                   <TableCell className="text-right font-medium text-foreground">
                     ₹{vendor.totalDue.toLocaleString("en-IN")}
@@ -313,7 +315,7 @@ export function VendorPayments() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
-            <div className="p-4 bg-muted/50 rounded-lg space-y-2 border border-border/50">
+            <div className="p-4 bg-muted rounded-lg space-y-2 border border-border">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Vendor:</span>
                 <span className="text-foreground font-medium">{selectedVendor?.vendor}</span>

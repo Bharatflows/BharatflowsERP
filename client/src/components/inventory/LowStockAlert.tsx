@@ -31,13 +31,13 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
   const getStockLevelColor = (level: string) => {
     switch (level) {
       case "critical":
-        return "bg-[#fee2e2] text-[#991b1b] border-[#fecaca]";
+        return "bg-destructive/10 text-destructive border-destructive/20";
       case "low":
-        return "bg-[#fef3c7] text-[#92400e] border-[#fde68a]";
+        return "bg-warning/10 text-warning border-warning/20";
       case "warning":
-        return "bg-[#fed7aa] text-[#9a3412] border-[#fdba74]";
+        return "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -129,40 +129,40 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-[#fecaca] p-4">
+        <div className="card-base border-destructive/20 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-muted-foreground">Critical</p>
-              <h3 className="text-foreground mt-1">{criticalCount}</h3>
-              <p className="text-muted-foreground">Out of stock or urgent</p>
+              <p className="text-base text-muted-foreground">Critical</p>
+              <h3 className="text-xl font-bold text-foreground mt-1">{criticalCount}</h3>
+              <p className="text-sm text-muted-foreground">Out of stock or urgent</p>
             </div>
-            <div className="bg-[#ef4444] p-3 rounded-lg">
+            <div className="bg-error p-3 rounded-lg">
               <TrendingDown className="size-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-[#fde68a] p-4">
+        <div className="card-base border-warning/20 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted-foreground">Low Stock</p>
               <h3 className="text-foreground mt-1">{lowCount}</h3>
               <p className="text-muted-foreground">Below minimum level</p>
             </div>
-            <div className="bg-[#f59e0b] p-3 rounded-lg">
+            <div className="bg-amber-500 p-3 rounded-lg">
               <AlertTriangle className="size-5 text-white" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-[#fdba74] p-4">
+        <div className="card-base border-orange-200 dark:border-orange-800 p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-muted-foreground">Warning</p>
               <h3 className="text-foreground mt-1">{warningCount}</h3>
               <p className="text-muted-foreground">Approaching minimum</p>
             </div>
-            <div className="bg-[#f97316] p-3 rounded-lg">
+            <div className="bg-warning p-3 rounded-lg">
               <Package className="size-5 text-white" />
             </div>
           </div>
@@ -170,7 +170,7 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
       </div>
 
       {/* Low Stock Products */}
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
+      <div className="card-base overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h3 className="text-foreground">Products Requiring Action</h3>
           <p className="text-muted-foreground">Restock or adjust inventory levels for these products</p>
@@ -180,24 +180,24 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
           {lowStockProducts.map((product: any) => (
             <div
               key={product.id}
-              className="p-6 hover:bg-[#f8fafc] transition-colors"
+              className="p-6 hover:bg-background transition-colors"
             >
               <div className="flex items-start gap-4">
                 {/* Product Icon */}
                 <div
                   className={cn(
                     "p-3 rounded-xl",
-                    product.stockLevel === "critical" && "bg-[#fee2e2]",
-                    product.stockLevel === "low" && "bg-[#fef3c7]",
-                    product.stockLevel === "warning" && "bg-[#fed7aa]"
+                    product.stockLevel === "critical" && "bg-red-100",
+                    product.stockLevel === "low" && "bg-amber-100",
+                    product.stockLevel === "warning" && "bg-orange-100"
                   )}
                 >
                   <Package
                     className={cn(
                       "size-6",
-                      product.stockLevel === "critical" && "text-[#991b1b]",
-                      product.stockLevel === "low" && "text-[#92400e]",
-                      product.stockLevel === "warning" && "text-[#9a3412]"
+                      product.stockLevel === "critical" && "text-destructive",
+                      product.stockLevel === "low" && "text-warning",
+                      product.stockLevel === "warning" && "text-orange-600 dark:text-orange-400"
                     )}
                   />
                 </div>
@@ -224,25 +224,25 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
 
                   {/* Stock Information */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div className="p-3 bg-[#f8fafc] rounded-lg">
+                    <div className="p-3 bg-background rounded-lg">
                       <p className="text-muted-foreground">Current Stock</p>
                       <p className="text-foreground">
                         {product.currentStock} {product.unit}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#f8fafc] rounded-lg">
+                    <div className="p-3 bg-background rounded-lg">
                       <p className="text-muted-foreground">Minimum Stock</p>
                       <p className="text-foreground">
                         {product.minStock} {product.unit}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#f8fafc] rounded-lg">
+                    <div className="p-3 bg-background rounded-lg">
                       <p className="text-muted-foreground">Required Quantity</p>
                       <p className="text-foreground">
                         {Math.max(0, product.minStock - product.currentStock)} {product.unit}
                       </p>
                     </div>
-                    <div className="p-3 bg-[#f8fafc] rounded-lg">
+                    <div className="p-3 bg-background rounded-lg">
                       <p className="text-muted-foreground">Est. Stockout</p>
                       <p className="text-foreground">
                         {product.daysUntilStockout === 0
@@ -272,7 +272,7 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
                       Edit Product
                     </Button>
                     {product.stockLevel === "critical" && (
-                      <div className="ml-auto flex items-center gap-2 text-[#991b1b] bg-[#fee2e2] px-3 py-1.5 rounded-lg">
+                      <div className="ml-auto flex items-center gap-2 text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg">
                         <AlertTriangle className="size-4" />
                         <span>Urgent Action Required</span>
                       </div>
@@ -290,19 +290,19 @@ export function LowStockAlert({ onAdjustStock, onEditProduct }: LowStockAlertPro
         <h3 className="text-foreground mb-3">💡 Inventory Management Tips</h3>
         <ul className="space-y-2 text-foreground">
           <li className="flex items-start gap-2">
-            <span className="text-[#2563eb] mt-1">•</span>
+            <span className="text-primary mt-1">•</span>
             <span>Set appropriate minimum stock levels based on your sales velocity</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-[#2563eb] mt-1">•</span>
+            <span className="text-primary mt-1">•</span>
             <span>Enable reorder notifications to receive alerts via email or SMS</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-[#2563eb] mt-1">•</span>
+            <span className="text-primary mt-1">•</span>
             <span>Review and adjust stock levels regularly based on seasonal demand</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="text-[#2563eb] mt-1">•</span>
+            <span className="text-primary mt-1">•</span>
             <span>Consider setting up automatic purchase orders for fast-moving items</span>
           </li>
         </ul>

@@ -13,6 +13,8 @@ export const inventoryKeys = {
     warehouses: () => [...inventoryKeys.all, 'warehouses'] as const,
     valuation: () => [...inventoryKeys.all, 'valuation'] as const,
     stockMovements: () => [...inventoryKeys.all, 'stock-movements'] as const,
+    stockAdjustments: () => [...inventoryKeys.all, 'stock-adjustments'] as const,
+    stockAdjustment: (id: string) => [...inventoryKeys.stockAdjustments(), id] as const,
 };
 
 // ============ PRODUCTS ============
@@ -206,6 +208,57 @@ export function useInventoryValuation() {
         queryKey: inventoryKeys.valuation(),
         queryFn: () => inventoryService.getValuation(),
         staleTime: 5 * 60 * 1000,
+    });
+}
+
+// ============ STOCK ADJUSTMENT DOCUMENTS ============
+
+export function useStockAdjustments(params?: QueryParams) {
+    return useQuery({
+        queryKey: [...inventoryKeys.stockAdjustments(), params],
+        queryFn: () => inventoryService.getStockAdjustments(params),
+    });
+}
+
+export function useStockAdjustment(id: string) {
+    return useQuery({
+        queryKey: inventoryKeys.stockAdjustment(id),
+        queryFn: () => inventoryService.getStockAdjustmentById(id),
+        enabled: !!id,
+    });
+}
+
+export function useCreateStockAdjustmentDocument() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: any) => inventoryService.createStockAdjustment(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.stockAdjustments() });
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.products() });
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.lowStock() });
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.stockMovements() });
+            toast.success('Stock adjustment document created successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to create stock adjustment');
+        },
+    });
+}
+
+export function useDeleteStockAdjustment() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (id: string) => inventoryService.deleteStockAdjustment(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.stockAdjustments() });
+            queryClient.invalidateQueries({ queryKey: inventoryKeys.products() });
+            toast.success('Stock adjustment cancelled successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error.message || 'Failed to cancel stock adjustment');
+        },
     });
 }
 

@@ -4,3 +4,5 @@ export * from './useSales';
 export * from './usePurchase';
 export * from './useInventory';
 export * from './useParties';
+export * from './useAssets';
+export * from './useManufacturing';

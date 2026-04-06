@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { hrService } from "../../services/modules.service";
-import { Loader2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { Loader2, ArrowLeft, Save, User, Briefcase, Building2, CreditCard, Phone, Mail, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -15,8 +14,8 @@ import {
 } from "../ui/select";
 import { Calendar } from "../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { CalendarIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { CalendarIcon, ArrowLeft, Save, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 interface AddEditEmployeeProps {
@@ -24,57 +23,129 @@ interface AddEditEmployeeProps {
   onBack: () => void;
 }
 
+const FORM_STEPS = [
+  { id: 1, title: "Personal", description: "Basic info", icon: User },
+  { id: 2, title: "Employment", description: "Job details", icon: Briefcase },
+  { id: 3, title: "Salary", description: "Compensation", icon: CreditCard },
+];
+
+const DEPARTMENTS = ["Sales", "Operations", "Accounts", "Admin", "IT", "Marketing", "HR", "Production"];
+
+const PAY_FREQUENCIES = [
+  { value: "MONTHLY", label: "Monthly" },
+  { value: "WEEKLY", label: "Weekly" },
+  { value: "DAILY", label: "Daily" },
+];
+
 export function AddEditEmployee({ employeeId, onBack }: AddEditEmployeeProps) {
   const isEditMode = !!employeeId;
   const [loading, setLoading] = useState(false);
+  const [fetchingEmployee, setFetchingEmployee] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
 
   const [formData, setFormData] = useState({
     employeeId: "",
     name: "",
     email: "",
     phone: "",
-    dateOfBirth: new Date(),
+    dateOfBirth: null as Date | null,
     joiningDate: new Date(),
+    address: "",
     department: "",
     designation: "",
+    payFrequency: "MONTHLY",
     salary: "",
+    overtimeRate: "",
     accountNumber: "",
     ifscCode: "",
     panNumber: "",
     aadhaarNumber: "",
-    pfNumber: "",
-    esiNumber: "",
-    address: "",
-    emergencyContact: "",
-    emergencyName: "",
   });
 
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const departments = [
-    "Sales",
-    "Operations",
-    "Accounts",
-    "Admin",
-    "IT",
-    "Marketing",
-    "HR",
-  ];
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name || !formData.email || !formData.department || !formData.salary) {
-      toast.error("Please fill all required fields");
-      return;
+  // Fetch employee data when editing
+  useEffect(() => {
+    if (isEditMode && employeeId) {
+      setFetchingEmployee(true);
+      hrService.getById(employeeId)
+        .then((response) => {
+          if (response.success && response.data) {
+            const emp: any = response.data;
+            setFormData({
+              employeeId: emp.employeeId || "",
+              name: emp.name || "",
+              email: emp.email || "",
+              phone: emp.phone || "",
+              dateOfBirth: emp.dateOfBirth ? new Date(emp.dateOfBirth) : null,
+              joiningDate: emp.joiningDate ? new Date(emp.joiningDate) : new Date(),
+              address: emp.address || "",
+              department: emp.department || "",
+              designation: emp.designation || "",
+              payFrequency: emp.payFrequency || "MONTHLY",
+              salary: emp.salary?.toString() || "",
+              overtimeRate: emp.overtimeRate?.toString() || "",
+              accountNumber: emp.accountNumber || "",
+              ifscCode: emp.ifscCode || "",
+              panNumber: emp.panNumber || "",
+              aadhaarNumber: emp.aadhaarNumber || "",
+            });
+          }
+        })
+        .catch(() => toast.error("Failed to load employee data"))
+        .finally(() => setFetchingEmployee(false));
     }
+  }, [employeeId, isEditMode]);
+
+  const handleChange = (field: string, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validateStep = (step: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (step === 1) {
+      if (!formData.name.trim()) newErrors.name = "Name is required";
+      if (!formData.phone.trim()) newErrors.phone = "Phone is required";
+      if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+        newErrors.email = "Invalid email format";
+      }
+    }
+
+    if (step === 2) {
+      if (!formData.department) newErrors.department = "Department is required";
+      if (!formData.designation.trim()) newErrors.designation = "Designation is required";
+    }
+
+    if (step === 3) {
+      if (!formData.salary) newErrors.salary = "Salary is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep((prev) => Math.min(prev + 1, 3));
+    }
+  };
+
+  const handlePrev = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) return;
 
     setLoading(true);
     try {
       const employeeData = {
         ...formData,
-        salary: Number(formData.salary),
-        dateOfBirth: formData.dateOfBirth.toISOString(),
+        salary: Number(formData.salary) || 0,
+        overtimeRate: formData.overtimeRate ? Number(formData.overtimeRate) : null,
+        dateOfBirth: formData.dateOfBirth?.toISOString() || null,
         joiningDate: formData.joiningDate.toISOString(),
       };
 
@@ -87,467 +158,379 @@ export function AddEditEmployee({ employeeId, onBack }: AddEditEmployeeProps) {
       }
       onBack();
     } catch (error: any) {
-      console.error("Failed to save employee:", error);
       toast.error(error.message || "Failed to save employee");
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPhoto(file);
-      toast.success("Photo uploaded");
+  const getSalaryLabel = () => {
+    switch (formData.payFrequency) {
+      case "DAILY": return "Daily Wage (₹)";
+      case "WEEKLY": return "Weekly Wage (₹)";
+      default: return "Monthly Salary (₹)";
     }
   };
 
-  const removePhoto = () => {
-    setPhoto(null);
-    toast.info("Photo removed");
-  };
+  if (fetchingEmployee) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="size-10 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">Loading employee data...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="size-5" />
+    <div className="max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <Button variant="ghost" onClick={onBack} className="gap-2 mb-4 -ml-2 text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" />
+          Back
         </Button>
-        <div>
-          <h2 className="text-foreground">
-            {isEditMode ? "Edit Employee" : "Add New Employee"}
-          </h2>
-          <p className="text-muted-foreground">
-            {isEditMode ? `Editing ${employeeId}` : "Enter employee details"}
+        <div className="bg-gradient-to-r from-primary to-primary/80 text-white px-8 py-6 rounded-2xl shadow-lg shadow-primary/20">
+          <h2 className="text-2xl font-bold">{isEditMode ? "Edit Employee" : "Add New Employee"}</h2>
+          <p className="text-blue-100 mt-1">
+            {isEditMode ? `${formData.name} • ${formData.employeeId}` : "Enter employee details"}
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Form */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Personal Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>Basic employee details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeId">Employee ID *</Label>
-                    <Input
-                      id="employeeId"
-                      placeholder="EMP001"
-                      value={formData.employeeId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, employeeId: e.target.value })
-                      }
-                    />
-                  </div>
+      {/* Step Indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between relative">
+          <div className="absolute top-6 left-0 right-0 h-0.5 bg-slate-200">
+            <div
+              className="h-full bg-blue-500 transition-all duration-500"
+              style={{ width: `${((currentStep - 1) / (FORM_STEPS.length - 1)) * 100}%` }}
+            />
+          </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      placeholder="e.g., Rajesh Kumar"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
+          {FORM_STEPS.map((step) => (
+            <div key={step.id} className="relative flex flex-col items-center z-10">
+              <div
+                className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm",
+                  currentStep > step.id
+                    ? "bg-emerald-500 text-white"
+                    : currentStep === step.id
+                      ? "bg-blue-600 text-white ring-4 ring-blue-100"
+                      : "bg-white text-muted-foreground border-2 border-slate-200"
+                )}
+              >
+                {currentStep > step.id ? <CheckCircle2 className="size-6" /> : <step.icon className="size-5" />}
+              </div>
+              <div className="mt-3 text-center">
+                <p className={cn("font-medium text-sm", currentStep >= step.id ? "text-foreground" : "text-muted-foreground")}>
+                  {step.title}
+                </p>
+                <p className="text-xs text-muted-foreground">{step.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="employee@company.com"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                    />
-                  </div>
+      {/* Form */}
+      <div className="bg-white rounded-2xl border border-border p-8 shadow-sm">
+        {/* Step 1: Personal Information */}
+        {currentStep === 1 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                <User className="size-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Personal Information</h3>
+                <p className="text-sm text-muted-foreground">Basic employee details</p>
+              </div>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone *</Label>
-                    <Input
-                      id="phone"
-                      placeholder="+91 98765 43210"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="font-medium">Employee ID</Label>
+                <Input
+                  value={formData.employeeId}
+                  onChange={(e) => handleChange("employeeId", e.target.value)}
+                  placeholder="EMP001"
+                  className="h-11 rounded-xl"
+                />
+                <p className="text-xs text-muted-foreground">Auto-generated if left empty</p>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dob">Date of Birth</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left",
-                            !formData.dateOfBirth && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 size-4" />
-                          {formData.dateOfBirth
-                            ? formData.dateOfBirth.toLocaleDateString("en-IN")
-                            : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.dateOfBirth}
-                          onSelect={(date) =>
-                            date && setFormData({ ...formData, dateOfBirth: date })
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+              <div className="space-y-2">
+                <Label className="font-medium">Full Name <span className="text-rose-500">*</span></Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => handleChange("name", e.target.value)}
+                  placeholder="Rajesh Kumar"
+                  className={cn("h-11 rounded-xl", errors.name && "border-rose-500")}
+                />
+                {errors.name && <p className="text-sm text-rose-500">{errors.name}</p>}
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="joiningDate">Joining Date *</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left",
-                            !formData.joiningDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 size-4" />
-                          {formData.joiningDate
-                            ? formData.joiningDate.toLocaleDateString("en-IN")
-                            : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.joiningDate}
-                          onSelect={(date) =>
-                            date && setFormData({ ...formData, joiningDate: date })
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Complete address"
-                    rows={2}
-                    value={formData.address}
-                    onChange={(e) =>
-                      setFormData({ ...formData, address: e.target.value })
-                    }
+              <div className="space-y-2">
+                <Label className="font-medium">Phone <span className="text-rose-500">*</span></Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => handleChange("phone", e.target.value)}
+                    placeholder="9876543210"
+                    className={cn("h-11 rounded-xl pl-10", errors.phone && "border-rose-500")}
                   />
                 </div>
-              </CardContent>
-            </Card>
+                {errors.phone && <p className="text-sm text-rose-500">{errors.phone}</p>}
+              </div>
 
-            {/* Employment Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Employment Details</CardTitle>
-                <CardDescription>Job and salary information</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="department">Department *</Label>
-                    <Select
-                      value={formData.department}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, department: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>
-                            {dept}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="designation">Designation *</Label>
-                    <Input
-                      id="designation"
-                      placeholder="e.g., Sales Manager"
-                      value={formData.designation}
-                      onChange={(e) =>
-                        setFormData({ ...formData, designation: e.target.value })
-                      }
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label className="font-medium">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <Input
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    placeholder="employee@example.com"
+                    className={cn("h-11 rounded-xl pl-10", errors.email && "border-rose-500")}
+                  />
                 </div>
+                {errors.email && <p className="text-sm text-rose-500">{errors.email}</p>}
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="salary">Monthly Salary (CTC) *</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-muted-foreground">₹</span>
-                    <Input
-                      id="salary"
-                      type="number"
-                      placeholder="35000"
-                      className="pl-7"
-                      value={formData.salary}
-                      onChange={(e) =>
-                        setFormData({ ...formData, salary: e.target.value })
-                      }
+              <div className="space-y-2">
+                <Label className="font-medium">Date of Birth</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full h-11 rounded-xl justify-start", !formData.dateOfBirth && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 size-4" />
+                      {formData.dateOfBirth ? formData.dateOfBirth.toLocaleDateString("en-IN") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.dateOfBirth || undefined}
+                      onSelect={(date) => handleChange("dateOfBirth", date)}
+                      initialFocus
                     />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            {/* Bank & Statutory Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Bank & Statutory Details</CardTitle>
-                <CardDescription>
-                  Bank account and government IDs
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Bank Account Number</Label>
-                    <Input
-                      id="accountNumber"
-                      placeholder="1234567890"
-                      value={formData.accountNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, accountNumber: e.target.value })
-                      }
+              <div className="space-y-2">
+                <Label className="font-medium">Joining Date <span className="text-rose-500">*</span></Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full h-11 rounded-xl justify-start">
+                      <CalendarIcon className="mr-2 size-4" />
+                      {formData.joiningDate.toLocaleDateString("en-IN")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.joiningDate}
+                      onSelect={(date) => date && handleChange("joiningDate", date)}
+                      initialFocus
                     />
-                  </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ifscCode">IFSC Code</Label>
-                    <Input
-                      id="ifscCode"
-                      placeholder="SBIN0001234"
-                      value={formData.ifscCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, ifscCode: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="panNumber">PAN Number</Label>
-                    <Input
-                      id="panNumber"
-                      placeholder="ABCDE1234F"
-                      value={formData.panNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, panNumber: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="aadhaarNumber">Aadhaar Number</Label>
-                    <Input
-                      id="aadhaarNumber"
-                      placeholder="1234 5678 9012"
-                      value={formData.aadhaarNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, aadhaarNumber: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pfNumber">PF Number</Label>
-                    <Input
-                      id="pfNumber"
-                      placeholder="PF Account Number"
-                      value={formData.pfNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, pfNumber: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="esiNumber">ESI Number</Label>
-                    <Input
-                      id="esiNumber"
-                      placeholder="ESI Account Number"
-                      value={formData.esiNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, esiNumber: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Emergency Contact */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Emergency Contact</CardTitle>
-                <CardDescription>Contact in case of emergency</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="emergencyName">Contact Name</Label>
-                    <Input
-                      id="emergencyName"
-                      placeholder="Emergency contact name"
-                      value={formData.emergencyName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, emergencyName: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="emergencyContact">Contact Number</Label>
-                    <Input
-                      id="emergencyContact"
-                      placeholder="+91 98765 43210"
-                      value={formData.emergencyContact}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          emergencyContact: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Photo Upload & Actions */}
-          <div className="space-y-6">
-            {/* Photo Upload */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Employee Photo</CardTitle>
-                <CardDescription>Upload employee photograph</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!photo ? (
-                  <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:bg-accent transition-colors">
-                    <Upload className="size-8 text-muted-foreground mb-2" />
-                    <p className="text-muted-foreground text-center mb-1">
-                      Click to upload
-                    </p>
-                    <p className="text-muted-foreground text-center">
-                      JPG, PNG (Max 2MB)
-                    </p>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".jpg,.jpeg,.png"
-                      onChange={handlePhotoUpload}
-                    />
-                  </label>
-                ) : (
-                  <div className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <p className="text-foreground">{photo.name}</p>
-                        <p className="text-muted-foreground">
-                          {(photo.size / 1024).toFixed(2)} KB
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="sm" onClick={removePhoto}>
-                        <X className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Quick Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Employee ID:</span>
-                  <span className="text-foreground">
-                    {formData.employeeId || "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Department:</span>
-                  <span className="text-foreground">
-                    {formData.department || "—"}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Designation:</span>
-                  <span className="text-foreground">
-                    {formData.designation || "—"}
-                  </span>
-                </div>
-                <div className="pt-3 border-t flex justify-between">
-                  <span className="text-foreground">Monthly Salary:</span>
-                  <span className="text-foreground">
-                    ₹{formData.salary ? parseFloat(formData.salary).toLocaleString("en-IN") : "0"}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
             <div className="space-y-2">
-              <Button type="submit" className="w-full gap-2" disabled={loading}>
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {isEditMode ? "Update Employee" : "Add Employee"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={onBack}
-              >
-                Cancel
-              </Button>
+              <Label className="font-medium">Address</Label>
+              <Textarea
+                value={formData.address}
+                onChange={(e) => handleChange("address", e.target.value)}
+                placeholder="Complete address..."
+                rows={2}
+                className="rounded-xl resize-none"
+              />
             </div>
           </div>
+        )}
+
+        {/* Step 2: Employment Details */}
+        {currentStep === 2 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <Briefcase className="size-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Employment Details</h3>
+                <p className="text-sm text-muted-foreground">Job and department information</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="font-medium">Department <span className="text-rose-500">*</span></Label>
+                <Select value={formData.department} onValueChange={(value) => handleChange("department", value)}>
+                  <SelectTrigger className={cn("h-11 rounded-xl", errors.department && "border-rose-500")}>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((dept) => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.department && <p className="text-sm text-rose-500">{errors.department}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Designation <span className="text-rose-500">*</span></Label>
+                <Input
+                  value={formData.designation}
+                  onChange={(e) => handleChange("designation", e.target.value)}
+                  placeholder="e.g., Sales Manager"
+                  className={cn("h-11 rounded-xl", errors.designation && "border-rose-500")}
+                />
+                {errors.designation && <p className="text-sm text-rose-500">{errors.designation}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Salary & Bank Details */}
+        {currentStep === 3 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                <CreditCard className="size-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold">Salary & Bank Details</h3>
+                <p className="text-sm text-muted-foreground">Compensation and payment info</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="font-medium">Payment Frequency</Label>
+                <Select value={formData.payFrequency} onValueChange={(value) => handleChange("payFrequency", value)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAY_FREQUENCIES.map((freq) => (
+                      <SelectItem key={freq.value} value={freq.value}>{freq.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">{getSalaryLabel()} <span className="text-rose-500">*</span></Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    value={formData.salary}
+                    onChange={(e) => handleChange("salary", e.target.value)}
+                    placeholder={formData.payFrequency === "DAILY" ? "500" : formData.payFrequency === "WEEKLY" ? "3500" : "25000"}
+                    className={cn("h-11 rounded-xl pl-8", errors.salary && "border-rose-500")}
+                  />
+                </div>
+                {errors.salary && <p className="text-sm text-rose-500">{errors.salary}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Overtime Rate (₹/hour)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    value={formData.overtimeRate}
+                    onChange={(e) => handleChange("overtimeRate", e.target.value)}
+                    placeholder="100"
+                    className="h-11 rounded-xl pl-8"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Optional - for OT calculation</p>
+              </div>
+            </div>
+
+            <hr className="my-6" />
+
+            <h4 className="font-semibold text-muted-foreground mb-4">Bank & ID Details (Optional)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="font-medium">Bank Account Number</Label>
+                <Input
+                  value={formData.accountNumber}
+                  onChange={(e) => handleChange("accountNumber", e.target.value)}
+                  placeholder="Account number"
+                  className="h-11 rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">IFSC Code</Label>
+                <Input
+                  value={formData.ifscCode}
+                  onChange={(e) => handleChange("ifscCode", e.target.value.toUpperCase())}
+                  placeholder="SBIN0001234"
+                  className="h-11 rounded-xl uppercase"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">PAN Number</Label>
+                <Input
+                  value={formData.panNumber}
+                  onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
+                  placeholder="ABCDE1234F"
+                  maxLength={10}
+                  className="h-11 rounded-xl uppercase"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-medium">Aadhaar Number</Label>
+                <Input
+                  value={formData.aadhaarNumber}
+                  onChange={(e) => handleChange("aadhaarNumber", e.target.value)}
+                  placeholder="1234 5678 9012"
+                  maxLength={14}
+                  className="h-11 rounded-xl"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Buttons */}
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-border">
+          <Button
+            variant="outline"
+            onClick={currentStep === 1 ? onBack : handlePrev}
+            className="gap-2 rounded-xl"
+          >
+            <ArrowLeft className="size-4" />
+            {currentStep === 1 ? "Cancel" : "Previous"}
+          </Button>
+
+          {currentStep < 3 ? (
+            <Button onClick={handleNext} className="gap-2 rounded-xl bg-blue-600 hover:bg-blue-700">
+              Next Step
+              <ArrowLeft className="size-4 rotate-180" />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {isEditMode ? "Update Employee" : "Add Employee"}
+            </Button>
+          )}
         </div>
-      </form>
+      </div>
     </div>
   );
 }
-

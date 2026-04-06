@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
@@ -57,93 +57,11 @@ interface Contact {
   tags?: string[];
 }
 
-const mockContacts: Contact[] = [
-  {
-    id: 1,
-    name: "Rajesh Kumar",
-    type: "Customer",
-    company: "Kumar Enterprises",
-    email: "rajesh@kumar.com",
-    phone: "+91 98765 43210",
-    avatar: "RK",
-    starred: true,
-    tags: ["Premium", "Regular"],
-  },
-  {
-    id: 2,
-    name: "Priya Sharma",
-    type: "Supplier",
-    company: "Sharma Suppliers Ltd",
-    email: "priya@sharma.com",
-    phone: "+91 98765 43211",
-    avatar: "PS",
-    starred: true,
-    tags: ["Verified"],
-  },
-  {
-    id: 3,
-    name: "Amit Patel",
-    type: "Employee",
-    company: "BharatFlow",
-    email: "amit@bharatflow.com",
-    phone: "+91 98765 43212",
-    avatar: "AP",
-    tags: ["Sales Team"],
-  },
-  {
-    id: 4,
-    name: "Sunita Reddy",
-    type: "Customer",
-    company: "Reddy Industries",
-    email: "sunita@reddy.com",
-    phone: "+91 98765 43213",
-    avatar: "SR",
-    tags: ["B2B"],
-  },
-  {
-    id: 5,
-    name: "Vikram Singh",
-    type: "Supplier",
-    company: "Singh Distributors",
-    email: "vikram@singh.com",
-    phone: "+91 98765 43214",
-    avatar: "VS",
-    tags: ["Verified", "Long-term"],
-  },
-  {
-    id: 6,
-    name: "Meena Iyer",
-    type: "Employee",
-    company: "BharatFlow",
-    email: "meena@bharatflow.com",
-    phone: "+91 98765 43215",
-    avatar: "MI",
-    tags: ["Inventory Team"],
-  },
-  {
-    id: 7,
-    name: "Deepak Gupta",
-    type: "Customer",
-    company: "Gupta Traders",
-    email: "deepak@gupta.com",
-    phone: "+91 98765 43216",
-    avatar: "DG",
-    tags: ["Retail"],
-  },
-  {
-    id: 8,
-    name: "Anjali Nair",
-    type: "Other",
-    company: "Nair Consulting",
-    email: "anjali@nair.com",
-    phone: "+91 98765 43217",
-    avatar: "AN",
-    tags: ["Consultant"],
-  },
-];
+
+import { partiesService } from "../../services/modules.service";
 
 export function Contacts() {
-  const [contacts, setContacts] = useState<Contact[]>(mockContacts);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -155,11 +73,29 @@ export function Contacts() {
     phone: "",
   });
 
+  useEffect(() => {
+    partiesService.getAll().then(res => {
+      const data = Array.isArray(res.data) ? res.data : (res.data as any)?.items || [];
+      const mapped = data.map((p: any) => ({
+        id: p.id || p._id || Math.random(),
+        name: p.contactPerson || p.partyName || "Unknown",
+        type: p.partyType === 'VENDOR' ? 'Supplier' : (p.partyType === 'CUSTOMER' ? 'Customer' : 'Other'),
+        company: p.partyName || "",
+        email: p.email || "",
+        phone: p.phone || "",
+        avatar: (p.contactPerson || p.partyName || "A").substring(0, 2).toUpperCase(),
+        starred: false,
+        tags: []
+      }));
+      setContacts(mapped);
+    }).catch(console.error);
+  }, []);
+
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch =
-      contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.phone.includes(searchQuery);
+      contact.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.phone?.includes(searchQuery);
     const matchesFilter = filterType === "all" || contact.type === filterType;
     return matchesSearch && matchesFilter;
   });
@@ -203,13 +139,13 @@ export function Contacts() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "Customer":
-        return "bg-[#2563eb]/10 text-[#2563eb] border-[#2563eb]/20";
+        return "bg-primary/10 text-primary border-primary/20";
       case "Supplier":
-        return "bg-[#10b981]/10 text-[#10b981] border-[#10b981]/20";
+        return "bg-success/10 text-success border-success/20";
       case "Employee":
-        return "bg-[#f97316]/10 text-[#f97316] border-[#f97316]/20";
+        return "bg-warning/10 text-warning border-warning/20";
       default:
-        return "bg-[#8b5cf6]/10 text-[#8b5cf6] border-[#8b5cf6]/20";
+        return "bg-chart-4/10 text-chart-4 border-chart-4/20";
     }
   };
 
@@ -373,7 +309,7 @@ export function Contacts() {
             variant={filterType === "Customer" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilterType("Customer")}
-            className={filterType === "Customer" ? "bg-[#2563eb]" : ""}
+            className={filterType === "Customer" ? "bg-primary" : ""}
           >
             Customers ({contacts.filter((c) => c.type === "Customer").length})
           </Button>
@@ -381,7 +317,7 @@ export function Contacts() {
             variant={filterType === "Supplier" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilterType("Supplier")}
-            className={filterType === "Supplier" ? "bg-[#10b981]" : ""}
+            className={filterType === "Supplier" ? "bg-success" : ""}
           >
             Suppliers ({contacts.filter((c) => c.type === "Supplier").length})
           </Button>
@@ -389,7 +325,7 @@ export function Contacts() {
             variant={filterType === "Employee" ? "default" : "outline"}
             size="sm"
             onClick={() => setFilterType("Employee")}
-            className={filterType === "Employee" ? "bg-[#f97316]" : ""}
+            className={filterType === "Employee" ? "bg-warning" : ""}
           >
             Employees ({contacts.filter((c) => c.type === "Employee").length})
           </Button>
@@ -403,7 +339,7 @@ export function Contacts() {
           {starredContacts.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-[#f97316] fill-[#f97316]" />
+                <Star className="h-4 w-4 text-warning fill-warning" />
                 <span className="text-muted-foreground">Starred Contacts</span>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -428,8 +364,8 @@ export function Contacts() {
                             >
                               <Star
                                 className={`h-4 w-4 ${contact.starred
-                                    ? "fill-[#f97316] text-[#f97316]"
-                                    : "text-muted-foreground"
+                                  ? "fill-warning text-warning"
+                                  : "text-muted-foreground"
                                   }`}
                               />
                             </Button>

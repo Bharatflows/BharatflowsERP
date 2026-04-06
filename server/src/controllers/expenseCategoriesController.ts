@@ -125,7 +125,7 @@ export const updateCategory = async (req: AuthRequest, res: Response) => {
         }
 
         const updated = await prisma.expenseCategory.update({
-            where: { id: categoryId },
+            where: { id: categoryId , companyId: req.user.companyId },
             data: {
                 name: name || existing.name,
                 description: description !== undefined ? description : existing.description,
@@ -178,7 +178,7 @@ export const deleteCategory = async (req: AuthRequest, res: Response) => {
         }
 
         await prisma.expenseCategory.delete({
-            where: { id: categoryId }
+            where: { id: categoryId , companyId: req.user.companyId }
         });
 
         res.json({

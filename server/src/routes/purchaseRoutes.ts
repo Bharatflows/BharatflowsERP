@@ -1,5 +1,7 @@
 import express from 'express';
 import { protect } from '../middleware/auth';
+import { validateFinancialYear } from '../middleware/validateFinancialYear';  // P0: FY locking
+import { checkCustomRole } from '../middleware/customRoleMiddleware';  // C3: Custom role enforcement
 import {
   getPurchaseOrders,
   getPurchaseOrder,
@@ -16,7 +18,9 @@ import {
   getGRN,
   createGRN,
   updateGRN,
-  deleteGRN
+  deleteGRN,
+  convertPOToGRN,
+  convertPOToBill
 } from '../controllers/purchase';
 import * as debitNoteController from '../controllers/purchase/debitNoteController';
 
@@ -26,14 +30,13 @@ const router = express.Router();
 router.use(protect);
 
 // Purchase Bills routes (must come BEFORE /:id route)
-router.route('/bills')
-  .get(getPurchaseBills)
-  .post(createPurchaseBill);
-
-router.route('/bills/:id')
-  .get(getPurchaseBill)
-  .put(updatePurchaseBill)
-  .delete(deletePurchaseBill);
+// P0: Validate FY before creating/updating bills
+// C3 FIX: Apply custom role permissions
+router.get('/bills', checkCustomRole('purchase', 'read'), getPurchaseBills);
+router.post('/bills', checkCustomRole('purchase', 'create'), validateFinancialYear('billDate'), createPurchaseBill);
+router.get('/bills/:id', checkCustomRole('purchase', 'read'), getPurchaseBill);
+router.put('/bills/:id', checkCustomRole('purchase', 'update'), validateFinancialYear('billDate'), updatePurchaseBill);
+router.delete('/bills/:id', checkCustomRole('purchase', 'delete'), deletePurchaseBill);
 
 // GRN routes (must come BEFORE /:id route)
 router.route('/grn')
@@ -46,13 +49,11 @@ router.route('/grn/:id')
   .delete(deleteGRN);
 
 // Debit Note routes
-router.route('/debit-notes')
-  .get(debitNoteController.getDebitNotes)
-  .post(debitNoteController.createDebitNote);
-
-router.route('/debit-notes/:id')
-  .get(debitNoteController.getDebitNote)
-  .delete(debitNoteController.deleteDebitNote);
+// P0: Validate FY before creating debit notes
+router.get('/debit-notes', debitNoteController.getDebitNotes);
+router.post('/debit-notes', validateFinancialYear('debitNoteDate'), debitNoteController.createDebitNote);
+router.get('/debit-notes/:id', debitNoteController.getDebitNote);
+router.delete('/debit-notes/:id', debitNoteController.deleteDebitNote);
 
 // Purchase Orders routes (generic routes come LAST)
 router.route('/')
@@ -61,6 +62,10 @@ router.route('/')
 
 // Status update route (must come before /:id)
 router.patch('/:id/status', updatePurchaseOrderStatus);
+
+// Conversion routes (must come before /:id)
+router.post('/:id/convert-to-grn', convertPOToGRN);
+router.post('/:id/convert-to-bill', convertPOToBill);
 
 router.route('/:id')
   .get(getPurchaseOrder)

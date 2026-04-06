@@ -26,7 +26,7 @@ export const recordPayment = async (req: AuthRequest, res: Response): Promise<Re
         }
 
         const invoice = await prisma.invoice.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: { customer: true }
         });
 
@@ -128,6 +128,7 @@ export const recordPayment = async (req: AuthRequest, res: Response): Promise<Re
 // @desc    Update invoice status
 // @route   PUT /api/v1/sales/invoices/:id/status
 // @access  Private
+// H1: HYBRID APPROACH - Phase 1: Strict server-side transition validation
 export const updateInvoiceStatus = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
@@ -141,7 +142,7 @@ export const updateInvoiceStatus = async (req: AuthRequest, res: Response): Prom
             });
         }
 
-        const invoice = await prisma.invoice.findUnique({ where: { id } });
+        const invoice = await prisma.invoice.findUnique({ where: { id , companyId: req.user.companyId } });
 
         if (!invoice || invoice.companyId !== req.user.companyId) {
             return res.status(404).json({
@@ -150,20 +151,53 @@ export const updateInvoiceStatus = async (req: AuthRequest, res: Response): Prom
             });
         }
 
+        // H1: Define allowed transitions (current status → allowed new statuses)
+        const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+            'DRAFT': ['SENT', 'CANCELLED'],
+            'SENT': ['PAID', 'PARTIAL', 'OVERDUE', 'CANCELLED'],
+            'PARTIAL': ['PAID', 'CANCELLED'],
+            'OVERDUE': ['PAID', 'PARTIAL', 'CANCELLED'],
+            'PAID': [], // LOCKED - no transitions allowed
+            'CANCELLED': [] // LOCKED - no transitions allowed
+        };
+
+        const currentStatus = invoice.status;
+        const allowedNextStatuses = ALLOWED_TRANSITIONS[currentStatus] || [];
+
+        // H1: Block transition if not allowed
+        if (!allowedNextStatuses.includes(status)) {
+            // Same status is a no-op, not an error
+            if (currentStatus === status) {
+                return res.status(200).json({
+                    success: true,
+                    message: 'Invoice status unchanged',
+                    data: { invoice }
+                });
+            }
+
+            return res.status(400).json({
+                success: false,
+                message: `Cannot transition from ${currentStatus} to ${status}. Allowed transitions: ${allowedNextStatuses.join(', ') || 'None (status is locked)'}`,
+                code: 'INVALID_STATUS_TRANSITION'
+            });
+        }
+
+        // H1: Block PAID if balance is outstanding (derived status rule)
         if (status === 'PAID' && Number(invoice.balanceAmount) > 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Cannot mark as PAID when balance is outstanding'
+                message: 'Cannot mark as PAID when balance is outstanding. Use payment recording instead.',
+                code: 'PAID_REQUIRES_ZERO_BALANCE'
             });
         }
 
         const updatedInvoice = await prisma.invoice.update({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             data: { status },
             include: { customer: true, items: true }
         });
 
-        logger.info(`Invoice status updated: ${invoice.invoiceNumber} to ${status} by ${req.user.email}`);
+        logger.info(`[H1] Invoice status updated: ${invoice.invoiceNumber} from ${currentStatus} to ${status} by ${req.user.email}`);
 
         return res.status(200).json({
             success: true,
@@ -188,7 +222,7 @@ export const downloadInvoicePDF = async (req: AuthRequest, res: Response): Promi
         const { id } = req.params;
 
         const invoice = await prisma.invoice.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: {
                 customer: true,
                 items: true
@@ -280,7 +314,7 @@ export const sendInvoiceEmail = async (req: AuthRequest, res: Response): Promise
         const { email: customEmail, message: customMessage } = req.body;
 
         const invoice = await prisma.invoice.findUnique({
-            where: { id },
+            where: { id , companyId: req.user.companyId },
             include: { customer: true, items: true }
         });
 
@@ -378,7 +412,7 @@ export const sendInvoiceEmail = async (req: AuthRequest, res: Response): Promise
 
         if (invoice.status === 'DRAFT') {
             await prisma.invoice.update({
-                where: { id },
+                where: { id , companyId: req.user.companyId },
                 data: { status: 'SENT' }
             });
         }

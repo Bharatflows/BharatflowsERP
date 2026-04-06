@@ -121,7 +121,7 @@ export function ITCLedger() {
   return (
     <div className="space-y-6">
       {/* Header Card */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="bg-primary/10 p-3 rounded-xl">
@@ -155,7 +155,7 @@ export function ITCLedger() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-emerald-50 p-2.5 rounded-lg">
@@ -166,7 +166,7 @@ export function ITCLedger() {
           <h3 className="text-2xl font-bold text-emerald-600">₹{(totalCredit / 100000).toFixed(2)}L</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-rose-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-rose-50 p-2.5 rounded-lg">
@@ -177,7 +177,7 @@ export function ITCLedger() {
           <h3 className="text-2xl font-bold text-rose-600">₹{(totalDebit / 1000).toFixed(2)}K</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-blue-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -188,7 +188,7 @@ export function ITCLedger() {
           <h3 className="text-2xl font-bold text-blue-600">₹{(netITC / 100000).toFixed(2)}L</h3>
         </div>
 
-        <div className="bg-card rounded-xl border border-border/50 shadow-sm p-5 relative overflow-hidden">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-violet-500/10 to-transparent rounded-bl-full" />
           <div className="flex items-start justify-between mb-3">
             <div className="bg-violet-50 p-2.5 rounded-lg">
@@ -201,7 +201,7 @@ export function ITCLedger() {
       </div>
 
       {/* Tax Breakdown */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <h3 className="text-lg font-semibold text-foreground mb-4">Tax Component Breakdown</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
@@ -226,7 +226,7 @@ export function ITCLedger() {
       </div>
 
       {/* Search and Filter */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm p-4">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -245,7 +245,7 @@ export function ITCLedger() {
       </div>
 
       {/* Transactions Table */}
-      <div className="bg-card rounded-xl border border-border/50 shadow-sm overflow-hidden">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/30 border-b border-border/50">
