@@ -51,6 +51,7 @@ router.put('/payments/:id', gstPaymentsController.updateGSTPayment as any);
 router.delete('/payments/:id', gstPaymentsController.deleteGSTPayment as any);
 
 // ============ E-Invoices ============
+router.get('/einvoice/stats', eInvoiceController.getEInvoiceStats as any);
 router.get('/e-invoices', eInvoiceController.getEInvoices as any);
 router.get('/e-invoices/:id', eInvoiceController.getEInvoice as any);
 router.post('/e-invoices/generate', eInvoiceController.generateEInvoice as any);
@@ -59,6 +60,7 @@ router.post('/e-invoices/:id/cancel', eInvoiceController.cancelEInvoice as any);
 router.delete('/e-invoices/:id', eInvoiceController.deleteEInvoice as any);
 
 // ============ E-Waybills ============
+router.get('/ewaybill/stats', eWaybillController.getEWaybillStats as any);
 router.get('/e-waybills', eWaybillController.getEWaybills as any);
 router.get('/e-waybills/:id', eWaybillController.getEWaybill as any);
 router.post('/e-waybills', eWaybillController.createEWaybill as any);

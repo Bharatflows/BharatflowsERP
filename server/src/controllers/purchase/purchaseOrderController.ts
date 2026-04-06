@@ -547,11 +547,13 @@ export const convertPOToBill = async (req: AuthRequest, res: Response) => {
             return;
         }
 
-        // Check if already converted
-        if (po.status === 'RECEIVED') {
+        // Check if already billed or cancelled
+        if (po.status === 'CANCELLED' || po.status === 'BILLED') {
             res.status(400).json({
                 success: false,
-                message: 'Purchase Order has already been converted'
+                message: po.status === 'CANCELLED' 
+                    ? 'Cannot create bill for a cancelled Purchase Order' 
+                    : 'Purchase Order has already been billed'
             });
             return;
         }
@@ -589,7 +591,7 @@ export const convertPOToBill = async (req: AuthRequest, res: Response) => {
             // Update PO status
             prisma.purchaseOrder.update({
                 where: { id , companyId: req.user.companyId },
-                data: { status: 'RECEIVED' }
+                data: { status: 'BILLED' }
             })
         ]);
 

@@ -83,9 +83,9 @@ export const createEmployeeInvite = async (req: AuthRequest, res: Response) => {
         try {
             await sendEmail({
                 to: email,
-                subject: `Invitation to join ${company?.businessName || 'BharatFlow'}`,
+                subject: `Invitation to join ${company?.businessName || 'BharatFlows'}`,
                 html: generateInviteEmailHTML({
-                    companyName: company?.businessName || 'BharatFlow',
+                    companyName: company?.businessName || 'BharatFlows',
                     recipientName: 'Team Member',
                     inviteLink,
                     message: message || `You've been invited to join ${company?.businessName} as a ${role.toLowerCase()}.`,
@@ -180,12 +180,12 @@ export const createPartyInvite = async (req: AuthRequest, res: Response) => {
         try {
             await sendEmail({
                 to: recipientEmail,
-                subject: `Invitation to connect with ${company?.businessName || 'BharatFlow'}`,
+                subject: `Invitation to connect with ${company?.businessName || 'BharatFlows'}`,
                 html: generateInviteEmailHTML({
-                    companyName: company?.businessName || 'BharatFlow',
+                    companyName: company?.businessName || 'BharatFlows',
                     recipientName,
                     inviteLink,
-                    message: message || `${company?.businessName} has invited you to join BharatFlow for seamless business communication.`,
+                    message: message || `${company?.businessName} has invited you to join BharatFlows for seamless business communication.`,
                 }),
                 senderEmail: req.user?.email,
                 senderName: company?.businessName,
@@ -316,9 +316,9 @@ export const resendInvite = async (req: AuthRequest, res: Response) => {
         try {
             await sendEmail({
                 to: invite.email,
-                subject: `Reminder: Invitation to join ${company?.businessName || 'BharatFlow'}`,
+                subject: `Reminder: Invitation to join ${company?.businessName || 'BharatFlows'}`,
                 html: generateInviteEmailHTML({
-                    companyName: company?.businessName || 'BharatFlow',
+                    companyName: company?.businessName || 'BharatFlows',
                     recipientName: 'User',
                     inviteLink,
                     message: invite.message || undefined,

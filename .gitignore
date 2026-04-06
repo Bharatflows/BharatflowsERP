@@ -1,1 +1,9 @@
 node_modules
+.env
+.env.local
+.env.production
+.env.development
+dist/
+build/
+*.log
+.DS_Store

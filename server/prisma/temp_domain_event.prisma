@@ -1,0 +1,42 @@
+
+// P0-5: Durable Domain Event Log (Append Only)
+// Ensures reliability, auditability, and replay capability
+model DomainEvent {
+  id            String   @id @default(uuid())
+  companyId     String
+  
+  // Event Classification
+  eventType     String   // e.g. INVOICE_CREATED, PAYMENT_RECEIVED
+  aggregateType String   // e.g. INVOICE, PAYMENT, PRODUCT
+  aggregateId   String   // ID of the entity that changed
+  version       Int      @default(1)
+  
+  // Payload
+  payload       Json     // Full event data snapshot
+  metadata      Json?    // Context: userId, source, ip, etc.
+  
+  // Processing Status
+  status        EventStatus @default(PENDING)
+  processedAt   DateTime?
+  failedAt      DateTime?
+  error         String?
+  retryCount    Int      @default(0)
+  lockedUntil   DateTime? // For worker locking
+  
+  // Audit
+  createdAt     DateTime @default(now())
+  
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, eventType])
+  @@index([aggregateType, aggregateId])
+  @@index([status, lockedUntil]) // For worker polling
+  @@index([createdAt])
+}
+
+enum EventStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}

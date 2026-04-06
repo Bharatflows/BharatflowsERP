@@ -501,9 +501,9 @@ export const inviteParty = async (req: AuthRequest, res: Response) => {
 
         await sendEmail({
             to: recipientEmail,
-            subject: `Invitation to connect from ${company?.businessName || 'BharatFlow User'}`,
+            subject: `Invitation to connect from ${company?.businessName || 'BharatFlows User'}`,
             html: generateInviteEmailHTML({
-                companyName: company?.businessName || 'BharatFlow User',
+                companyName: company?.businessName || 'BharatFlows User',
                 recipientName,
                 inviteLink,
                 message,

@@ -15,7 +15,7 @@ export class ValidationUtils {
      */
     static isValidGSTIN(gstin: string): boolean {
         if (!gstin) return false;
-        return this.GSTIN_REGEX.test(gstin);
+        return this.GSTIN_REGEX.test(gstin.trim().toUpperCase());
     }
 
     /**
@@ -39,6 +39,6 @@ export class ValidationUtils {
      */
     static isValidPAN(pan: string): boolean {
         if (!pan) return false;
-        return this.PAN_REGEX.test(pan);
+        return this.PAN_REGEX.test(pan.trim().toUpperCase());
     }
 }

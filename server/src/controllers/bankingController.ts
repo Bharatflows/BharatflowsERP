@@ -484,6 +484,26 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response) => {
             .filter(acc => acc.type === 'Cash')
             .reduce((sum, acc) => sum + Number(acc.balance), 0);
 
+        // Calculate Monthly Inflow/Outflow for KPIs
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        const currentMonthTransactions = await prisma.transaction.findMany({
+            where: {
+                companyId,
+                date: { gte: startOfMonth }
+            },
+            select: { amount: true, type: true }
+        });
+        
+        const monthlyIncome = currentMonthTransactions
+            .filter(t => t.type?.toUpperCase() === 'CREDIT')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+            
+        const monthlyExpense = currentMonthTransactions
+            .filter(t => t.type?.toUpperCase() === 'DEBIT')
+            .reduce((sum, t) => sum + Number(t.amount), 0);
+
         // Get recent transactions (last 10)
         const recentTransactions = await prisma.transaction.findMany({
             where: { companyId },
@@ -520,6 +540,12 @@ export const getDashboardSummary = async (req: AuthRequest, res: Response) => {
                     totalBalance,
                     bankBalance,
                     cashBalance
+                },
+                kpis: {
+                    totalBalance,
+                    monthlyIncome,
+                    monthlyExpense,
+                    pendingReconciliation: 0 // Default to 0 until reconciliation module is fully implemented
                 },
                 recentTransactions: recentTransactions.map(tx => ({
                     id: tx.id,

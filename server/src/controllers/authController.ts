@@ -576,7 +576,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<Respo
     try {
       await sendEmail({
         to: email,
-        subject: 'Reset Your Password - BharatFlow',
+        subject: 'Reset Your Password - BharatFlows',
         html: `
                 <h1>Reset Your Password</h1>
                 <p>You have requested to reset your password.</p>

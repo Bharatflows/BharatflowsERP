@@ -299,13 +299,6 @@ export async function createLedger(data: {
             openingType: data.openingType || 'DEBIT'
         }
     });
-    return prisma.ledger.create({
-        data: {
-            ...data,
-            openingBalance: data.openingBalance || 0,
-            openingType: data.openingType || 'DEBIT'
-        }
-    });
 }
 
 export async function updateLedger(id: string, data: {

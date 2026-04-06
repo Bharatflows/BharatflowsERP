@@ -1,7 +1,7 @@
 {
-  "name": "bharatflow-server",
+  "name": "bharatflows-server",
   "version": "1.0.0",
-  "description": "BharatFlow MSME Operating System - Backend API",
+  "description": "BharatFlows MSME Operating System - Backend API",
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
@@ -25,7 +25,7 @@
     "gst",
     "india"
   ],
-  "author": "BharatFlow",
+  "author": "BharatFlows",
   "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.7.0",

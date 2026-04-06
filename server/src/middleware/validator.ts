@@ -31,6 +31,8 @@ export const registerValidation = [
     .withMessage('Invalid phone number format (10 digits starting with 6-9)'),
   body('gstin')
     .optional({ checkFalsy: true })
+    .trim()
+    .toUpperCase()
     .matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/)
     .withMessage('Invalid GSTIN format'),
   validate
@@ -67,7 +69,9 @@ export const partyValidation = [
   body('partyName').trim().notEmpty().withMessage('Party name is required'),
   body('partyType').isIn(['customer', 'supplier', 'both']).withMessage('Valid party type required'),
   body('gstin')
-    .optional()
+    .optional({ checkFalsy: true })
+    .trim()
+    .toUpperCase()
     .matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/)
     .withMessage('Valid GSTIN required'),
   body('email').optional().isEmail().withMessage('Valid email required'),
@@ -100,13 +104,13 @@ export const employeeValidation = [
 // GSTIN validation
 export const gstinValidation = (gstin: string): boolean => {
   const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  return gstinRegex.test(gstin);
+  return gstinRegex.test(gstin.trim().toUpperCase());
 };
 
 // PAN validation
 export const panValidation = (pan: string): boolean => {
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-  return panRegex.test(pan);
+  return panRegex.test(pan.trim().toUpperCase());
 };
 
 // Phone validation

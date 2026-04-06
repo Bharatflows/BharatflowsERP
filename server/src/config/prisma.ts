@@ -10,7 +10,7 @@ const TENANT_MODELS = [
     'StockBatch', 'StockAdjustment', 'BillOfMaterial', 'WorkOrder', 'ProductionPlan',
     'QualityInspection', 'MaintenanceSchedule', 'PostDatedCheque', 'FinancialYear',
     'FinancialPeriod', 'LedgerGroup', 'Ledger', 'Voucher', 'POSSession', 'RecurringInvoiceProfile',
-    'PurchaseBill', 'Branch', 'Warehouse', 'CustomRole'
+    'PurchaseBill', 'Branch', 'Warehouse', 'CustomRole', 'CompanyEmailConfig'
 ];
 
 const prisma = new PrismaClient().$extends({

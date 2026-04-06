@@ -302,3 +302,34 @@ export const deleteEInvoice = async (req: AuthRequest, res: Response) => {
         });
     }
 };
+
+// @desc    Get E-Invoice statistics
+// @route   GET /api/v1/gst/einvoice/stats
+// @access  Private
+export const getEInvoiceStats = async (req: AuthRequest, res: Response) => {
+    try {
+        const companyId = req.user.companyId;
+
+        const [generated, pending, cancelled] = await Promise.all([
+            prisma.eInvoice.count({ where: { companyId, status: 'generated' } }),
+            prisma.eInvoice.count({ where: { companyId, status: 'pending' } }),
+            prisma.eInvoice.count({ where: { companyId, status: 'cancelled' } }),
+        ]);
+
+        return res.json({
+            success: true,
+            data: {
+                generated,
+                pending,
+                expired: cancelled // Mapping cancelled to expired for dashboard
+            },
+        });
+    } catch (error: any) {
+        logger.error('Get E-Invoice stats error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch E-Invoice stats',
+            error: error.message,
+        });
+    }
+};

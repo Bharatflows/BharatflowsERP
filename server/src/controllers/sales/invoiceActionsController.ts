@@ -380,7 +380,8 @@ export const sendInvoiceEmail = async (req: AuthRequest, res: Response): Promise
 
         const pdfBuffer = await generatePDFBuffer(pdfData);
 
-        const { sendEmail, generateInvoiceEmailHTML } = await import('../../services/emailService');
+        const { sendCompanyEmail } = await import('../../services/companyEmailService');
+        const { generateInvoiceEmailHTML } = await import('../../services/emailService');
 
         const formatDate = (date: Date | null): string => {
             if (!date) return 'N/A';
@@ -391,7 +392,8 @@ export const sendInvoiceEmail = async (req: AuthRequest, res: Response): Promise
             });
         };
 
-        await sendEmail({
+        await sendCompanyEmail({
+            companyId: req.user.companyId,
             to: customerEmail,
             subject: `Invoice ${invoice.invoiceNumber} from ${company.businessName}`,
             html: generateInvoiceEmailHTML({
@@ -406,8 +408,6 @@ export const sendInvoiceEmail = async (req: AuthRequest, res: Response): Promise
                 filename: `${invoice.invoiceNumber}.pdf`,
                 content: pdfBuffer
             }],
-            senderEmail: req.user.email,
-            senderName: company.businessName
         });
 
         if (invoice.status === 'DRAFT') {

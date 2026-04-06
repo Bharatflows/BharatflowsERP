@@ -124,6 +124,7 @@ model Company {
   // Subscription & Payment Gateway
   subscriptions         Subscription[]
   paymentGatewayConfigs PaymentGatewayConfig[]
+  emailConfig           CompanyEmailConfig?
 
   // Settings Audit & Approval
   settingsAuditLogs          SettingsAuditLog[]
@@ -259,6 +260,9 @@ model User {
   // Transaction Approvals (P0-8)
   transactionRequests        ApprovalRequest[] @relation("TransactionRequests")
   transactionApprovals       ApprovalRequest[] @relation("TransactionApprovals")
+
+  // Audit Logs (Generic)
+  auditLogs                  AuditLog[]
 }
 
 // System Notifications (Low Stock, Payment Due, etc.)
@@ -1520,6 +1524,7 @@ model AuditLog {
   changedAt DateTime @default(now())
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
+  user      User?    @relation(fields: [changedBy], references: [id])
 
   @@index([companyId])
   @@index([entityType, entityId])
@@ -2964,6 +2969,35 @@ model PaymentGatewayConfig {
   @@unique([companyId, provider])
   @@index([companyId])
   @@index([isActive])
+}
+
+// Per-company email configuration for business emails (invoices, quotations, etc.)
+model CompanyEmailConfig {
+  id          String   @id @default(uuid())
+  companyId   String   @unique
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Email provider type
+  provider    String   @default("system") // "gmail" | "outlook" | "yahoo" | "zoho" | "custom" | "system"
+
+  // SMTP settings (encrypted at rest)
+  smtpHost    String?
+  smtpPort    Int?     @default(587)
+  smtpSecure  Boolean  @default(false)
+  smtpUser    String?  // the from email address
+  smtpPass    String?  // encrypted using ENCRYPTION_KEY
+  fromName    String?  // company display name
+
+  // Status
+  isVerified  Boolean  @default(false)
+  lastTestedAt DateTime?
+  lastError   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([isVerified])
 }
 
 // Subscription tracking for company plans

@@ -135,11 +135,24 @@ export const generateGSTR1 = async (req: ProtectedRequest, res: Response) => {
             });
         });
 
+        const b2bSummary = invoices.reduce((acc, inv) => {
+            acc.count++;
+            acc.taxableValue += Number(inv.subtotal);
+            acc.cgst += Number(inv.totalTax) / 2;
+            acc.sgst += Number(inv.totalTax) / 2;
+            acc.igst += 0; // Proper IGST/CGST/SGST split logic should be here
+            return acc;
+        }, { count: 0, taxableValue: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 });
+
         const gstr1Data = {
             gstin: '', // Company GSTIN - fetch from company
             period: `${month}${year}`,
-            b2b: b2bTransactions,
-            hsn: Array.from(hsnSummary.values()),
+            b2bSummary,
+            b2cSummary: { count: 0, taxableValue: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 },
+            exportsSummary: { count: 0, taxableValue: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 },
+            cdnrSummary: { count: 0, taxableValue: 0, cgst: 0, sgst: 0, igst: 0, cess: 0 },
+            b2bTransactions,
+            hsnSummary: Array.from(hsnSummary.values()),
             summary: {
                 totalInvoices: invoices.length,
                 totalTaxableValue: invoices.reduce((sum, inv) => sum + Number(inv.subtotal), 0),

@@ -37,7 +37,7 @@ import messagingRoutes from './routes/messagingRoutes';
 import inviteRoutes from './routes/inviteRoutes';
 
 import syncRoutes from './routes/syncRoutes';
-// import accountingRoutes from './routes/accountingRoutes';
+import accountingRoutes from './routes/accountingRoutes';
 import posRoutes from './routes/posRoutes';
 import auditRoutes from './routes/auditRoutes';
 import productionRoutes from './routes/productionRoutes';
@@ -58,11 +58,11 @@ import channelHubRoutes from './routes/channelHubRoutes'; // Phase 4A: Channel H
 import decisionEngineRoutes from './routes/decisionEngineRoutes'; // Phase 5: Decision Engine
 import escrowRoutes from './routes/escrowRoutes'; // MVP: Escrow
 import paymentIntelligenceRoutes from './routes/paymentIntelligenceRoutes'; // Payment Intelligence
-// import manufacturingRoutes from './routes/manufacturingRoutes'; // BharatFlow: Manufacturing
-// import projectRoutes from './routes/projectRoutes'; // BharatFlow: Projects
-// import qualityRoutes from './routes/qualityRoutes'; // BharatFlow: Quality Control
-// import supportRoutes from './routes/supportRoutes'; // BharatFlow: Support/Helpdesk
-// import assetRoutes from './routes/assetRoutes'; // BharatFlow: Fixed Assets
+// import manufacturingRoutes from './routes/manufacturingRoutes'; // BharatFlows: Manufacturing
+// import projectRoutes from './routes/projectRoutes'; // BharatFlows: Projects
+// import qualityRoutes from './routes/qualityRoutes'; // BharatFlows: Quality Control
+// import supportRoutes from './routes/supportRoutes'; // BharatFlows: Support/Helpdesk
+// import assetRoutes from './routes/assetRoutes'; // BharatFlows: Fixed Assets
 
 // Load environment variables
 dotenv.config();
@@ -182,7 +182,7 @@ app.use(`/api/${API_VERSION}/masterdata`, masterdataRoutes);
 app.use(`/api/${API_VERSION}/messaging`, messagingRoutes);
 app.use(`/api/${API_VERSION}/invites`, inviteRoutes);
 app.use(`/api/${API_VERSION}/sync`, syncRoutes);
-// app.use(`/api/${API_VERSION}/accounting`, accountingRoutes);
+app.use(`/api/${API_VERSION}/accounting`, accountingRoutes);
 app.use(`/api/${API_VERSION}/pos`, posRoutes);
 app.use(`/api/${API_VERSION}/audit`, auditRoutes);
 app.use(`/api/${API_VERSION}/production`, productionRoutes);
@@ -216,7 +216,7 @@ app.use(errorHandler);
 // Start HTTP server (with Socket.IO) - Only if not in test mode
 if (process.env.NODE_ENV !== 'test') {
   httpServer.listen(PORT, async () => {
-    logger.info(`🚀 BharatFlow API server running on port ${PORT}`);
+    logger.info(`🚀 BharatFlows API server running on port ${PORT}`);
     logger.info(`📍 Environment: ${process.env.NODE_ENV}`);
     logger.info(`🌐 API URL: http://localhost:${PORT}/api/${API_VERSION}`);
     logger.info(`🔌 WebSocket: ws://localhost:${PORT}`);

@@ -1,6 +1,7 @@
 import express from 'express';
 import { protect } from '../middleware/auth';
 import { requireAdmin, requireOwner, requireSensitiveAccess } from '../middleware/roleAuth';
+import { uploadImage, handleUploadError } from '../middleware/upload';
 import {
     getSequences,
     getSequence,
@@ -14,9 +15,11 @@ import * as devicesController from '../controllers/settings/devicesController';
 import * as ipWhitelistController from '../controllers/settings/ipWhitelistController';
 import * as workflowsController from '../controllers/settings/workflowsController';
 import * as companyController from '../controllers/companyController';
+import { uploadCompanyLogo } from '../controllers/companyController';
 import * as usersController from '../controllers/settings/userController';
 import * as rolesController from '../controllers/settings/roleController';
 import * as settingsDashboardController from '../controllers/settings/settingsDashboardController';
+import * as emailConfigController from '../controllers/settings/emailConfigController';
 
 const router = express.Router();
 router.use(protect);
@@ -27,6 +30,13 @@ router.get('/dashboard/stats', settingsDashboardController.getSettingsDashboardS
 // ============ Company Profile ============
 router.get('/company', companyController.getCompany);
 router.put('/company', requireAdmin, companyController.updateCompany);
+router.post('/company/logo', requireAdmin, uploadImage.single('logo'), handleUploadError, uploadCompanyLogo);
+
+// ============ Email Configuration (Per-Company SMTP) ============
+router.get('/email-config', emailConfigController.getEmailConfig);
+router.post('/email-config', requireAdmin, emailConfigController.saveEmailConfig);
+router.post('/email-config/test', requireAdmin, emailConfigController.testEmailConfig);
+router.get('/email-config/providers', emailConfigController.getProviderPresets);
 
 // ============ User Profile (Self) ============
 import * as profileController from '../controllers/settings/profileController';

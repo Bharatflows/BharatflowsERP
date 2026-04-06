@@ -18,6 +18,14 @@ export const getEntityLogs = async (req: AuthRequest, res: Response) => {
                 entityType,
                 entityId
             },
+            include: {
+                user: {
+                    select: {
+                        name: true,
+                        email: true
+                    }
+                }
+            },
             orderBy: { changedAt: 'desc' },
             take: 100 // Limit for performance
         });
@@ -65,8 +73,12 @@ export const getGlobalLogs = async (req: AuthRequest, res: Response) => {
             skip: (Number(page) - 1) * Number(limit),
             take: Number(limit),
             include: {
-                // If we want to show user names, we might need relation or fetch separately
-                // company: true 
+                user: {
+                    select: {
+                        name: true,
+                        email: true
+                    }
+                }
             }
         });
 

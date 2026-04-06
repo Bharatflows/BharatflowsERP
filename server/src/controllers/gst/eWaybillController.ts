@@ -360,3 +360,35 @@ export const deleteEWaybill = async (req: AuthRequest, res: Response) => {
         });
     }
 };
+
+// @desc    Get E-Waybill statistics
+// @route   GET /api/v1/gst/ewaybill/stats
+// @access  Private
+export const getEWaybillStats = async (req: AuthRequest, res: Response) => {
+    try {
+        const companyId = req.user.companyId;
+
+        const [active, pending, cancelled, expired] = await Promise.all([
+            prisma.eWaybill.count({ where: { companyId, status: 'active' } }),
+            prisma.eWaybill.count({ where: { companyId, status: 'pending' } }),
+            prisma.eWaybill.count({ where: { companyId, status: 'cancelled' } }),
+            prisma.eWaybill.count({ where: { companyId, status: 'expired' } }),
+        ]);
+
+        return res.json({
+            success: true,
+            data: {
+                generated: active,
+                pending,
+                expired: cancelled + expired // Mapping cancelled + expired to expired
+            },
+        });
+    } catch (error: any) {
+        logger.error('Get E-Waybill stats error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch E-Waybill stats',
+            error: error.message,
+        });
+    }
+};
