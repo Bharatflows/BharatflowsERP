@@ -1,6 +1,6 @@
-# BharatFlow Backend Server
+# BharatFlows Backend Server
 
-This directory contains the backend API server for BharatFlow MSME OS.
+This directory contains the backend API server for Bharatflows MSME OS.
 
 ## Technology Stack
 
@@ -299,4 +299,4 @@ CORS_ORIGIN=http://localhost:5173
 
 ## License
 
-Proprietary - BharatFlow MSME OS
+Proprietary - Bharatflows MSME OS
