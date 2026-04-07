@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@config "../../tailwind.config.cjs";
+
 
 /* ============================================
    BharatFlow Design System — TailwindCSS v4
@@ -7,7 +7,7 @@
    ============================================ */
 
 @theme {
-  /* ── Color Primitives: Orange (Brand) ── */
+  /* ── Color Primitives: Orange (Brand) ── */h
   --color-orange-50:  #FFF5EB;
   --color-orange-100: #FFEDD5;
   --color-orange-200: #FED7AA;
