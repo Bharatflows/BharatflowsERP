@@ -134,6 +134,9 @@ stubs = {
     # Lib utilities (missing)
     'lib/chartColors.ts': "export const chartColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#f97316'];\nexport const CHART_COLORS = chartColors;\nexport default chartColors;",
     'constants/theme.ts': "export const CHART_COLORS = { blue: '#3b82f6', indigo: '#6366f1', violet: '#8b5cf6', green: '#10b981', emerald: '#10b981', red: '#ef4444', amber: '#f59e0b', orange: '#f97316', slate: '#64748b', slateGrid: '#e2e8f0' };\nexport default CHART_COLORS;",
+    'components/ui/SmartCard.tsx': 'import { ReactNode } from \'react\'; export function SmartCard({ children, className = \'\', title, ...props }: { children?: ReactNode; className?: string; title?: string; [k: string]: any }) { return <div className={`card-base p-4 ${className}`} {...props}>{title && <h3 className="font-semibold mb-2">{title}</h3>}{children}</div>; } export default SmartCard;',
+    'hooks/usePurchase.ts': 'export function usePurchaseBills(..._: any[]): any { return { data: [], isLoading: false }; }\nexport function useDeletePurchaseBill(..._: any[]): any { return { mutate: () => {} }; }\nexport const purchaseKeys = { all: [\'purchase\'] };',
+    'services/modules.service.ts': 'export const salesAnalyticsService = { async getAnalytics() { return { success: true, data: { funnel: { quotes: 0, orders: 0, invoices: 0, conversionRate: 0 }, avgTimeToConvert: 0, topProducts: [], lostReasons: [], insights: [] } }; } };\nexport const analyticsService = { async getDashboardData() { return {}; } };',
 }
 
 src = 'client/src'
