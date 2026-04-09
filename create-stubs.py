@@ -52,7 +52,7 @@ stubs = {
     'components/gst/GSTOverview.tsx': 'export function GSTOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">GST</h2></div>; }',
     'components/expenses/ExpensesOverview.tsx': 'export function ExpensesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Expenses</h2></div>; }',
     'components/reports/ReportsOverview.tsx': 'export function ReportsOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Reports</h2></div>; }',
-    'components/banking/BankingOverview.tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"4urn <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
+    'components/banking/BankingOverview.tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
     'components/inventory/InventoryOverview.tsx': 'export function InventoryOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Inventory</h2></div>; }',
     'components/parties/PartiesOverview.tsx': 'export function PartiesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Parties</h2></div>; }',
     'components/production/ProductionOverview.tsx': 'export function ProductionOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Production</h2></div>; }',
