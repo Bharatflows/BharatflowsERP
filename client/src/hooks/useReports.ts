@@ -1,0 +1,1 @@
+export function useReportsDashboard(..._: any[]): any { return {}; }

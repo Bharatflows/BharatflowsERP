@@ -1,0 +1,1 @@
+export function useVouchers(..._: any[]): any { return {}; }

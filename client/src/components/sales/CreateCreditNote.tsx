@@ -1,0 +1,1 @@
+export function CreateCreditNote(_props: any) { return <div className="p-4">Create Credit Note</div>; }

@@ -1,0 +1,1 @@
+export function EmployeeRequestCard(_props: any) { return <div className="card-base p-4">EmployeeRequest</div>; }

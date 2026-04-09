@@ -1,0 +1,1 @@
+export function CreateDebitNote(_props: any) { return <div className="p-4">CreateDebitNote</div>; }

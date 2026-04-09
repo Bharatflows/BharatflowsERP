@@ -1,0 +1,1 @@
+export function SubscriptionPlans(_props: any) { return <div className="p-4">SubscriptionPlans</div>; }

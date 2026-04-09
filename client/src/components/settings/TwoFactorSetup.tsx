@@ -1,0 +1,1 @@
+export function TwoFactorSetup(_props: any) { return <div className="p-4">TwoFactorSetup</div>; }

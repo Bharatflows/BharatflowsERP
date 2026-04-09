@@ -1,0 +1,1 @@
+export function DataIntegrityDashboard(_props: any) { return <div className="p-4">DataIntegrityDashboard</div>; }

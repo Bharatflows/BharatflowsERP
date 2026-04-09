@@ -1,0 +1,1 @@
+export function WorkflowBuilder(_props: any) { return <div className="p-4">WorkflowBuilder</div>; }

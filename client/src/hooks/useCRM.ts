@@ -1,0 +1,1 @@
+export function useCRMDashboard(..._: any[]): any { return {}; }

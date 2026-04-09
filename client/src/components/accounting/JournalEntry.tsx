@@ -1,0 +1,1 @@
+export function JournalEntry(_props: any) { return <div className="p-4">Journal Entry</div>; }

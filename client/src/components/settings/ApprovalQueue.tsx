@@ -1,0 +1,1 @@
+export function ApprovalQueue(_props: any) { return <div className="p-4">ApprovalQueue</div>; }

@@ -1,0 +1,1 @@
+export function BusinessOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Business Overview</h2></div>; }

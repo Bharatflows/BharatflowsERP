@@ -1,0 +1,1 @@
+export function CRMOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">CRM</h2></div>; }

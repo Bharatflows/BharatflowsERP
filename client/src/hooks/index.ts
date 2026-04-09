@@ -1,8 +1,2 @@
-// Custom hooks barrel export
-export * from './useApi';
-export * from './useSales';
-export * from './usePurchase';
-export * from './useInventory';
-export * from './useParties';
-export * from './useAssets';
-export * from './useManufacturing';
+export function useAssets(..._: any[]): any { return {}; }
+export function useManufacturing(..._: any[]): any { return {}; }

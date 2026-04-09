@@ -1,0 +1,1 @@
+export function GSTOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">GST</h2></div>; }

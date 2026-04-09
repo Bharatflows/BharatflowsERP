@@ -1,0 +1,1 @@
+export function PaymentMethodCard(_props: any) { return <div className="card-base p-4">PaymentMethod</div>; }

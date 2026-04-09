@@ -1,0 +1,1 @@
+export function useKeyboardShortcuts(..._: any[]): any { return {}; }

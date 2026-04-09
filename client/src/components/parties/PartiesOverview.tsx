@@ -1,0 +1,1 @@
+export function PartiesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Parties</h2></div>; }

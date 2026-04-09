@@ -1,0 +1,1 @@
+export function CostCenterManagement(_props: any) { return <div className="p-4">Cost Centers</div>; }

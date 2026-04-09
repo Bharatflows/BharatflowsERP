@@ -1,0 +1,1 @@
+export function ReportsOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Reports</h2></div>; }

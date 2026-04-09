@@ -1,0 +1,1 @@
+export function AccountingOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Accounting</h2></div>; }

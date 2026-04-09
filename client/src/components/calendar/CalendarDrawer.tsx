@@ -1,0 +1,1 @@
+export function CalendarDrawer({ open, onClose }: any) { return null; }

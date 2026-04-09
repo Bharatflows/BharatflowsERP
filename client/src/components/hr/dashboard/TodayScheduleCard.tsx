@@ -1,0 +1,1 @@
+export function TodayScheduleCard(_props: any) { return <div className="card-base p-4">TodaySchedule</div>; }

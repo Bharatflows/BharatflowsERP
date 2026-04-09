@@ -1,0 +1,1 @@
+export function CreateStockAdjustment(_props: any) { return <div className="p-4">CreateStockAdjustment</div>; }

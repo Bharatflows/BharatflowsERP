@@ -1,0 +1,1 @@
+export function DebitNoteList(_props: any) { return <div className="p-4">DebitNoteList</div>; }

@@ -1,0 +1,1 @@
+export function ResetPassword() { return <div className="flex items-center justify-center min-h-screen"><p>Reset Password</p></div>; }
