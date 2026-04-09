@@ -29,3 +29,5 @@ export const goodsReceivedService=_s();
 export const stockAdjustmentService=_s();
 export const salesAnalyticsService={getAnalytics:async(..._:any[])=>({success:true,data:{funnel:{quotes:0,orders:0,invoices:0,conversionRate:0},avgTimeToConvert:0,topProducts:[],lostReasons:[],insights:[]}})};
 export const analyticsService={getDashboardData:async(..._:any[])=>({})};
+
+export const auditService = _s();
