@@ -1,0 +1,24 @@
+{
+  admin off
+  persist_config off
+  auto_https off
+  quiet
+}
+
+:{$PORT} {
+  root * /app/dist
+  encode zstd gzip
+
+  @static {
+    file
+    path /assets/* *.svg *.png *.ico *.webmanifest *.js *.css *.txt
+  }
+  handle @static {
+    file_server
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
+}
