@@ -31,3 +31,12 @@ export const salesAnalyticsService={getAnalytics:async(..._:any[])=>({success:tr
 export const analyticsService={getDashboardData:async(..._:any[])=>({})};
 
 export const auditService = _s();
+
+export const dashboardService = _s();
+export const inviteService = _s();
+export const notificationsService = _s();
+export const posService = _s();
+export const profileService = _s();
+export const roleService = _s();
+export const searchService = _s();
+export const userService = _s();
