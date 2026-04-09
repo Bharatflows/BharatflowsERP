@@ -1,0 +1,1 @@
+export function EscrowManager(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Escrow Manager</h1></div>; }

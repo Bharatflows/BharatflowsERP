@@ -1,0 +1,1 @@
+export function SetupWizard(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Setup Wizard</h1></div>; }

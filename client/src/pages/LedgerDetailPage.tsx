@@ -1,0 +1,1 @@
+export function LedgerDetailPage(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Ledger Detail</h1></div>; }
