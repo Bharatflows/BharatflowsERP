@@ -1,0 +1,5 @@
+[phases.build]
+cmds = ["npm ci", "npx vite build", "cp -r /app/dist /srv/dist"]
+
+[start]
+cmd = "npx serve -s /srv/dist -l $PORT"
