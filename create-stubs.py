@@ -41,7 +41,7 @@ stubs = {
     'components/ui/ListFilters.tsx': 'export function ListFilters(_props: any) { return <div className="flex gap-2 py-2" />; }',
     'components/ui/searchable-select.tsx': 'export function SearchableSelect({ placeholder = \'Select...\', onChange, ..._ }: any) {\n  return <select className="input-base" onChange={(e) => onChange?.(e.target.value)}><option value="">{placeholder}</option></select>;\n}',
     'components/ui/AdaptiveTable.tsx': 'export function AdaptiveTable({ data = [], columns = [], ..._ }: any) {\n  return <div className="rounded-md border overflow-auto"><table className="w-full text-sm"><thead><tr>{columns.map((c: any, i: number) => <th key={i} className="p-2 text-left">{c.header || c.accessorKey}</th>)}</tr></thead><tbody>{data.map((_r: any, i: number) => <tr key={i} className="border-t" />)}</tbody></table></div>;\n}',
-    'components/ui/command-palette.tsx': 'import { useState } from \'react\';\nexport function CommandPalette({ open, onClose }: { open?: boolean; onClose?: () => void }) {\n  if (!open) return null;\n  return <div className="fixed inset-0 z-modal bg-black/50 flex items-start justify-center pt-32" onClick={onClose}><div className="bg-card rounded-xl shadow-xl w-full max-w-lg p-4" onClick={e => e.stopPropagation()}><input className="input-base" placeholder="Type a command..." autoFocus /></div></div>;\n}',
+    'components/ui/command-palette.tsx': 'import { useState } from \'react\';\nexport function CommandPalette({ open, onClose }: { open?: boolean; onClose?: () => void }) {\n  if (!open) return null;\n  return <div className="fixed inset-0 z-modal bg-black/50 flex items-start justify-center pt-32" onClick={onClose}><div className="bg-card rounded-xl shadow-xl w-full max-w-lg p-4"><input className="input-base" placeholder="Type a command..." autoFocus /></div></div>;\n}',
     'components/calendar/CalendarDrawer.tsx': 'export function CalendarDrawer({ open, onClose }: any) { return null; }',
     'components/system/index.ts': 'export function ConfirmActionDialog(_props: any) { return null; }',
     'components/system/PageLayout.tsx': 'import { ReactNode } from \'react\';\nexport function PageLayout({ children, title }: { children: ReactNode; title?: string }) {\n  return <div className="flex flex-col h-full"><div className="p-6">{title && <h1 className="text-2xl font-bold mb-4">{title}</h1>}{children}</div></div>;\n}',
@@ -52,7 +52,7 @@ stubs = {
     'components/gst/GSTOverview.tsx': 'export function GSTOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">GST</h2></div>; }',
     'components/expenses/ExpensesOverview.tsx': 'export function ExpensesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Expenses</h2></div>; }',
     'components/reports/ReportsOverview.tsx': 'export function ReportsOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Reports</h2></div>; }',
-    'components/banking/BankingOverview.tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
+    'components/banking/BankingOverview.tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"4urn <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
     'components/inventory/InventoryOverview.tsx': 'export function InventoryOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Inventory</h2></div>; }',
     'components/parties/PartiesOverview.tsx': 'export function PartiesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Parties</h2></div>; }',
     'components/production/ProductionOverview.tsx': 'export function ProductionOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Production</h2></div>; }',
@@ -131,6 +131,8 @@ stubs = {
     'components/assets/AssetModule.tsx': 'export function AssetModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Assets</h1></div>; }',
     'components/projects/ProjectModule.tsx': 'export function ProjectModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Projects</h1></div>; }',
     'components/support/SupportModule.tsx': 'export function SupportModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Support</h1></div>; }',
+    # Lib utilities (missing)
+    'lib/chartColors.ts': "export const chartColors = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#f97316'];\nexport const CHART_COLORS = chartColors;\nexport default chartColors;",
 }
 
 src = 'client/src'
