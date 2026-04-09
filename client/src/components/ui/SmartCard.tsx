@@ -1,0 +1,1 @@
+import { ReactNode } from 'react'; export function SmartCard({ children, className = '', title, ...props }: { children?: ReactNode; className?: string; title?: string; [k: string]: any }) { return <div className={`card-base p-4 ${className}`} {...props}>{title && <h3 className="font-semibold mb-2">{title}</h3>}{children}</div>; } export default SmartCard;
