@@ -1,2 +1,13 @@
-export const salesAnalyticsService = { async getAnalytics() { return { success: true, data: { funnel: { quotes: 0, orders: 0, invoices: 0, conversionRate: 0 }, avgTimeToConvert: 0, topProducts: [], lostReasons: [], insights: [] } }; } };
-export const analyticsService = { async getDashboardData() { return {}; } };
+const _s=()=>({getAll:async(..._:any[])=>({success:true,data:[]}),getById:async(..._:any[])=>({success:true,data:{}}),create:async(..._:any[])=>({success:true,data:{}}),update:async(..._:any[])=>({success:true,data:{}}),remove:async(..._:any[])=>({success:true}),list:async(..._:any[])=>({success:true,data:[]})});
+export const salesService=_s();
+export const estimatesService=_s();
+export const salesOrdersService=_s();
+export const deliveryChallansService=_s();
+export const quotationsService=_s();
+export const creditNotesService=_s();
+export const productsService=_s();
+export const inventoryService=_s();
+export const partiesService=_s();
+export const reportsService=_s();
+export const salesAnalyticsService={getAnalytics:async(..._:any[])=>({success:true,data:{funnel:{quotes:0,orders:0,invoices:0,conversionRate:0},avgTimeToConvert:0,topProducts:[],lostReasons:[],insights:[]}})};
+export const analyticsService={getDashboardData:async(..._:any[])=>({})};
