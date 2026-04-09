@@ -1,0 +1,2 @@
+export const CHART_COLORS = { blue: '#3b82f6', indigo: '#6366f1', violet: '#8b5cf6', green: '#10b981', emerald: '#10b981', red: '#ef4444', amber: '#f59e0b', orange: '#f97316', slate: '#64748b', slateGrid: '#e2e8f0' };
+export default CHART_COLORS;
