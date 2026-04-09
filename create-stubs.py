@@ -52,7 +52,7 @@ stubs = {
     'components/gst/GSTOverview.tsx': 'export function GSTOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">GST</h2></div>; }',
     'components/expenses/ExpensesOverview.tsx': 'export function ExpensesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Expenses</h2></div>; }',
     'components/reports/ReportsOverview.tsx': 'export function ReportsOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Reports</h2></div>; }',
-    'components/banking/BankingOverview tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
+    'components/banking/BankingOverview.tsx': 'export function BankingOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Banking</h2></div>; }',
     'components/inventory/InventoryOverview.tsx': 'export function InventoryOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Inventory</h2></div>; }',
     'components/parties/PartiesOverview.tsx': 'export function PartiesOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Parties</h2></div>; }',
     'components/production/ProductionOverview.tsx': 'export function ProductionOverview(_props: any) { return <div className="card-base p-6"><h2 className="text-lg font-semibold">Production</h2></div>; }',
@@ -112,6 +112,25 @@ stubs = {
         'export function ProductGrid(_props: any) { return <div className="grid grid-cols-3 gap-2 p-4" />; }\n'
         'export function CartSection(_props: any) { return <div className="w-80 border-l h-full p-4" />; }'
     ),
+    # Pages (missing from repo)
+    'pages/StockroomPage.tsx': 'export function StockroomPage(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Stockroom</h1></div>; }',
+    'pages/ModuleSetupPage.tsx': 'export function ModuleSetupPage(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Module Setup</h1></div>; }',
+    'pages/LedgerDetailPage.tsx': 'export function LedgerDetailPage(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Ledger Detail</h1></div>; }',
+    'pages/OrderPipelinePage.tsx': 'export function OrderPipelinePage(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Order Pipeline</h1></div>; }',
+    # Modules (missing from repo)
+    'modules/admin/AdminDashboard.tsx': 'export function AdminDashboard(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Admin Dashboard</h1></div>; }',
+    'modules/accounting/AccountingDashboard.tsx': 'export function AccountingDashboard(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Accounting Dashboard</h1></div>; }\nexport default AccountingDashboard;',
+    # Missing components imported from routes/index.tsx
+    'components/logistics/LogisticsTracker.tsx': 'export function LogisticsTracker(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Logistics</h1></div>; }',
+    'components/channels/ChannelHub.tsx': 'export function ChannelHub(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Channel Hub</h1></div>; }',
+    'components/channels/OrderAggregator.tsx': 'export function OrderAggregator(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Order Aggregator</h1></div>; }',
+    'components/channels/ChannelSettings.tsx': 'export function ChannelSettings(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Channel Settings</h1></div>; }',
+    'components/setup/SetupWizard.tsx': 'export function SetupWizard(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Setup Wizard</h1></div>; }',
+    'components/admin/UXDashboard.tsx': 'export function UXDashboard(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">UX Dashboard</h1></div>; }',
+    'components/escrow/EscrowManager.tsx': 'export function EscrowManager(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Escrow Manager</h1></div>; }',
+    'components/assets/AssetModule.tsx': 'export function AssetModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Assets</h1></div>; }',
+    'components/projects/ProjectModule.tsx': 'export function ProjectModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Projects</h1></div>; }',
+    'components/support/SupportModule.tsx': 'export function SupportModule(_props: any) { return <div className="p-6"><h1 className="text-2xl font-bold">Support</h1></div>; }',
 }
 
 src = 'client/src'
