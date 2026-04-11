@@ -16,7 +16,19 @@ import './styles/globals.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
 
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
 function App() {
+  const innerContent = (
+    <AuthProvider>
+      <NetworkStatusProvider>
+        <AppRoutes />
+        <Toaster position="top-right" />
+        <NetworkStatusIndicator />
+      </NetworkStatusProvider>
+    </AuthProvider>
+  );
+
   return (
     <ErrorBoundary>
       <ErrorLogProvider>
@@ -25,15 +37,13 @@ function App() {
             <DesignSystemProvider>
               <QueryProvider>
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
-                    <AuthProvider>
-                      <NetworkStatusProvider>
-                        <AppRoutes />
-                        <Toaster position="top-right" />
-                        <NetworkStatusIndicator />
-                      </NetworkStatusProvider>
-                    </AuthProvider>
-                  </GoogleOAuthProvider>
+                  {googleClientId ? (
+                    <GoogleOAuthProvider clientId={googleClientId}>
+                      {innerContent}
+                    </GoogleOAuthProvider>
+                  ) : (
+                    innerContent
+                  )}
                 </BrowserRouter>
               </QueryProvider>
             </DesignSystemProvider>
