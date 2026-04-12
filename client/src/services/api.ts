@@ -8,7 +8,7 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://www.bharatflows.com/api/v1';
 
 // P0-1: Company ID storage key
 const COMPANY_ID_KEY = 'currentCompanyId';

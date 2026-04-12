@@ -30,9 +30,13 @@ const onlineUsers = new Map<string, Set<string>>();
  * Initialize Socket.IO server
  */
 export function initializeSocket(httpServer: HttpServer): SocketIOServer {
+    const allowedOrigins = process.env.CORS_ORIGINS
+        ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+        : ['http://localhost:5173'];
+
     const io = new SocketIOServer(httpServer, {
         cors: {
-            origin: process.env.CORS_ORIGIN?.split(',') || 'http://localhost:5173',
+            origin: allowedOrigins,
             credentials: true,
         },
         pingTimeout: 60000,
@@ -48,12 +52,14 @@ export function initializeSocket(httpServer: HttpServer): SocketIOServer {
                 return next(new Error('Authentication required'));
             }
 
+
             const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { id: string };
 
             const user = await prisma.user.findUnique({
                 where: { id: decoded.id },
                 select: { id: true, name: true, companyId: true, status: true },
             });
+
 
             if (!user || user.status !== 'ACTIVE') {
                 return next(new Error('User not found or inactive'));
